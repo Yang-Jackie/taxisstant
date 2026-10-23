@@ -1,0 +1,19 @@
+{
+  "name": "@taxisstant/server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "tsx": "^4.23.15"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx watch src/DataServiceApp.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module"
+}

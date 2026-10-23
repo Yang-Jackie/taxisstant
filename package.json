@@ -1,0 +1,23 @@
+{
+  "name": "taxisstant",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "concurrently --names server,client --prefix-colors blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "workspaces": [
+    "server",
+    "client"
+  ]
+}
