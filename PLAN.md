@@ -14,6 +14,7 @@ I'm the only one writing code, so Phase 2 covers the whole app. Nothing is copie
 
 | What | Where |
 |---|---|
+| **This project's code** | [github.com/Yang-Jackie/taxisstant](https://github.com/Yang-Jackie/taxisstant) |
 | **Design model (class diagram), current version** | `Lab3_DesignModel.drawio` (diagrams.net), version from 23 Oct |
 | **Layered and deployment architecture, current version** | `Lab3_SystemArchitecture.drawio` (diagrams.net), version from 23 Oct |
 | Use cases UC 0001–0013, FR/NFR, data dictionary | team repo: `lab3/Lab 3 Report.pdf` |
@@ -26,7 +27,7 @@ The PNGs in the team repo (`lab3/Diagrams/`, 15 Oct) are **out of date**. They s
 
 - **Monorepo:** npm workspaces with `client/`, `server/` and `shared/`, all under the `@taxisstant/` package scope
 - **Client:** React, TypeScript, Vite, react-leaflet with OneMap tiles, IndexedDB (`idb`), i18next (EN/ZH)
-- **Server:** Node, Express and TypeScript; node-cron for the scheduled sync; an in-memory cache and no database; API keys kept in `.env`
+- **Server:** Node, Express and TypeScript; a timer-based scheduled sync (`setTimeout`, no node-cron: adapters declare intervals, not clock times); an in-memory cache and no database; API keys kept in `.env`
 - **Contract:** shared TypeScript types in `shared/`. In Phase 2 these get generated from zod schemas via OpenAPI.
 - **Tests:** Vitest, Supertest, Testing Library, fake-indexeddb
 - **TypeScript 7:** `strict` is on by default, and `@types` packages are only loaded when listed in `types`.
@@ -77,6 +78,22 @@ The PNGs in the team repo (`lab3/Diagrams/`, 15 Oct) are **out of date**. They s
 
 ### Server: `server/src/`
 
+The server is organised by component, the same grouping as the deployment diagram:
+
+```
+server/src/
+├── DataServiceApp.ts        «startup»
+├── api/                     DataApiController
+├── cache/                   ServerDataCache, Dataset
+├── sync/                    SyncService, DatasetAdapter
+│   ├── adapters/            TaxiStandAdapter (+ Phase 2 adapters)
+│   └── strategies/          Phase 2: SuggestionStrategy and its two strategies
+├── external/                ExternalApiFacade, ApiKeyStore, Provider
+├── contract/                ApiResponse, DTOs (move to shared/ in M5)
+└── sample-data/             test fixtures, including the recorded LTA response
+```
+
+
 | Class | Role | Built in |
 |---|---|---|
 | `DataServiceApp` | «startup»: builds everything and starts the sync | M0, M2, M3 |
@@ -126,7 +143,7 @@ UC 0001 runs through every part of the architecture once:
   - root `dev`, `test` and `typecheck` scripts
 - [x] Done
 
-### M1 — TypeScript through the domain objects (no React, no server)
+### M1 — TypeScript through the domain objects (no React, no server) ✅
 - **Learn:** types vs interfaces vs classes, union types, abstract classes and inheritance, implementing an interface, structural typing, generics, strict null checks, aliasing, writing tests.
 - **Claude sets up:**
   - [x] acceptance tests (25, in `client/src/entity/*.test.ts`), checked against a reference solution kept outside the repo
@@ -140,46 +157,52 @@ UC 0001 runs through every part of the architecture once:
     - stores `Locatable[]` per layer, copying the arrays on the way in and out
   - [x] my own test: the coordinate-limit boundaries
 - **Done when:** `npm test` and `npm run typecheck` pass.
-- [ ] Done
+- [x] Done
 
-### M2 — First backend: serve data over HTTP
+### M2 — First backend: serve data over HTTP ✅
 - **Learn:** HTTP requests and responses, routes, JSON, status codes, headers, middleware, `curl`.
 - **Claude sets up:**
   - [x] Express 5 and Supertest installed
-  - [x] `server/src/sample-data/taxi-stands.json` (6 made-up stands)
-  - [x] acceptance tests (11, in `server/src/*.test.ts`), checked against a reference solution kept outside the repo
+  - [x] `server/src/sample-data/taxi-stands.json` (6 made-up stands; deleted in M3 once real data arrived)
+  - [x] acceptance tests (11, in `server/src/**/*.test.ts`), checked against a reference solution kept outside the repo
 - **I write:**
-  - `DataServiceApp` grows into an Express app
-  - the `Dataset` union, starting with `"TAXI_STANDS"`
-  - `ServerDataCache`: `get(d)` and `put(d, data)`. `put` wraps the data in `ApiResponse<T>` (`{ asOf, etag, data }`) and computes the ETag.
-  - `DataApiController.getTaxiStands` at `GET /api/taxi-stands`, which answers:
+  - [x] `DataServiceApp` grows into an Express app
+  - [x] the `Dataset` union, starting with `"TAXI_STANDS"`
+  - [x] `ServerDataCache`: `get(d)` and `put(d, data)`. `put` wraps the data in `ApiResponse<T>` (`{ asOf, etag, data }`) and computes the ETag.
+  - [x] `DataApiController.getTaxiStands` at `GET /api/taxi-stands`, which answers:
     - 503 before any data exists
     - 304 when `If-None-Match` matches the ETag
     - otherwise 200 with the data
-  - a small logging middleware
+  - [x] a small logging middleware
+  - [x] a JSON 404 for unknown `/api` paths (my addition)
+  - [x] my own tests: 503 then 200 once data arrives, the 503 says why, the JSON 404
 - **Done when:** `curl -i` shows a 200 then a 304, and the tests pass.
-- [ ] Done
+- [x] Done
 
-### M3 — Real data on the server
+### M3 — Real data on the server ✅
 - **Learn:** async/await and Promises, `fetch`, error handling, environment variables and why secrets stay on the server (NF-2.2), checking untrusted JSON with zod, scheduled jobs.
 - **Claude sets up:**
-  - zod and node-cron installed
-  - `.env` loading and `.env.example`
-  - a recorded LTA response to test against
-  - acceptance tests
+  - [x] zod installed
+  - [x] `.env` loading (Node's built-in `--env-file-if-exists`) and `server/.env.example`
+  - [x] a real LTA response recorded by me: `server/src/sample-data/lta-taxi-stands.raw.json` (316 stands, 26 Oct; committed after the M3 commit, as the tests need it)
+  - [x] `server/src` reorganised by component (`api/`, `cache/`, `sync/`, `external/`, `contract/`)
+  - [x] acceptance tests (32, in `server/src/**/*.test.ts`), checked against a reference solution and 5 deliberate bugs
 - **I write:**
-  - the `Provider` union
-  - `ApiKeyStore`
-  - `ExternalApiFacade.fetch(provider, path)`: async, with the AccountKey header and paging
-  - the `DatasetAdapter` interface, and `TaxiStandAdapter`, which declares its source, path and interval and `prepare()`s the data, checked with zod
-  - `SyncService.start()`:
+  - [x] the `Provider` union
+  - [x] `ApiKeyStore`
+  - [x] `ExternalApiFacade.fetch(provider, path)`: async, with the AccountKey header and paging
+  - [x] `TaxiStandDto`, the `DatasetAdapter<T>` interface, and `TaxiStandAdapter`, which declares its source, path and interval and `prepare()`s the data, checked with zod
+  - [x] `SyncService.start()`:
     - syncs every adapter once at startup, retrying failures
     - then runs each adapter on its own interval
+    - `stop()`, to cancel the timers
+  - [x] `DataServiceApp` swaps the sample file for the real sync
+  - [ ] my own test (not written yet)
 - **Needs:** my LTA DataMall AccountKey in `server/.env`.
 - **Done when:**
   - the endpoint serves real taxi stands that refresh on a schedule
   - a failed fetch keeps the last good copy
-- [ ] Done
+- [x] Done: 316 real stands served on 26 Oct; failures and retries verified by tests and by a deliberately wrong key
 
 ### M4 — React basics: a map with a toggle
 - **Learn:** JSX, components, props, `useState`, event handlers, conditional rendering, lists and keys, `useEffect`, component tests.
@@ -365,10 +388,9 @@ I review and approve before the next package starts. Claude asks me whenever a d
 | Package 3 | How to score pickup spots and rest stops (`calculateProbability`, `calculateAmenities`). |
 | Package 8 | `Bookmark` has no `id` and holds the whole `Landmark`, yet `BookmarkList.remove(id)` needs an id. Should bookmarks get an `id` and store a `landmarkId`? |
 | Package 10 | How to get access to the school lab server, and whether it can serve HTTPS. |
-| Any time | Where the code lives, e.g. a GitHub repo. The team repo is for PDFs only. |
 
 ## Things I need to do
-- [ ] Register for an LTA DataMall AccountKey before M3. It's sent by email, which can take a while.
+- [x] Register for an LTA DataMall AccountKey before M3. It's sent by email, which can take a while.
 - [ ] Register for a OneMap account before Phase 2.
 - [ ] Optional: a data.gov.sg API key, which raises the rate limit.
 - [ ] Push the 23 Oct `.drawio` files and PNGs to the team repo, so the repo matches the design.
