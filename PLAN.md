@@ -204,20 +204,21 @@ UC 0001 runs through every part of the architecture once:
   - a failed fetch keeps the last good copy
 - [x] Done: 316 real stands served on 26 Oct; failures and retries verified by tests and by a deliberately wrong key
 
-### M4 — React basics: a map with a toggle
+### M4 — React basics: a map with a toggle ✅
 - **Learn:** JSX, components, props, `useState`, event handlers, conditional rendering, lists and keys, `useEffect`, component tests.
 - **Claude sets up:**
-  - Leaflet and react-leaflet installed, with the CSS and marker icons working
-  - the OneMap tiles and attribution
-  - the Vite demo removed and basic mobile styles added
-  - Testing Library
-- **I write**, in `client/src/boundary/`:
-  - `App` → `MapView`: a map centred on Singapore
-  - `FilterTool` with a Taxi Stands toggle (`onToggle(t)`): white when inactive, highlighted when active
-  - markers drawn from hard-coded `Locatable`s
-  - one component test
+  - [x] Leaflet 1.9 and react-leaflet 5 installed, with the CSS and marker icons working (`boundary/leafletSetup.ts`)
+  - [x] the OneMap tiles and attribution (`boundary/onemap.ts`)
+  - [x] the Vite demo removed, basic mobile styles in `index.css`, and a placeholder `App.tsx`
+  - [x] Testing Library, jest-dom and jsdom, set up in `vite.config.ts` and `src/test-setup.ts`
+  - [x] acceptance tests (14, in `FilterTool.test.tsx`, `MapView.test.tsx`, `App.test.tsx`), checked against a reference solution and 2 classic React mistakes
+- **I write**, in `client/src/boundary/` and `client/src/App.tsx`:
+  - [x] `FilterTool`: one toggle per layer (mockup labels), `aria-pressed` on the ones that are on, `onToggle(t)` on click; white when inactive, highlighted when active
+  - [x] `MapView`: a map centred on Singapore with OneMap tiles, and one marker per taxi stand, titled with its name
+  - [x] `App`: owns which layers are on (`useState`), passes them down, and shows hard-coded `TaxiStand`s when Taxi stands is on
+  - [ ] one component test of my own
 - **Done when:** toggling shows and hides the markers.
-- [ ] Done
+- [x] Done
 
 ### M5 — Connecting the frontend to the backend
 - **Learn:** same-origin and CORS, the Vite dev proxy, `fetch` in the browser, timeouts with `AbortController` (NF-3.1.1), loading and error states, union types for results, sharing a package between workspaces.

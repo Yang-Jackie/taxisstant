@@ -1,0 +1,29 @@
+.filter-tool {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000; /* above Leaflet's map layers and zoom buttons */
+  display: flex;
+  gap: 8px;
+  overflow-x: auto; /* swipe sideways on a narrow phone */
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); /* clear the iPhone home bar */
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -6px 20px rgb(0 0 0 / 0.15);
+}
+
+.filter-tool button {
+  flex: 0 0 auto; /* keep each button its natural width; don't squash */
+  padding: 10px 14px;
+  border: 1.5px solid #e4e6ea;
+  border-radius: 999px;
+  background: #fff; /* "inactive = white", from your data dictionary */
+  color: #17181a;
+  font-weight: 600;
+}
+
+.filter-tool button[aria-pressed="true"] {
+  background: #fdf1d6; /* the mockup's amber */
+  border-color: #e8930c;
+}
