@@ -3,7 +3,7 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { DataApiController } from "./DataApiController.js";
-import { ServerDataCache } from "./ServerDataCache.js";
+import { ServerDataCache } from "../cache/ServerDataCache.js";
 
 /** Builds an app the same way DataServiceApp will: the controller's router mounted under /api. */
 function appWith(cache: ServerDataCache) {

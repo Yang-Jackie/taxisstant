@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import type { ServerDataCache } from "./ServerDataCache.js";
+import type { ServerDataCache } from "../cache/ServerDataCache.js";
 
 export class DataApiController {
   private readonly cache: ServerDataCache;

@@ -1,7 +1,11 @@
 import express, { type NextFunction, type Request, type Response } from "express";  
-import { readFileSync } from "node:fs";                                               
-import { DataApiController } from "./DataApiController.js";                           
-import { ServerDataCache } from "./ServerDataCache.js";
+import { DataApiController } from "./api/DataApiController.js";                           
+import { ServerDataCache } from "./cache/ServerDataCache.js";
+import { ApiKeyStore } from "./external/ApiKeyStore.js";
+import { ExternalApiFacade } from "./external/ExternalApiFacade.js";
+import { TaxiStandAdapter } from "./sync/adapters/TaxiStandAdapter.js";
+import { SyncService } from "./sync/SyncService.js";
+
 
 class DataServiceApp {
     static main(): void {
@@ -12,19 +16,19 @@ class DataServiceApp {
         }
 
         console.log(`Data service starting on port ${port}`);
-        const cache = new ServerDataCache();                                               
-        const sampleStands: unknown = JSON.parse(                                          
-            readFileSync(new URL("./sample-data/taxi-stands.json", import.meta.url), "utf8"),
-        );
-        cache.put("TAXI_STANDS", sampleStands);                                            
+        const cache = new ServerDataCache();
+        const facade = new ExternalApiFacade(new ApiKeyStore());
+        const sync = new SyncService(facade, cache, [new TaxiStandAdapter()]);
 
         const app = express();                                                             
         app.use(DataServiceApp.logRequests);                                               
         app.use("/api", new DataApiController(cache).router());                            
 
-        app.listen(port, () => {                                                           
+        app.listen(port, () => {
             console.log(`Data service listening on http://localhost:${port}`);
         });
+
+        void sync.start();   // in the background: the server answers 503 until the first sync lands (D7)
     }
 
     private static logRequests(req: Request, res: Response, next: NextFunction): void { 
