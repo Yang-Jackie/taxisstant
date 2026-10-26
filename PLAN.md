@@ -12,13 +12,15 @@ I'm the only one writing code, so Phase 2 covers the whole app. Nothing is copie
 
 ## Sources
 
-| What | Where (team repo) |
+| What | Where |
 |---|---|
-| Use cases UC 0001–0013, FR/NFR, data dictionary | `lab3/Lab 3 Report.pdf` |
-| Tech stack and the team's critique of the design | `lab3/Lab 3 - AI Report.pdf` |
-| Design model (class diagram) | `lab3/Diagrams/Lab3_DesignModel.png` |
-| Layered and deployment architecture | `lab3/Diagrams/Lab3_SystemArchitecture-*.png` |
-| Dialog map (screen flow) | `lab3/Diagrams/dialog map.png` |
+| **Design model (class diagram), current version** | `Lab3_DesignModel.drawio` (diagrams.net), version from 23 Oct |
+| **Layered and deployment architecture, current version** | `Lab3_SystemArchitecture.drawio` (diagrams.net), version from 23 Oct |
+| Use cases UC 0001–0013, FR/NFR, data dictionary | team repo: `lab3/Lab 3 Report.pdf` |
+| Tech stack and the team's critique of the earlier design | team repo: `lab3/Lab 3 - AI Report.pdf` |
+| Dialog map (screen flow) | team repo: `lab3/Diagrams/dialog map.png` |
+
+The PNGs in the team repo (`lab3/Diagrams/`, 15 Oct) are **out of date**. They still show `LandmarkRepository`, `CrowdForecast`, `RestStopSite` and recommendations calculated on the client.
 
 ## Stack (decided in Lab 3)
 
@@ -29,34 +31,69 @@ I'm the only one writing code, so Phase 2 covers the whole app. Nothing is copie
 - **Tests:** Vitest, Supertest, Testing Library, fake-indexeddb
 - **TypeScript 7:** `strict` is on by default, and `@types` packages are only loaded when listed in `types`.
 
-## Project layout
+---
 
-```
-taxisstant/
-├── package.json        root: workspaces and scripts
-├── server/             Express data service
-│   └── src/            startup, API controller, cache, sync, facade, adapters
-├── client/             React app, scaffolded with create-vite
-│   └── src/
-│       ├── entity/     domain classes: Landmark, TaxiStand, …             (M1)
-│       ├── boundary/   React components: MapView, FilterTool, …           (M4)
-│       ├── services/   DataApiClient, LocalStore, CacheManager, …         (M5–M7)
-│       └── control/    controllers: MapDisplayController, …               (M6)
-└── shared/             types used by both client and server               (M5)
-```
+## Codebase design (from the 23 Oct diagrams)
 
-The client has four layers, matching the layered architecture diagram:
+### How the system works
+- **Server:**
+  - fetches government data on a schedule
+  - prepares it, one adapter per dataset
+  - **scores the suggested pickup and rest-stop sites once for all drivers**, using the Strategy pattern
+  - serves everything through 11 GET endpoints: 5 static and 6 live
+- **Client:**
+  - caches what it receives and works offline
+  - **ranks the suggested sites by distance from the driver**, so the driver's location never leaves the phone
+  - draws everything on the map
 
-- boundary: what the user sees
-- control: application logic
-- entity: domain objects
-- services: data access and device services
+### Client: `client/src/`
 
-Each layer only calls the layer below it.
+| Folder | Layer | Classes, from the design model | Built in |
+|---|---|---|---|
+| `entity/` | Domain objects | `LayerType`, `Location`, **`Locatable`** (interface) | M1 |
+| | | abstract `Landmark` → `TaxiStand` | M1 |
+| | | **`MapDataRepository`** («container»): `getByLayerType`, `replaceLayer` | M1 |
+| | | `MapDataRepository`: `updateAvailability`, `getSuggestions`, `replaceSuggestions` | Phase 2 |
+| | | `Carpark`, `FuelStation`, `ChargingStation`, `HawkerCentre` (Landmarks) | Phase 2 |
+| | | `Taxi` (Locatable) | Phase 2 |
+| | | abstract `Site` → `Hotspot`; abstract `SuggestedSite` → `SuggestedPickup`, `SuggestedRestStop` | Phase 2 |
+| | | `UserPreferences`, `Bookmark`, `BookmarkList`, `TaxiDriver` | M6 / Phase 2 |
+| | | `Language`, `VehicleType`, `RecommendationKind`, `DensityLevel` | when needed |
+| `services/` | Data access & device services | `DataApiClient` | M5 |
+| | | `LocalStore` | M6 |
+| | | `CacheManager` | M7 |
+| | | `GPSInterface`, `NavigationGateway` | Phase 2 |
+| `control/` | Application logic | `MapDisplayController`, `SettingsController`, `DataSyncController` | M6 |
+| | | `DataSyncObserver`, `LocationObserver` (interfaces) | M6 / Phase 2 |
+| | | `LocationController`, `NavigationController`, `RecommendationController`, `BookmarkController` | Phase 2 |
+| `boundary/` | Presentation (React) | `MapView`, `FilterTool` | M4 |
+| | | `Sidemenu`, `RecommendationCard`, `BookmarkPanel`, `SettingsView` | Phase 2 |
+| `App.tsx` | «startup» | `App`: creates the services and controllers, then calls `DataSyncController.loadCached()` | M6 |
 
-Tests sit next to the code they test, named `*.test.ts` (or `*.test.tsx`).
+- **Inheritance in the domain layer:**
+  - `Landmark`, `Site` and `Taxi` all implement `Locatable`, so the map can draw any of them.
+  - `Hotspot` and `SuggestedSite` extend `Site`, which is an area: a centre plus a radius.
+- **`boundary/` holds React components only.** `DataApiClient`, `GPSInterface` and `NavigationGateway` are labelled «boundary» in the design model, but the layered diagram puts them in the bottom layer, so they go in `services/`.
 
-`boundary/` holds React components only. The design model also labels `DataApiClient`, `GPSInterface` and `NavigationGateway` as «boundary», because they talk to outside systems. The architecture diagram puts them in the bottom layer, so they go in `services/`.
+### Server: `server/src/`
+
+| Class | Role | Built in |
+|---|---|---|
+| `DataServiceApp` | «startup»: builds everything and starts the sync | M0, M2, M3 |
+| `DataApiController` | 11 GET endpoints, with ETag, gzip and rate limit; `/api/taxi-stands` first | M2 |
+| `ServerDataCache` | in-memory last good copy per `Dataset` | M2 |
+| `DatasetAdapter` (interface) | declares its own source, path and refresh interval, and `prepare()`s raw data. `TaxiStandAdapter` is the first one | M3 |
+| `SyncService` | `start()`: runs each adapter on its own interval, then `buildSuggestions()` | M3; suggestions in Phase 2 |
+| `ExternalApiFacade` | `fetch(provider, path)` | M3 |
+| `ApiKeyStore` | keys from `.env`, plus the OneMap token | M3 |
+| `Dataset`, `Provider` | server-side string unions | M2–M3 |
+| `SuggestionStrategy` → `PickupSuggestionStrategy`, `RestStopSuggestionStrategy` | score sites from the cached data | Phase 2 |
+
+**Shared, in `shared/src/`:** `ApiResponse<T>` and the DTO types, starting with `TaxiStandDto` (M5).
+
+**Tests** sit next to the code they test, named `*.test.ts` (or `*.test.tsx`).
+
+**Layering rules:** each client layer only calls the layer below it. Views call controllers, and re-render when controller state changes. Controllers never call views.
 
 ---
 
@@ -64,9 +101,7 @@ Tests sit next to the code they test, named `*.test.ts` (or `*.test.tsx`).
 
 UC 0001 runs through every part of the architecture once:
 
-> LTA DataMall → adapter → scheduled sync → server cache → REST endpoint → API client → offline cache → controller → repository → React view
-
-After that, most of the app is the same pattern repeated, plus the recommendation algorithms.
+> LTA DataMall → TaxiStandAdapter → SyncService → ServerDataCache → DataApiController → DataApiClient → CacheManager → DataSyncController → MapDataRepository → MapDisplayController → MapView
 
 **Who does what**
 
@@ -76,57 +111,48 @@ After that, most of the app is the same pattern repeated, plus the recommendatio
   - test harnesses and sample data
   - each milestone's acceptance tests
 
-  Each setup comes with a short explanation, so nothing is magic.
-- **I write** everything listed under "I write", because that's where the learning is. I also write at least one extra test of my own per milestone.
-- **Review:** Claude reviews my code like a PR and gives hints when I ask. Claude only writes my part if I ask for the answer.
+  Each setup comes with a short explanation.
+- **I write** everything listed under "I write", plus at least one extra test of my own per milestone.
+- **Review:** Claude reviews my code and gives hints when I ask. Claude only writes my part if I ask for the answer.
 - **Commits:** I commit at the end of each milestone.
 
-### M0 — Project setup
-- **Learn:** npm and `package.json`, workspaces, dependencies vs devDependencies, `tsc` vs `tsx`, ES modules, tsconfig basics.
-- **Already done:**
-  - [x] `git init` and `.gitignore`
-  - [x] root `package.json` with workspaces, plus TypeScript and Vitest
-  - [x] `tsconfig.base.json` and the `server` workspace
-- **I write:**
-  - [ ] `server/src/DataServiceApp.ts`: a «startup» class with a static `main()` that logs its port
-  - [ ] the `tsx`-vs-`tsc` experiment: a type error that `tsx` runs anyway and `tsc` catches
-- **Claude sets up:**
-  - [x] the rest of the server config:
-    - `rootDir`, `outDir` and `include`
-    - move `types: ["node"]` from the base config to the server, because browser code must not see Node's types
-    - install `tsx`, and `@types/node` pinned to 24 to match the installed Node
-  - [x] the `client` workspace via create-vite (React + TS):
-    - its tsconfigs extend `tsconfig.base.json`
-    - the template's own TypeScript 6 was removed, so the whole repo uses one TypeScript 7
-  - [x] `verbatimModuleSyntax` and `erasableSyntaxOnly` in the base config, so client and server follow the same TypeScript rules
-  - [x] Vitest in both workspaces
-  - [x] root scripts: `dev` (client and server together via `concurrently`), `test`, `typecheck`
-- **Done when:**
-  - `npm run dev` starts both client and server
-  - `npm test` and `npm run typecheck` pass
-  - the first commit is made
-- [ ] Done
+### M0 — Project setup ✅
+- [x] Already done by me: `git init`, `.gitignore`, the root `package.json` with workspaces, `tsconfig.base.json`, the `server` workspace
+- [x] I wrote: `DataServiceApp.main()` logging its port; the `tsx`-vs-`tsc` experiment
+- [x] Claude set up:
+  - the server config, the client via create-vite, and one TypeScript 7 for the whole repo
+  - `verbatimModuleSyntax` and `erasableSyntaxOnly`
+  - Vitest in both workspaces
+  - root `dev`, `test` and `typecheck` scripts
+- [x] Done
 
-### M1 — TypeScript through the entity classes (no React, no server)
-- **Learn:** types vs interfaces vs classes, union types, abstract classes and inheritance, generics, strict null checks, writing tests.
-- **Claude sets up:** acceptance tests for the entity classes.
+### M1 — TypeScript through the domain objects (no React, no server)
+- **Learn:** types vs interfaces vs classes, union types, abstract classes and inheritance, implementing an interface, structural typing, generics, strict null checks, aliasing, writing tests.
+- **Claude sets up:**
+  - [x] acceptance tests (25, in `client/src/entity/*.test.ts`), checked against a reference solution kept outside the repo
 - **I write**, in `client/src/entity/`:
-  - `LayerType` as a string union
-  - `Location` with an optional `address`, and `distanceTo()` in metres (haversine)
-  - abstract `Landmark` → `TaxiStand`
-  - `LandmarkRepository` with:
-    - `getByType` and `replace`
-    - `findNear`: radius in metres, nearest first
-- **Done when:** the acceptance tests and my own test pass.
+  - [x] `LayerType`: a string union, derived from `LAYER_TYPES`
+  - [x] `Location`: optional `address`, `distanceTo()` in metres, and a `RangeError` for impossible coordinates
+  - [x] abstract `Landmark` → `TaxiStand`
+  - [x] `Locatable` interface, implemented by `Landmark` through `getLocation()`
+  - [x] `MapDataRepository`, which replaces my `LandmarkRepository.ts`:
+    - `getByLayerType` and `replaceLayer`
+    - stores `Locatable[]` per layer, copying the arrays on the way in and out
+  - [x] my own test: the coordinate-limit boundaries
+- **Done when:** `npm test` and `npm run typecheck` pass.
 - [ ] Done
 
 ### M2 — First backend: serve data over HTTP
 - **Learn:** HTTP requests and responses, routes, JSON, status codes, headers, middleware, `curl`.
-- **Claude sets up:** Express and Supertest installed, a sample taxi-stand JSON file, and acceptance tests.
+- **Claude sets up:**
+  - [x] Express 5 and Supertest installed
+  - [x] `server/src/sample-data/taxi-stands.json` (6 made-up stands)
+  - [x] acceptance tests (11, in `server/src/*.test.ts`), checked against a reference solution kept outside the repo
 - **I write:**
   - `DataServiceApp` grows into an Express app
-  - `ServerDataCache`: a `Map` that stores `ApiResponse<T>` (`{ asOf, etag, data }`) and computes the ETag on `put`
-  - `DataApiController` with `GET /api/taxi-stands`, which answers:
+  - the `Dataset` union, starting with `"TAXI_STANDS"`
+  - `ServerDataCache`: `get(d)` and `put(d, data)`. `put` wraps the data in `ApiResponse<T>` (`{ asOf, etag, data }`) and computes the ETag.
+  - `DataApiController.getTaxiStands` at `GET /api/taxi-stands`, which answers:
     - 503 before any data exists
     - 304 when `If-None-Match` matches the ETag
     - otherwise 200 with the data
@@ -142,12 +168,13 @@ After that, most of the app is the same pattern repeated, plus the recommendatio
   - a recorded LTA response to test against
   - acceptance tests
 - **I write:**
+  - the `Provider` union
   - `ApiKeyStore`
-  - `ExternalApiFacade.fetch()` calling LTA DataMall: async, with the AccountKey header and paging
-  - a generic `DatasetAdapter<T>`, and `TaxiStandAdapter` that checks the raw data with zod
-  - `SyncService`:
-    - syncs once at startup and retries if that fails
-    - then runs on a node-cron schedule
+  - `ExternalApiFacade.fetch(provider, path)`: async, with the AccountKey header and paging
+  - the `DatasetAdapter` interface, and `TaxiStandAdapter`, which declares its source, path and interval and `prepare()`s the data, checked with zod
+  - `SyncService.start()`:
+    - syncs every adapter once at startup, retrying failures
+    - then runs each adapter on its own interval
 - **Needs:** my LTA DataMall AccountKey in `server/.env`.
 - **Done when:**
   - the endpoint serves real taxi stands that refresh on a schedule
@@ -158,26 +185,26 @@ After that, most of the app is the same pattern repeated, plus the recommendatio
 - **Learn:** JSX, components, props, `useState`, event handlers, conditional rendering, lists and keys, `useEffect`, component tests.
 - **Claude sets up:**
   - Leaflet and react-leaflet installed, with the CSS and marker icons working
-  - the OneMap tile URL and attribution
+  - the OneMap tiles and attribution
   - the Vite demo removed and basic mobile styles added
   - Testing Library
 - **I write**, in `client/src/boundary/`:
-  - `App` → `MapView`: a map centred on Singapore with OneMap tiles
-  - `FilterTool` with a Taxi Stands toggle: white background when inactive, highlighted when active (per the data dictionary)
-  - markers from a hard-coded list
+  - `App` → `MapView`: a map centred on Singapore
+  - `FilterTool` with a Taxi Stands toggle (`onToggle(t)`): white when inactive, highlighted when active
+  - markers drawn from hard-coded `Locatable`s
   - one component test
 - **Done when:** toggling shows and hides the markers.
 - [ ] Done
 
 ### M5 — Connecting the frontend to the backend
 - **Learn:** same-origin and CORS, the Vite dev proxy, `fetch` in the browser, timeouts with `AbortController` (NF-3.1.1), loading and error states, union types for results, sharing a package between workspaces.
-- **Claude sets up:** the `shared/` workspace's plumbing (its `package.json`, tsconfig, and links to client and server), plus acceptance tests.
+- **Claude sets up:** the `shared/` workspace's plumbing, plus acceptance tests.
 - **I write:**
   - `TaxiStandDto` and `ApiResponse<T>` in `shared/`, used by both sides
-  - `DataApiClient.get()` in `client/src/services/`:
+  - `DataApiClient.get(endpoint, etag)`:
     - a 7-second timeout
     - returns either `ok` (with the body) or `not-modified`
-  - converting DTOs (plain JSON) into entity class instances
+  - converting DTOs (plain JSON) into `TaxiStand` instances
   - the dev proxy, after seeing the CORS error for myself
   - toggling on fetches the real stands and shows them; a failure shows a toast and switches the toggle back
 - **Done when:** the real stands show on the map, and stopping the server gives the toast.
@@ -186,22 +213,24 @@ After that, most of the app is the same pattern repeated, plus the recommendatio
 ### M6 — The layered architecture in React (the key lesson)
 - **Learn:**
   - why logic lives in control classes, not components
-  - the Observer pattern
+  - the Observer pattern (`DataSyncObserver`)
   - a `useSyncExternalStore` custom hook
-  - dependency direction: views call controllers; lower layers never call upward
+  - dependency direction
   - React context
   - IndexedDB
 - **Claude sets up:** idb and fake-indexeddb installed, plus acceptance tests.
 - **I write:**
-  - `LocalStore`, a wrapper around idb, in `services/`
-  - `SettingsController`: the only owner of which layers are visible, saved through `LocalStore`
-  - `MapDisplayController`:
+  - `LocalStore`, a wrapper around idb
+  - `UserPreferences`, containing only `visibleLayers` for now
+  - `SettingsController.setLayerVisible`: the only owner of which layers are visible, saved through `LocalStore`
+  - `MapDisplayController`, which is a `DataSyncObserver`:
     - `toggleLayer`
-    - the visible items
-    - a `notice` that `MapView` shows as a toast
-  - `DataSyncController`: loads data into `LandmarkRepository` and notifies observers
+    - `onDataUpdated`
+    - the `visible` items
+    - a `notice` that `MapView` shows as a toast (D3)
+  - `DataSyncController`: `refreshStatic()` and `attach(observer)`. It fills `MapDataRepository` and notifies observers.
   - a hook that re-renders components when a controller changes
-  - `App` wiring: create the services and controllers once and provide them through React context
+  - `App.initControllers()`: create the services and controllers once and provide them through React context
 - **Done when:**
   - the toggle state survives a reload
   - no component calls `fetch` or touches storage directly
@@ -212,10 +241,9 @@ After that, most of the app is the same pattern repeated, plus the recommendatio
 - **Claude sets up:** acceptance tests, plus instructions for simulating offline in Chrome DevTools.
 - **I write:**
   - `CacheManager` on top of `LocalStore`, with async `get`, `put` and `isStale`
-  - `DataSyncController` at startup:
-    - loads from the cache first
-    - re-checks static data with `If-None-Match` once a day
-- **Done when** UC 0001 works as revised in decision D1:
+  - `DataSyncController.loadCached()`, called by `App` at startup, which fills `MapDataRepository` from the cache
+  - `refreshStatic()` re-checks with `If-None-Match` once a day
+- **Done when** UC 0001 works as revised in D1:
   - after one online load, the taxi stands still toggle on with the server down or the device offline
   - with no cached copy and no connection, toggling shows the toast and switches back
 - [ ] Done
@@ -236,93 +264,94 @@ I review and approve before the next package starts. Claude asks me whenever a d
    - [ ] zod schemas → OpenAPI → generated types in `shared/`, replacing the hand-written DTOs
    - [ ] Prettier, and Oxlint (already set up in the client by the Vite template) extended to the server
 2. **Server data**
-   - [ ] the remaining adapters: taxi availability, HDB carpark availability, hawker centres, LTA carparks, EV charging and charger availability, crowd forecast, fuel stations
-   - [ ] sync schedules from the deployment diagram:
+   - [ ] adapters for the other 4 static endpoints (carparks, hawker centres, fuel stations, charging stations)
+   - [ ] adapters for the live endpoints: taxis, carpark availability, charger availability, hotspots
+   - [ ] intervals from the deployment diagram:
      - taxis every 30 s
      - availability every 1–5 min
-     - crowd forecast every 30 min
+     - hotspots every 30 min
      - static data daily
-   - [ ] `RestStopSite` precomputation
-   - [ ] all 10 endpoints, with gzip, rate limiting and a CORS allow-list
+   - [ ] gzip, rate limiting and a CORS allow-list
    - [ ] OneMap token refresh
-3. **Client data layer, extended from M7 to every endpoint**
+3. **Suggested sites on the server (Strategy pattern)**
+   - [ ] `SuggestionStrategy` with `PickupSuggestionStrategy.calculateProbability` and `RestStopSuggestionStrategy.calculateAmenities`
+   - [ ] `SyncService.buildSuggestions()`
+   - [ ] the `/api/pickup-sites` and `/api/rest-stop-sites` endpoints
+4. **Client data layer for every endpoint**
    - [ ] caching and daily re-checks for every static endpoint
-   - [ ] polling only the live layers that are toggled on
+   - [ ] `refreshLive(layers, kinds)`, polling only what's toggled on
    - [ ] pausing when the app is in the background
-4. **Map layers (UC 0002–0007)**
-   - [ ] nearby taxis, with clustering or density
-   - [ ] hotspots
-   - [ ] charging stations
-   - [ ] fuel stations
-   - [ ] carparks with availability
-   - [ ] hawker centres
+   - [ ] `MapDataRepository.updateAvailability` and the suggestion methods
+5. **Map layers (UC 0002–0007)**
+   - [ ] the other 4 Landmark types, `Taxi`, and `Site` → `Hotspot`
+   - [ ] taxis shown with clustering or density
+   - [ ] hotspots and suggestions drawn as circles
    - [ ] vehicle type hides irrelevant energy stops (FR-2.1.1)
-5. **Location (UC 0013).** This comes before recommendations, which need the driver's position.
-   - [ ] GPS tracking
+6. **Location (UC 0013)**
+   - [ ] `GPSInterface`, `LocationController` and `LocationObserver`
    - [ ] driver pin
    - [ ] re-centre button
    - [ ] banner when location permission is denied
-6. **Recommendations (UC 0008–0009)**
-   - [ ] `RecommendationStrategy`, with Pickup and RestStop strategies (Strategy pattern)
-   - [ ] `Sidemenu` and `RecommendationCard`, with results sorted by proximity
-7. **Navigation and bookmarks (UC 0011–0012)**
-   - [ ] Google Maps deep link
+7. **Recommendations (UC 0008–0009)**
+   - [ ] `RecommendationController`: `toggle`, plus `rank()` by distance and preferences on the client
+   - [ ] `Sidemenu.onToggleSuggestion`
+   - [ ] `RecommendationCard`
+   - [ ] turning a suggestion on also turns on its related layers
+8. **Navigation and bookmarks (UC 0011–0012)**
+   - [ ] `NavigationController` and `NavigationGateway.openDeepLink`
    - [ ] Yes/No prompt with "Do not show again"
-   - [ ] starring and unstarring landmarks
-   - [ ] the bookmark panel
-8. **Settings (FR-2)**
+   - [ ] `BookmarkController`, `BookmarkList` and `BookmarkPanel`
+9. **Settings (FR-2)**
    - [ ] EN/ZH language switch
    - [ ] vehicle type
-   - [ ] the other settings agreed in the scope decision
+   - [ ] font size
+   - [ ] dark mode
    - [ ] every setting persisted
    - [ ] Help & Support page (from the dialog map)
-9. **Hardening and deployment**
-   - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
-   - [ ] wider test coverage
-   - [ ] HTTPS deployment on the school lab server
+10. **Hardening and deployment**
+    - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
+    - [ ] wider test coverage
+    - [ ] HTTPS deployment
 
 ---
 
 ## Design decisions
 
-### From reviewing the diagrams
+### Already in the 23 Oct diagrams (fixed since the AI report)
+- Each `DatasetAdapter` declares its own source, path and refresh interval.
+- `DataSyncController.loadCached()` runs at startup, so the map works offline.
+- `UserPreferences` has `fontSize`, `darkMode` and `activeSuggestions`.
+- Vehicle type reaches the ranking through `rank(…, prefs)`.
+- Taxis are stored in the repository as `Locatable`.
+- `NavigationGateway` opens the deep link itself, and nothing calls `MapView`.
+- `Bounds`, `Callback`, `DateTime`, `Duration`, `Json`, `Dataset` and `Provider` are defined in a note.
+
+### Decisions the code adds on top of the diagrams
 - **D1 — Freshness.**
-  - Static layers (taxi stands, carparks, hawker centres, fuel, charging, rest-stop sites) are re-checked daily using ETags.
-  - Only live layers (taxis, hotspots, availability) follow the 5-minute rule, and they're polled only while toggled on.
-  - A toggle reads from `LandmarkRepository`, which is loaded from the cache. The "Unable to load" exception only happens when there's no cached copy at all.
-  - This fixes the contradiction in UC 0001 and UC 0004–0007.
-- **D2 — Sync.**
-  - The server syncs on its own schedule, whether or not anyone is using the app. It's the only part that calls external APIs or holds keys.
-  - The client only ever refreshes from our server.
-  - UC 0010 currently describes these two as one use case.
-- **D3 — Notices and toggle state.**
-  - `MapDisplayController` holds a `notice` that `MapView` shows as a toast, because controllers never call views.
-  - `SettingsController` is the only owner of which layers are visible.
+  - Static layers are re-checked daily using ETags.
+  - Live layers follow the 5-minute rule, and they're polled only while toggled on.
+  - A toggle reads from `MapDataRepository`. The "Unable to load" exception only happens when there's no cached copy at all.
+- **D2 — Sync.** The server syncs on its own schedule and is the only part that calls external APIs or holds keys. The client only ever talks to our server.
+- **D3 — Notices.** `MapDisplayController` holds a `notice` that `MapView` shows as a toast, because controllers never call views and no class in the diagram holds error state. `SettingsController` owns the toggle state, as the diagram already shows.
 - **D4 — Async I/O.**
-  - Every network and storage call returns a `Promise`.
+  - Every network and storage call returns a `Promise`. The diagram writes them as plain return types, except `LocalStore`.
   - `DataApiClient.get` returns either `ok` with the body or `not-modified`.
 - **D5 — Types.**
-  - A generic `DatasetAdapter<T>` with `prepare(raw: unknown): T`, checked with zod.
-  - `ApiResponse<T>` everywhere, and no `Object` types.
-  - `Bounds`, `Duration`, `DateTime`, `Json` and `Callback` get real definitions.
+  - Use string unions instead of TS enums.
+  - Make the adapter generic: `DatasetAdapter<T>`, with `prepare(raw: unknown): T`, checked with zod.
+  - Use `ApiResponse<T>` everywhere, and no `Object` types.
 - **D6 — Location.**
   - `address` is optional.
   - Distances are in metres.
-  - JSON DTOs are converted into entity classes in one place.
+  - JSON DTOs are converted into entity classes in one place, `DataSyncController`.
 - **D7 — Server startup.**
   - The server syncs once at boot and retries failures.
   - It returns 503 only until the first successful sync.
   - If a later sync fails, it keeps the last good copy.
-
-### From the Lab 3 AI report
-- Use string unions instead of TS enums.
-- `Bookmark` gets its own `id` and stores `landmarkId`, not the `Landmark` object.
-- `NavigationGateway` only builds the Google Maps URL. The view opens it.
-- Each server adapter declares its own data source (URL, paging, schedule).
-- `LandmarkRepository` gets a getter for taxis.
-- At startup the repository loads from the cache, even when the cache is still fresh.
-- `UserPreferences` gets `fontSize`.
-- `calculateAmenities` receives the driver's vehicle type.
+- **D8 — Visibility.**
+  - Fields the diagram marks `#` (protected) or `-` (private) become `readonly` public fields when other layers need to read them, e.g. the map showing a landmark's `name`.
+  - The diagram only defines `getLocation()` and `getType()`, with no getters for `id` or `name`.
+- **D9 — Suggestion updates (my decision, 23 Oct).** `DataSyncObserver` gets a second method, `onRecommendationUpdated(k: RecommendationKind)`. `onDataUpdated(t: LayerType)` stays for map layers. Added in Phase 2, package 4.
 
 ---
 
@@ -331,25 +360,28 @@ I review and approve before the next package starts. Claude asks me whenever a d
 | When | Decision |
 |---|---|
 | M7 | Should `CacheManager` stay a Singleton as in the design model, which shows the pattern, or be created once and passed in, which is easier to test? |
-| Package 2 | Which fuel-station data source to use (the team hasn't chosen one). What "hotspots" should mean: as far as Claude knows, LTA's crowd forecast only covers MRT platforms. |
-| Package 6 | How to score pickup spots and rest stops. |
-| Package 8 | Which settings are in scope. The dialog map and data dictionary mention font size, dark/light mode and a narrator, but no FR covers them. |
-| Package 9 | How to get access to the school lab server, and whether it can serve HTTPS. |
+| Package 2 | Which fuel-station data source to use (still undecided). |
+| Package 2 | Where hotspot coordinates come from. LTA's crowd forecast gives MRT *station names*, but `Hotspot` is a `Site` with a `centre`, so the station coordinates need another source. |
+| Package 3 | How to score pickup spots and rest stops (`calculateProbability`, `calculateAmenities`). |
+| Package 8 | `Bookmark` has no `id` and holds the whole `Landmark`, yet `BookmarkList.remove(id)` needs an id. Should bookmarks get an `id` and store a `landmarkId`? |
+| Package 10 | How to get access to the school lab server, and whether it can serve HTTPS. |
 | Any time | Where the code lives, e.g. a GitHub repo. The team repo is for PDFs only. |
 
 ## Things I need to do
 - [ ] Register for an LTA DataMall AccountKey before M3. It's sent by email, which can take a while.
 - [ ] Register for a OneMap account before Phase 2.
 - [ ] Optional: a data.gov.sg API key, which raises the rate limit.
+- [ ] Push the 23 Oct `.drawio` files and PNGs to the team repo, so the repo matches the design.
 
 ## Doc errors to raise with the team
-These aren't code problems, but the team's documents contradict each other:
-- The data dictionary's definitions of *Suggested Pickup* and *Suggested Rest Stop* are swapped compared with UC 0008/0009 and FR-1.3.
-- UC 0001 and UC 0004–0007 contradict themselves twice:
-  - The "cache under 5 minutes" precondition clashes with their own note that the data is static, and with NF-2.1.1.
+- **Diagrams vs report:** the team repo's PNGs (15 Oct) don't match the current `.drawio` files.
+- **UC 0008/0009 (and FR-1.3) are now out of date:** they say the client calculates suggestions from amenities and probabilities. The 23 Oct design has the server score them and the client only rank them.
+- **The data dictionary swaps the definitions** of *Suggested Pickup* and *Suggested Rest Stop*.
+- **UC 0001 and UC 0004–0007 contradict themselves twice:**
+  - The "cache under 5 minutes" precondition clashes with their own note that the data is static.
   - "Markers available offline" clashes with the exception "fails to retrieve from the server".
-- UC 0010 mixes the server's sync with the client's refresh, and has the client holding API credentials.
-- UC 0009 has copy-paste errors: pickup probability is "based on nearby amenities", and its exceptions mention rest stops.
-- The deployment diagram still says the framework and host are undecided.
-- The AI report and the Lab 3 report number the use cases differently. This plan uses the Lab 3 report's numbering.
-- `UserPreferences` has no font size, dark/light mode or narrator, although the data dictionary and dialog map mention them.
+- **UC 0010 mixes up two jobs:** the server's scheduled sync and the client's refresh. It also has the client holding API credentials.
+- **UC 0009 has copy-paste errors:** pickup probability is "based on nearby amenities", and its exceptions mention rest stops.
+- **The deployment diagram is out of date:** it still says the framework ("e.g. Next.js / React") and the host are undecided.
+- **`Location.address` is a required `String`** in the diagram, but taxis, hotspots and suggested sites have no address.
+- **The AI report and the Lab 3 report number the use cases differently.** This plan uses the Lab 3 report's numbering.

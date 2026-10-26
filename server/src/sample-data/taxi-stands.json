@@ -1,0 +1,8 @@
+[
+  { "id": "SAMPLE-01", "name": "Raffles City", "latitude": 1.2931, "longitude": 103.8526, "standType": "Stand", "isBarrierFree": true },
+  { "id": "SAMPLE-02", "name": "ION Orchard", "latitude": 1.304, "longitude": 103.8318, "standType": "Stand", "isBarrierFree": true },
+  { "id": "SAMPLE-03", "name": "Bugis Junction", "latitude": 1.2995, "longitude": 103.8556, "standType": "Stop", "isBarrierFree": false },
+  { "id": "SAMPLE-04", "name": "Marina Bay Sands", "latitude": 1.2834, "longitude": 103.8607, "standType": "Stand", "isBarrierFree": true },
+  { "id": "SAMPLE-05", "name": "VivoCity", "latitude": 1.2644, "longitude": 103.8222, "standType": "Stand", "isBarrierFree": true },
+  { "id": "SAMPLE-06", "name": "Changi Airport T3", "latitude": 1.3555, "longitude": 103.9864, "standType": "Stand", "isBarrierFree": true }
+]
