@@ -4,9 +4,16 @@ import "leaflet/dist/leaflet.css";
 import "./index.css";
 import "./boundary/leafletSetup";
 import { App } from "./App";
+import { ControllersContext, initControllers, startControllers } from "./startup";
+
+const controllers = initControllers();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ControllersContext.Provider value={controllers}>
+      <App />
+    </ControllersContext.Provider>
   </StrictMode>,
 );
+
+void startControllers(controllers);

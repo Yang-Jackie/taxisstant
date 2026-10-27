@@ -6,4 +6,7 @@ import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 
+// Leaflet still puts the folder it detects from its CSS in front of every icon URL, so our full
+// URLs would get a second copy of the path. A string here (even an empty one) turns detection off.
+L.Icon.Default.imagePath = "";
 L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl });

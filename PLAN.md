@@ -69,7 +69,7 @@ The PNGs in the team repo (`lab3/Diagrams/`, 15 Oct) are **out of date**. They s
 | | | `LocationController`, `NavigationController`, `RecommendationController`, `BookmarkController` | Phase 2 |
 | `boundary/` | Presentation (React) | `MapView`, `FilterTool` | M4 |
 | | | `Sidemenu`, `RecommendationCard`, `BookmarkPanel`, `SettingsView` | Phase 2 |
-| `App.tsx` | «startup» | `App`: creates the services and controllers, then calls `DataSyncController.loadCached()` | M6 |
+| `startup.ts`, `main.tsx` | «startup» | `initControllers()` creates the services and controllers once, outside React; `App` gets them through `ControllersContext`; `loadCached()` joins in M7 | M6 |
 
 - **Inheritance in the domain layer:**
   - `Landmark`, `Site` and `Taxi` all implement `Locatable`, so the map can draw any of them.
@@ -128,7 +128,7 @@ UC 0001 runs through every part of the architecture once:
   - each milestone's acceptance tests
 
   Each setup comes with a short explanation.
-- **I write** everything listed under "I write", plus at least one extra test of my own per milestone.
+- **I write** everything listed under "I write". Claude writes the tests and I review them (my own extra test per milestone was dropped on 27 Oct, after M6).
 - **Review:** Claude reviews my code and gives hints when I ask. Claude only writes my part if I ask for the answer.
 - **Commits:** I commit at the end of each milestone.
 
@@ -196,7 +196,6 @@ UC 0001 runs through every part of the architecture once:
     - then runs each adapter on its own interval
     - `stop()`, to cancel the timers
   - [x] `DataServiceApp` swaps the sample file for the real sync
-  - [ ] my own test (not written yet)
 - **Needs:** my LTA DataMall AccountKey in `server/.env`.
 - **Done when:**
   - the endpoint serves real taxi stands that refresh on a schedule
@@ -215,7 +214,6 @@ UC 0001 runs through every part of the architecture once:
   - [x] `FilterTool`: one toggle per layer (mockup labels), `aria-pressed` on the ones that are on, `onToggle(t)` on click; white when inactive, highlighted when active
   - [x] `MapView`: a map centred on Singapore with OneMap tiles, and one marker per taxi stand, titled with its name
   - [x] `App`: owns which layers are on (`useState`), passes them down, and shows hard-coded `TaxiStand`s when Taxi stands is on
-  - [ ] one component test of my own
 - **Done when:** toggling shows and hides the markers.
 - [x] Done
 
@@ -236,7 +234,7 @@ UC 0001 runs through every part of the architecture once:
 - **Done when:** the real stands show on the map, and stopping the server gives the toast.
 - [x] Done
 
-### M6 — The layered architecture in React (the key lesson)
+### M6 — The layered architecture in React (the key lesson) ✅
 - **Learn:**
   - why logic lives in control classes, not components
   - the Observer pattern (`DataSyncObserver`)
@@ -244,23 +242,23 @@ UC 0001 runs through every part of the architecture once:
   - dependency direction
   - React context
   - IndexedDB
-- **Claude sets up:** idb and fake-indexeddb installed, plus acceptance tests.
+- **Claude sets up:**
+  - [x] idb and fake-indexeddb installed; every test starts with an empty in-memory IndexedDB (`test-setup.ts`)
+  - [x] acceptance tests (46 new, replacing M5's `App` tests), checked against a reference solution and 7 likely mistakes
+  - [x] fixed the M4 marker icons, which showed as broken images (Leaflet put its CSS-detected folder in front of our URLs); regression test in `boundary/leafletSetup.test.ts`
 - **I write:**
-  - `LocalStore`, a wrapper around idb
-  - `UserPreferences`, containing only `visibleLayers` for now
-  - `SettingsController.setLayerVisible`: the only owner of which layers are visible, saved through `LocalStore`
-  - `MapDisplayController`, which is a `DataSyncObserver`:
-    - `toggleLayer`
-    - `onDataUpdated`
-    - the `visible` items
-    - a `notice` that `MapView` shows as a toast (D3)
-  - `DataSyncController`: `refreshStatic()` and `attach(observer)`. It fills `MapDataRepository` and notifies observers.
-  - a hook that re-renders components when a controller changes
-  - `App.initControllers()`: create the services and controllers once and provide them through React context
+  - [x] `control/Store.ts`: the Observer pattern (`subscribe`, `getSnapshot`, protected `setState`), no React
+  - [x] `boundary/useStore.ts`: the hook that re-renders a component when a store changes (`useSyncExternalStore`)
+  - [x] `services/LocalStore.ts`: `read` / `write` on IndexedDB through idb
+  - [x] `entity/UserPreferences.ts` (only `visibleLayers` for now) and `isLayerType()` in `entity/LayerType.ts`
+  - [x] `control/SettingsController.ts`: the only owner of which layers are visible; `load()` and `setLayerVisible()`, saved through `LocalStore`
+  - [x] `control/DataSyncObserver.ts` and `control/DataSyncController.ts`: `refreshStatic()` (once per session, shared in-flight request) and `attach(observer)`; fills `MapDataRepository` and notifies observers
+  - [x] `control/MapDisplayController.ts`, a `DataSyncObserver`: `toggleLayer`, `start`, `onDataUpdated`, `dismissNotice`; state `visible` + `notice` (D3)
+  - [x] `startup.ts`: `initControllers()`, `startControllers()`, `ControllersContext`; `App` reads controllers from context; `main.tsx` wires it all up
 - **Done when:**
   - the toggle state survives a reload
   - no component calls `fetch` or touches storage directly
-- [ ] Done
+- [x] Done: checked in Chrome on 27 Oct (on and off both survive a reload; junk in storage starts with everything off)
 
 ### M7 — Offline cache
 - **Learn:** caching strategies, staleness, ETag re-checks from the client, designing for offline use, async storage, testing with a fake IndexedDB.
@@ -378,6 +376,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
   - Fields the diagram marks `#` (protected) or `-` (private) become `readonly` public fields when other layers need to read them, e.g. the map showing a landmark's `name`.
   - The diagram only defines `getLocation()` and `getType()`, with no getters for `id` or `name`.
 - **D9 — Suggestion updates (my decision, 23 Oct).** `DataSyncObserver` gets a second method, `onRecommendationUpdated(k: RecommendationKind)`. `onDataUpdated(t: LayerType)` stays for map layers. Added in Phase 2, package 4.
+- **D10 — One `CacheManager`, passed in (my decision, 27 Oct).** The diagram marks `CacheManager` «Singleton». Instead, `initControllers()` creates exactly one and passes it to `DataSyncController`, like `LocalStore`. There is still only one instance, but the startup code guarantees it rather than a static `getInstance()`, so tests can use a fresh one and dependencies show in constructors.
 
 ---
 
@@ -385,7 +384,6 @@ I review and approve before the next package starts. Claude asks me whenever a d
 
 | When | Decision |
 |---|---|
-| M7 | Should `CacheManager` stay a Singleton as in the design model, which shows the pattern, or be created once and passed in, which is easier to test? |
 | Package 2 | Which fuel-station data source to use (still undecided). |
 | Package 2 | Where hotspot coordinates come from. LTA's crowd forecast gives MRT *station names*, but `Hotspot` is a `Site` with a `centre`, so the station coordinates need another source. |
 | Package 3 | How to score pickup spots and rest stops (`calculateProbability`, `calculateAmenities`). |
