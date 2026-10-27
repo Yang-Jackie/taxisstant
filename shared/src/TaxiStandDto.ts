@@ -1,4 +1,4 @@
-/** A taxi stand as the server serves it. Moves to shared/ in M5, so the client uses the same type. */
+/** A taxi stand as the server sends it and the client receives it (plain JSON, no methods). */
 export interface TaxiStandDto {
   id: string;
   name: string;

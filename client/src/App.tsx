@@ -1,34 +1,51 @@
-import { useState } from "react";
+import type { TaxiStandDto } from "@taxisstant/shared";
+import { useCallback, useState } from "react";
 import { FilterTool } from "./boundary/FilterTool";
 import { MapView } from "./boundary/MapView";
+import { Toast } from "./boundary/Toast";
 import type { LayerType } from "./entity/LayerType";
-import { Location } from "./entity/Location";
-import { TaxiStand } from "./entity/TaxiStand";
+import type { TaxiStand } from "./entity/TaxiStand";
+import { DataApiClient } from "./services/DataApiClient";
+import { toTaxiStand } from "./services/toTaxiStand";
 import "./App.css";
 
-/** Hard-coded for M4 — real data from your server arrives in M5. (Coordinates from your LTA recording.) */
-const SAMPLE_STANDS: readonly TaxiStand[] = [
-  new TaxiStand({ id: "A01", name: "Orchard Rd along driveway of Lucky Plaza", location: new Location(1.304294727, 103.8338467), standType: "Stand", isBarrierFree: true }),
-  new TaxiStand({ id: "A05", name: "Mt Elizabeth Rd at Mt Elizabeth Hospital", location: new Location(1.304571786, 103.835547), standType: "Stand", isBarrierFree: true }),
-  new TaxiStand({ id: "A06", name: "Cairnhill Rd at Cairnhill Nine", location: new Location(1.303519805, 103.8376729), standType: "Stop", isBarrierFree: true }),
-];
+const api = new DataApiClient();
 
 export function App() {
   const [active, setActive] = useState<ReadonlySet<LayerType>>(() => new Set());
+  const [taxiStands, setTaxiStands] = useState<readonly TaxiStand[] | null>(null); // null = not loaded yet
+  const [notice, setNotice] = useState<string | null>(null);
 
-  function toggle(t: LayerType) {
+  function setLayer(t: LayerType, on: boolean) {
     setActive((previous) => {
       const next = new Set(previous);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
+      if (on) next.add(t);
+      else next.delete(t);
       return next;
     });
   }
 
+  async function toggle(t: LayerType) {
+    const turningOn = !active.has(t);
+    setLayer(t, turningOn); // UC 0001 step 3: highlight the button straight away
+    if (t !== "TAXI_STAND" || !turningOn || taxiStands !== null) return; // load stands once, only when first needed
+
+    try {
+      const result = await api.get<TaxiStandDto[]>("/taxi-stands");
+      if (result.status === "ok") setTaxiStands(result.response.data.map(toTaxiStand));
+    } catch {
+      setLayer(t, false); // exception 4a: switch the toggle back…
+      setNotice("Unable to load taxi stand markers. Please check your connection."); // …and say why
+    }
+  }
+
+  const dismissNotice = useCallback(() => setNotice(null), []);
+
   return (
     <div className="app">
-      <MapView taxiStands={active.has("TAXI_STAND") ? SAMPLE_STANDS : []} />
+      <MapView taxiStands={active.has("TAXI_STAND") ? (taxiStands ?? []) : []} />
       <FilterTool active={active} onToggle={toggle} />
+      {notice && <Toast message={notice} onDismiss={dismissNotice} />}
     </div>
   );
 }

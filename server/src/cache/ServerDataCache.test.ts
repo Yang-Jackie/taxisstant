@@ -1,7 +1,7 @@
 // M2 acceptance tests — ServerDataCache «container»: the last good copy of each dataset, in memory.
 // Note the ".js" in the imports: under NodeNext you import the file that will exist after compiling.
 import { describe, expect, expectTypeOf, it } from "vitest";
-import type { ApiResponse } from "../contract/ApiResponse.js";
+import type { ApiResponse } from "@taxisstant/shared";
 import { ServerDataCache } from "./ServerDataCache.js";
 
 const stands = [{ id: "A" }, { id: "B" }];

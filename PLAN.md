@@ -89,7 +89,6 @@ server/src/
 │   ├── adapters/            TaxiStandAdapter (+ Phase 2 adapters)
 │   └── strategies/          Phase 2: SuggestionStrategy and its two strategies
 ├── external/                ExternalApiFacade, ApiKeyStore, Provider
-├── contract/                ApiResponse, DTOs (move to shared/ in M5)
 └── sample-data/             test fixtures, including the recorded LTA response
 ```
 
@@ -106,7 +105,7 @@ server/src/
 | `Dataset`, `Provider` | server-side string unions | M2–M3 |
 | `SuggestionStrategy` → `PickupSuggestionStrategy`, `RestStopSuggestionStrategy` | score sites from the cached data | Phase 2 |
 
-**Shared, in `shared/src/`:** `ApiResponse<T>` and the DTO types, starting with `TaxiStandDto` (M5).
+**Shared, in `shared/src/` (`@taxisstant/shared`):** `ApiResponse<T>` and the DTO types, starting with `TaxiStandDto` (moved there from `server/src/contract/` in M5). Types only, so no build step.
 
 **Tests** sit next to the code they test, named `*.test.ts` (or `*.test.tsx`).
 
@@ -220,19 +219,22 @@ UC 0001 runs through every part of the architecture once:
 - **Done when:** toggling shows and hides the markers.
 - [x] Done
 
-### M5 — Connecting the frontend to the backend
+### M5 — Connecting the frontend to the backend ✅
 - **Learn:** same-origin and CORS, the Vite dev proxy, `fetch` in the browser, timeouts with `AbortController` (NF-3.1.1), loading and error states, union types for results, sharing a package between workspaces.
-- **Claude sets up:** the `shared/` workspace's plumbing, plus acceptance tests.
+- **Claude sets up:**
+  - [x] the `shared/` workspace (`@taxisstant/shared`, types only, no build step), linked into client and server
+  - [x] acceptance tests (21 new client tests in `services/`, `boundary/Toast.test.tsx` and a new `App.test.tsx`; the cache test now imports from `@taxisstant/shared`), checked against a reference solution and 4 likely mistakes
 - **I write:**
-  - `TaxiStandDto` and `ApiResponse<T>` in `shared/`, used by both sides
-  - `DataApiClient.get(endpoint, etag)`:
+  - [x] move `TaxiStandDto` and `ApiResponse<T>` from `server/src/contract/` into `shared/`, and import them from `@taxisstant/shared` on both sides
+  - [x] `DataApiClient.get(endpoint, etag)` in `client/src/services/`:
     - a 7-second timeout
     - returns either `ok` (with the body) or `not-modified`
-  - converting DTOs (plain JSON) into `TaxiStand` instances
-  - the dev proxy, after seeing the CORS error for myself
-  - toggling on fetches the real stands and shows them; a failure shows a toast and switches the toggle back
+  - [x] `toTaxiStand(dto)` in `client/src/services/`: plain JSON → a real `TaxiStand`
+  - [x] `Toast` in `client/src/boundary/`: dismisses itself after 4 s (`useEffect` with cleanup)
+  - [x] `App`: toggling Taxi stands on fetches the real stands once and shows them; a failure shows a toast and switches the toggle back
+  - [x] the dev proxy in `client/vite.config.ts`, after seeing the CORS error for myself
 - **Done when:** the real stands show on the map, and stopping the server gives the toast.
-- [ ] Done
+- [x] Done
 
 ### M6 — The layered architecture in React (the key lesson)
 - **Learn:**

@@ -1,0 +1,13 @@
+{
+  "name": "@taxisstant/shared",
+  "private": true,
+  "version": "1.0.0",
+  "description": "The API contract: types used by both client and server.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Dataset } from "../../cache/Dataset.js";
-import type { TaxiStandDto } from "../../contract/TaxiStandDto.js";
+import type { TaxiStandDto } from "@taxisstant/shared";
 import type { Provider } from "../../external/Provider.js";
 import type { DatasetAdapter } from "../DatasetAdapter.js";
 

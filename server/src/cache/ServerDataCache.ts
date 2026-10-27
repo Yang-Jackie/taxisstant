@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ApiResponse } from "../contract/ApiResponse.js";
+import type { ApiResponse } from "@taxisstant/shared";
 import type { Dataset } from "./Dataset.js";
 
 export class ServerDataCache {
