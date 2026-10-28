@@ -50,6 +50,22 @@ export function markerIcon(t: LayerType): DivIcon {
   return icon;
 }
 
+const driverIcons = new Map<boolean, DivIcon>();
+
+/** The mockup's driver dot: blue with a white ring and a soft halo; grey when the position isn't live. */
+export function driverIcon(live: boolean): DivIcon {
+  let icon = driverIcons.get(live);
+  if (!icon) {
+    icon = new DivIcon({
+      className: `driver-dot${live ? "" : " driver-dot--stale"}`,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13],
+    });
+    driverIcons.set(live, icon);
+  }
+  return icon;
+}
+
 /** A bubble with the layer's icon and a count, bigger for bigger groups (D17). Layers in one colour group stay apart. */
 export function clusterIcon(t: LayerType, count: number): DivIcon {
   const px = count < 10 ? 42 : count < 100 ? 48 : 56;

@@ -341,11 +341,11 @@ I review and approve before the next package starts. Claude asks me whenever a d
    - [x] `SuggestionStrategy` (`buildSites(cache)`, plus its output dataset and inputs) with `PickupSuggestionStrategy.calculateProbability` (D28) and `RestStopSuggestionStrategy.calculateAmenities` (D29)
    - [x] `SyncService.buildSuggestions()`: a strategy rebuilds whenever one of its inputs syncs
    - [x] the `/api/pickup-sites` and `/api/rest-stop-sites` endpoints, contract-tested on the real samples
-6. **Location (UC 0013)**
-   - [ ] `GPSInterface`, `LocationController` and `LocationObserver`
-   - [ ] driver pin
-   - [ ] re-centre button
-   - [ ] banner when location permission is denied
+6. **Location (UC 0013)** ✅
+   - [x] `GPSInterface` (`watchPosition`), `LocationController` (`startTracking`, `getCurrentLocation`, `attach`) and `LocationObserver`; GPS paused in the background; only the last position kept (D32)
+   - [x] the mockup's blue dot with its accuracy circle, grey when not live; the map centres once (D31)
+   - [x] the crosshair button, lit when the driver is away from the middle of the screen (UC 0013 3a)
+   - [x] the denied banner with steps for this phone's browser, and Try again (D30)
 7. **Recommendations (UC 0008–0009)**
    - [ ] client data for suggestions: `MapDataRepository.getSuggestions` / `replaceSuggestions`, `DataSyncObserver.onRecommendationUpdated` (D9)
    - [ ] `RecommendationController`: `toggle`, plus `rank()` by distance and preferences on the client
@@ -428,6 +428,9 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D27 — Rate limit and CORS (my decision, 28 Oct).** The design model's `DataApiController -rateLimiter` allows each client address 300 requests a minute (`RATE_LIMIT_PER_MINUTE`): one phone uses about 10–15, and mobile carriers put many phones behind one address. Over it, the answer is 429 with `Retry-After`, and the client falls back to its saved copy (D1, D22). The deployment diagram's "CORS allow-list" is `CORS_ORIGINS`, empty by default, because the plan is for the server to also host the app (one origin, so no CORS headers at all); a separate frontend host would be listed there. Behind a reverse proxy, `TRUST_PROXY` lets the limit see each client's own address; without it, `X-Forwarded-For` is ignored so clients can't fake their way past the limit.
 - **D28 — How pickup spots are scored (my decision, 28 Oct).** `PickupSuggestionStrategy` scores every taxi stand (where pickups can legally happen): *demand* is the busiest station within 500 m (HIGH 1, MEDIUM 0.6, LOW 0.25, no station 0.1); *competition* is 1 + (empty taxis within 300 m) ÷ 5; `calculateProbability` = demand ÷ competition, between 0 and 1. Crowd levels older than D22's limit and taxi positions over 5 minutes old are left out. FR-1.3.1 says "high taxi density" counts in favour; but the taxi data counts empty taxis, and empty taxis waiting nearby are competition, so they count against.
 - **D29 — How rest stops are scored (my decision, 28 Oct).** `RestStopSuggestionStrategy` scores every hawker centre not closed today (D13) that has cooked food (wet markets with no food stalls are left out): `calculateAmenities` = ½ × food choice (cooked-food stalls ÷ 60, capped at 1) + ½ × parking (the best carpark within 500 m: free lots ÷ 50, capped at 1, or 0.5 when its lots aren't known). First built as food 1 plus parking, it gave all 119 open centres 1.00 on real data (parking near hawker centres is never scarce: even the worst-off tenth have about 87 free lots nearby), so food choice was added on 28 Oct. `hasFuel` and `hasCharging` say what's within 500 m but aren't scored: only the client knows the vehicle type, so `rank(…, prefs)` uses them (FR-2.1.1, package 7).
+- **D30 — When location is denied (my decision, 28 Oct).** UC 0013 wants an "actionable banner" that takes the driver "directly to OS app settings", but a web app can't open the phone's or the browser's settings, and once denied it can't even ask again. The banner keeps the use case's text; its button shows the steps for this phone's browser (iPhone Safari, Android Chrome, others), next to "Try again". The driver's dot turns grey, as specified.
+- **D31 — The map centres on the driver once (my decision, 28 Oct).** On the session's first fix the map centres on the driver; after that it never moves by itself. UC 0013 step 3 says the map keeps the driver in view; instead, the crosshair button lights up whenever the driver's dot is away from the middle of the screen, whether the driver panned away (3a) or the taxi drove off, and tapping it re-centres.
+- **D32 — Only the last position is kept (my decision, 28 Oct).** UC 0013's postcondition stores the location locally: only the latest fix (no history) goes into IndexedDB on the phone, so the map opens where the driver was and package 7 can rank suggestions before the GPS answers. It never leaves the phone, as the deployment diagram says. The design model's `TaxiDriver` (`driverId`, `currentLocation`) becomes `LocationController`'s state: with no user accounts, there is no driver id.
 
 ---
 
@@ -462,4 +465,6 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **`DatasetAdapter` declares one source and one path,** while the diagram's own note says adapters "convert · join · clean". Settled by D19 (no join for carparks) and D21 (several paths).
 - **Hotspots are described as a forecast** (FR-1.2.3, data dictionary, deployment diagram: "station crowd forecast", every 30 min); the app shows real-time levels every 10 min (D20).
 - **The deployment diagram's data.gov.sg "HDB carpark availability"** isn't used: LTA covers every agency (D19).
+- **UC 0013's exception sends the driver to OS app settings,** which a web app can't open (D30). Its step 3 keeps the map on the driver; the app centres once (D31).
+- **`TaxiDriver.driverId`** has no meaning without user accounts, which the design rules out (D32).
 - **The AI report and the Lab 3 report number the use cases differently.** This plan uses the Lab 3 report's numbering.

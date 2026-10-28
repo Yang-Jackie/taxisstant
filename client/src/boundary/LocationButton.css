@@ -1,0 +1,30 @@
+/* The mockup's floating action button: a white circle above the layer tools */
+.location-button {
+  position: absolute;
+  right: 16px;
+  bottom: 84px;
+  z-index: 1000;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  color: #17181a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.location-button svg {
+  width: 26px;
+  height: 26px;
+}
+.location-button--highlighted {
+  background: #1e6fe0; /* the mockup's blue, as the driver's dot */
+  color: #fff;
+}
+.location-button:disabled {
+  color: #b5b8bd;
+  cursor: default;
+}

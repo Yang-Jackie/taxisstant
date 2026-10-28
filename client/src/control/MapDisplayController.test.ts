@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Viewport } from "../entity/Bounds";
 import { STATIC_LAYERS, type StaticLayer } from "../entity/LayerType";
+import { Location } from "../entity/Location";
 import { MapDataRepository } from "../entity/MapDataRepository";
 import { CacheManager } from "../services/CacheManager";
 import { DataApiClient } from "../services/DataApiClient";
@@ -439,5 +440,100 @@ describe("MapDisplayController — polling (D25)", () => {
 
     expect(fetchFn).not.toHaveBeenCalled();
     mapDisplay.setForeground(false);
+  });
+});
+
+// Package 6 — the driver on the map (UC 0013): centred once (D31), the button lit when off centre.
+describe("MapDisplayController — the driver (package 6)", () => {
+  const live = (latitude: number, longitude: number) => ({
+    location: new Location(latitude, longitude),
+    accuracyM: 20,
+    at: new Date(),
+    live: true,
+  });
+  const saved = (latitude: number, longitude: number) => ({ ...live(latitude, longitude), live: false });
+  const screenAround = (latitude: number, longitude: number, zoom = 15): Viewport => {
+    const screen = { south: latitude - 0.01, north: latitude + 0.01, west: longitude - 0.01, east: longitude + 0.01 };
+    return { bounds: screen, screen, zoom };
+  };
+
+  it("shows the driver, and centres on the session's first live fix, at street level", () => {
+    const { mapDisplay } = setUp();
+    mapDisplay.refreshVisible(SINGAPORE_VIEW);
+
+    mapDisplay.onLocationUpdated(live(1.3, 103.8));
+
+    const { driver, focus } = mapDisplay.getSnapshot();
+    expect(driver?.location.latitude).toBe(1.3);
+    expect(focus).toMatchObject({ location: { latitude: 1.3, longitude: 103.8 }, zoom: 15 });
+  });
+
+  it("never moves the map by itself after that: the taxi may drive off screen (D31)", () => {
+    const { mapDisplay } = setUp();
+    mapDisplay.onLocationUpdated(live(1.3, 103.8));
+    const first = mapDisplay.getSnapshot().focus;
+
+    mapDisplay.onLocationUpdated(live(1.31, 103.81));
+
+    expect(mapDisplay.getSnapshot().focus).toBe(first);
+  });
+
+  it("opens on a saved position until the GPS answers, then centres on the live fix once", () => {
+    const { mapDisplay } = setUp();
+    mapDisplay.onLocationUpdated(saved(1.35, 103.9));
+    expect(mapDisplay.getSnapshot().focus?.location.latitude).toBe(1.35);
+
+    mapDisplay.onLocationUpdated(live(1.3, 103.8));
+    expect(mapDisplay.getSnapshot().focus?.location.latitude).toBe(1.3);
+  });
+
+  it("centreOnDriver goes to the driver again, even to the same place (the button)", () => {
+    const { mapDisplay } = setUp();
+    mapDisplay.onLocationUpdated(live(1.3, 103.8));
+    const first = mapDisplay.getSnapshot().focus!;
+
+    mapDisplay.centreOnDriver();
+
+    expect(mapDisplay.getSnapshot().focus).toMatchObject({ location: first.location, seq: first.seq + 1 });
+  });
+
+  it("keeps the zoom when the driver is already zoomed in further than street level", () => {
+    const { mapDisplay } = setUp();
+    mapDisplay.onLocationUpdated(live(1.3, 103.8));
+    mapDisplay.refreshVisible(screenAround(1.3, 103.8, 18));
+    mapDisplay.centreOnDriver();
+    expect(mapDisplay.getSnapshot().focus?.zoom).toBe(18);
+  });
+
+  it("lights the button when the driver is away from the middle of the screen, panned away or driven off (UC 0013 3a)", () => {
+    const { mapDisplay } = setUp();
+    mapDisplay.onLocationUpdated(live(1.3, 103.8));
+
+    mapDisplay.refreshVisible(screenAround(1.3, 103.8));
+    expect(mapDisplay.getSnapshot().driverOffCentre).toBe(false);
+
+    mapDisplay.refreshVisible(screenAround(1.3, 103.808)); // panned: the driver is near the edge
+    expect(mapDisplay.getSnapshot().driverOffCentre).toBe(true);
+
+    mapDisplay.refreshVisible(screenAround(1.3, 103.8));
+    mapDisplay.onLocationUpdated(live(1.309, 103.8)); // the taxi drove towards the top edge
+    expect(mapDisplay.getSnapshot().driverOffCentre).toBe(true);
+  });
+
+  it("judges 'off centre' by the screen, not by the wider area markers are loaded for", () => {
+    const { mapDisplay } = setUp();
+    mapDisplay.onLocationUpdated(live(1.3, 103.808));
+    const screen = { south: 1.29, north: 1.31, west: 103.79, east: 103.81 }; // the driver is near its east edge
+    const padded = { south: 1.28, north: 1.32, west: 103.78, east: 103.82 }; // but in the middle half of this
+
+    mapDisplay.refreshVisible({ bounds: padded, screen, zoom: 15 });
+
+    expect(mapDisplay.getSnapshot().driverOffCentre).toBe(true);
+  });
+
+  it("doesn't light the button when there's no driver to go to", () => {
+    const { mapDisplay } = setUp();
+    mapDisplay.refreshVisible(screenAround(1.3, 103.8));
+    expect(mapDisplay.getSnapshot().driverOffCentre).toBe(false);
   });
 });

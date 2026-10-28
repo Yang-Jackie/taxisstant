@@ -233,3 +233,41 @@ describe("MapView — live layers (package 2d)", () => {
     expect(container.querySelectorAll("path.leaflet-interactive")).toHaveLength(0);
   });
 });
+
+// Package 6 — the driver's dot, and moving to a focus (UC 0013, D31).
+describe("MapView — the driver (package 6)", () => {
+  const driver = (live: boolean) => ({ location: new Location(1.3, 103.8), accuracyM: 40, at: new Date(), live });
+
+  it("draws the driver as the mockup's blue dot, with its accuracy circle", () => {
+    const { container } = render(<MapView visible={visibleWith()} driver={driver(true)} />);
+    expect(screen.getByTitle("You are here")).toHaveClass("driver-dot");
+    expect(container.querySelectorAll("path.leaflet-interactive, path")).not.toHaveLength(0);
+  });
+
+  it("greys the dot when the position isn't live (UC 0013 1a)", () => {
+    render(<MapView visible={visibleWith()} driver={driver(false)} />);
+    expect(screen.getByTitle("Your last known position")).toHaveClass("driver-dot--stale");
+  });
+
+  it("moves to a focus, and back to a place it has been to before when asked again", () => {
+    withScreenSize();
+    const onPan = vi.fn<(v: Viewport) => void>();
+    const here = new Location(1.29, 103.85);
+    const there = new Location(1.35, 103.95);
+    const centreLatitude = () => {
+      const s = onPan.mock.lastCall![0].screen!;
+      return (s.south + s.north) / 2;
+    };
+    const { rerender } = render(
+      <MapView visible={visibleWith()} onPan={onPan} focus={{ location: here, zoom: 16, seq: 1 }} />,
+    );
+    expect(onPan.mock.lastCall![0].zoom).toBe(16);
+    expect(centreLatitude()).toBeCloseTo(1.29, 3);
+
+    rerender(<MapView visible={visibleWith()} onPan={onPan} focus={{ location: there, zoom: 16, seq: 2 }} />);
+    expect(centreLatitude()).toBeCloseTo(1.35, 3);
+
+    rerender(<MapView visible={visibleWith()} onPan={onPan} focus={{ location: here, zoom: 16, seq: 3 }} />);
+    expect(centreLatitude()).toBeCloseTo(1.29, 3);
+  });
+});

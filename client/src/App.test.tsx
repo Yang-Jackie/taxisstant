@@ -2,11 +2,13 @@
 // A fake server stands in for fetch; IndexedDB is the in-memory one from test-setup.ts (empty per test).
 // M7: after one online session, the stands work with the server down (D1).
 // Package 2b: every static layer is downloaded at startup (D18) and clustered while zoomed out (D17).
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ControllersContext, initControllers, startControllers } from "./startup";
+import { LocalStore } from "./services/LocalStore";
+import { fakeGeolocation } from "./testing/fakeGps";
 import { callsTo, fakeServer, offline, status, type Answer } from "./testing/fakeServer";
 
 const STATIC_PATHS = ["/taxi-stands", "/carparks", "/fuel-stations", "/charging-stations", "/hawker-centres"];
@@ -238,9 +240,9 @@ describe("App — live layers (package 2d)", () => {
 
   it("pauses polling while the page is hidden, and asks again when it is shown (D25)", async () => {
     const fetchFn = serve();
-    await openApp();
+    const { container } = await openApp();
     await userEvent.click(button("Nearby taxis"));
-    await waitFor(() => expect(callsTo(fetchFn, "/taxis")).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(shown(container)).toBe(4)); // the first request has finished, not just started
     const before = callsTo(fetchFn, "/taxis");
 
     const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
@@ -258,6 +260,7 @@ describe("App — page visibility (D25)", () => {
     const controllers = initControllers();
     await startControllers(controllers);
     const setForeground = vi.spyOn(controllers.mapDisplay, "setForeground");
+    const gpsForeground = vi.spyOn(controllers.location, "setForeground");
     const visibility = vi.spyOn(document, "visibilityState", "get");
     render(
       <ControllersContext.Provider value={controllers}>
@@ -269,10 +272,56 @@ describe("App — page visibility (D25)", () => {
     visibility.mockReturnValue("hidden");
     document.dispatchEvent(new Event("visibilitychange"));
     expect(setForeground).toHaveBeenLastCalledWith(false);
+    expect(gpsForeground).toHaveBeenLastCalledWith(false); // no GPS in the background either
 
     visibility.mockReturnValue("visible");
     document.dispatchEvent(new Event("visibilitychange"));
     expect(setForeground).toHaveBeenLastCalledWith(true);
     visibility.mockRestore();
+  });
+});
+
+// Package 6 — location in the whole app (UC 0013).
+describe("App — location (package 6)", () => {
+  it("shows the driver once the GPS answers, and lets the button centre on them", async () => {
+    serve();
+    const gps = fakeGeolocation();
+    vi.stubGlobal("navigator", { ...navigator, geolocation: gps.geolocation });
+    await openApp();
+    expect(screen.getByRole("button", { name: "Centre the map on my location" })).toBeDisabled();
+
+    act(() => gps.move(1.3, 103.8));
+
+    expect(await screen.findByTitle("You are here")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Centre the map on my location" })).toBeEnabled();
+  });
+
+  it("shows the banner when location is denied, and Try again asks the GPS again (D30)", async () => {
+    serve();
+    const gps = fakeGeolocation();
+    vi.stubGlobal("navigator", { ...navigator, geolocation: gps.geolocation });
+    await openApp();
+    await waitFor(() => expect(gps.watching()).toBe(true));
+
+    act(() => gps.fail(1));
+
+    expect(await screen.findByRole("region", { name: "Location access" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(gps.geolocation.watchPosition).toHaveBeenCalledTimes(2);
+  });
+
+  it("opens where the driver was last time (D32)", async () => {
+    serve();
+    vi.stubGlobal("navigator", { ...navigator, geolocation: fakeGeolocation().geolocation });
+    await new LocalStore().write("lastLocation", {
+      latitude: 1.35,
+      longitude: 103.9,
+      accuracyM: 30,
+      at: "2026-10-27T10:00:00.000Z",
+    });
+
+    await openApp();
+
+    expect(await screen.findByTitle("Your last known position")).toBeInTheDocument();
   });
 });

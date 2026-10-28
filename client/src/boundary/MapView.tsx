@@ -8,9 +8,10 @@ import { STATIC_LAYERS, type LayerType } from "../entity/LayerType";
 import type { Locatable } from "../entity/Locatable";
 import type { Location } from "../entity/Location";
 import type { LayerView } from "../control/LayerClusters";
-import type { VisibleLayers } from "../control/MapDisplayController";
+import type { MapFocus, VisibleLayers } from "../control/MapDisplayController";
+import type { DriverPosition } from "../entity/DriverPosition";
 import { HotspotDetails, LandmarkDetails } from "./LandmarkDetails";
-import { clusterIcon, markerIcon } from "./markerIcons";
+import { clusterIcon, driverIcon, markerIcon } from "./markerIcons";
 import {
   MAX_ZOOM,
   MIN_ZOOM,
@@ -54,6 +55,10 @@ export interface MapViewProps {
   visible: VisibleLayers;
   /** The design model's MapView.onPan(bounds): told whenever the view moves or zooms (FR-1.5.3). */
   onPan?: (viewport: Viewport) => void;
+  /** The driver's dot (UC 0013). */
+  driver?: DriverPosition | null;
+  /** Where the controller wants the map to go; it goes each time `seq` changes. */
+  focus?: MapFocus | null;
 }
 
 /** Reports the view after every move or zoom, padded so markers just off screen are ready before they scroll in. */
@@ -62,15 +67,48 @@ function ViewportReporter({ onPan }: { onPan: (viewport: Viewport) => void }) {
   const report = useCallback(() => {
     const size = map.getSize();
     if (size.x === 0 || size.y === 0) return; // not laid out yet: keep the controller's whole-island view
-    const b = map.getBounds().pad(0.25);
+    const screen = map.getBounds();
+    const b = screen.pad(0.25);
     onPan({
       bounds: { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() },
+      screen: { south: screen.getSouth(), west: screen.getWest(), north: screen.getNorth(), east: screen.getEast() },
       zoom: map.getZoom(),
     });
   }, [map, onPan]);
   useMapEvents({ moveend: report, resize: report });
   useEffect(report, [report]);
   return null;
+}
+
+/** Moves the map when the controller asks: centring on the driver (D31) or, later, on a chosen place. */
+function FocusFollower({ focus }: { focus: MapFocus | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (focus) map.setView([focus.location.latitude, focus.location.longitude], focus.zoom);
+  }, [map, focus]);
+  return null;
+}
+
+/** The mockup's blue dot, with how far off the fix may be; grey when not live (UC 0013 1a). */
+function DriverDot({ driver }: { driver: DriverPosition }) {
+  const colour = driver.live ? "#1e6fe0" : "#8a8d93";
+  return (
+    <>
+      <Circle
+        center={positionOf(driver.location)}
+        radius={driver.accuracyM}
+        pathOptions={{ weight: 1, color: colour, fillColor: colour, fillOpacity: 0.1 }}
+        interactive={false}
+      />
+      <Marker
+        position={positionOf(driver.location)}
+        icon={driverIcon(driver.live)}
+        title={driver.live ? "You are here" : "Your last known position"}
+        zIndexOffset={1000}
+        keyboard={false}
+      />
+    </>
+  );
 }
 
 function OsmCredit() {
@@ -150,7 +188,7 @@ function HotspotCircles({ hotspots }: { hotspots: readonly Hotspot[] }) {
   );
 }
 
-export function MapView({ visible, onPan }: MapViewProps) {
+export function MapView({ visible, onPan, driver = null, focus = null }: MapViewProps) {
   const fuelShown = visible.FUEL.items.length > 0 || visible.FUEL.clusters.length > 0;
   return (
     <MapContainer
@@ -163,6 +201,7 @@ export function MapView({ visible, onPan }: MapViewProps) {
     >
       <TileLayer url={ONEMAP_TILE_URL} attribution={ONEMAP_ATTRIBUTION} />
       {onPan && <ViewportReporter onPan={onPan} />}
+      <FocusFollower focus={focus} />
       {fuelShown && <OsmCredit />}
       <HotspotCircles hotspots={visible.HOTSPOT.items} />
       {STATIC_LAYERS.map((t) => (
@@ -176,6 +215,7 @@ export function MapView({ visible, onPan }: MapViewProps) {
         />
       ))}
       <PointMarkers layer="TAXIS" view={visible.TAXIS} keyOf={(_, i) => String(i)} titleOf={() => "Available taxi"} />
+      {driver && <DriverDot driver={driver} />}
     </MapContainer>
   );
 }

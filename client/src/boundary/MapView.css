@@ -2,6 +2,22 @@
   height: 100%;
 }
 
+/* Package 6: the driver's dot, as in the mockup */
+.driver-dot {
+  border-radius: 50%;
+  background: #1e6fe0;
+  border: 3px solid #fff;
+  box-shadow:
+    0 0 0 6px rgba(30, 111, 224, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+}
+.driver-dot--stale {
+  background: #8a8d93;
+  box-shadow:
+    0 0 0 6px rgba(138, 141, 147, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
 /* Package 2b: markers in the mockup's style (a white circle, the layer's icon in its group colour) */
 .marker-chip {
   display: flex;

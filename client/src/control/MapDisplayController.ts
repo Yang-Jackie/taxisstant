@@ -1,4 +1,5 @@
 import type { Bounds, Viewport } from "../entity/Bounds";
+import type { DriverPosition } from "../entity/DriverPosition";
 import type { Hotspot } from "../entity/Hotspot";
 import { isStaticLayer, type LayerType, type StaticLayer } from "../entity/LayerType";
 import type { Locatable } from "../entity/Locatable";
@@ -7,6 +8,7 @@ import type { LayerItems, MapDataRepository } from "../entity/MapDataRepository"
 import type { Taxi } from "../entity/Taxi";
 import { LIVE_LAYERS, type DataSyncController, type LiveLayer } from "./DataSyncController";
 import type { DataSyncObserver } from "./DataSyncObserver";
+import type { LocationObserver } from "./LocationObserver";
 import { EMPTY_VIEW, LayerClusters, type LayerView } from "./LayerClusters";
 import type { SettingsController } from "./SettingsController";
 import { Store } from "./Store";
@@ -14,11 +16,26 @@ import { Store } from "./Store";
 /** What the map should draw right now, per layer: the design model's `visible` (D17 adds clusters). */
 export type VisibleLayers = { readonly [K in LayerType]: LayerView<LayerItems[K]> };
 
+/** Where the map should go: the design model's focus. `seq` changes every time, so the same place can be asked for twice. */
+export interface MapFocus {
+  readonly location: Location;
+  readonly zoom: number;
+  readonly seq: number;
+}
+
 export interface MapDisplayState {
   readonly visible: VisibleLayers;
   /** A message for the user, shown as a toast (D3). */
   readonly notice: string | null;
+  /** The driver's dot: the design model's driverLocation (UC 0013). */
+  readonly driver: DriverPosition | null;
+  readonly focus: MapFocus | null;
+  /** The driver's dot is away from the middle of the screen: the re-centre button lights up (UC 0013 3a, D31). */
+  readonly driverOffCentre: boolean;
 }
+
+/** Centring on the driver zooms in at least this far: street level, where taxi stands and carparks show one by one. */
+const DRIVER_ZOOM = 15;
 
 /** Each layer's toast when it can't be loaded, worded as in UC 0001–0007 (exception 4a). */
 const LOAD_FAILED: Record<StaticLayer | LiveLayer, string> = {
@@ -44,6 +61,13 @@ const isLive = (t: LayerType): t is LiveLayer => (LIVE_LAYERS as readonly LayerT
 const inside = (b: Bounds, l: Location) =>
   l.latitude >= b.south && l.latitude <= b.north && l.longitude >= b.west && l.longitude <= b.east;
 
+/** The middle half of a rectangle: a quarter in from each side. */
+const middleOf = (b: Bounds): Bounds => {
+  const dLat = (b.north - b.south) / 4;
+  const dLon = (b.east - b.west) / 4;
+  return { south: b.south + dLat, north: b.north - dLat, west: b.west + dLon, east: b.east - dLon };
+};
+
 /** The whole of Singapore at the start zoom: what the map shows until it reports its own view. */
 export const SINGAPORE_VIEW: Viewport = {
   bounds: { south: 1.144, west: 103.535, north: 1.494, east: 104.15 },
@@ -67,7 +91,7 @@ const nothingVisible: VisibleLayers = {
   HAWKER: EMPTY_VIEW,
 };
 
-export class MapDisplayController extends Store<MapDisplayState> implements DataSyncObserver {
+export class MapDisplayController extends Store<MapDisplayState> implements DataSyncObserver, LocationObserver {
   private readonly settings: SettingsController;
   private readonly dataSync: DataSyncController;
   private readonly repo: MapDataRepository;
@@ -75,9 +99,10 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
   private viewport: Viewport = SINGAPORE_VIEW;
   private timer: ReturnType<typeof setInterval> | undefined;
   private foreground = false;
+  private centredOnLiveFix = false;
 
   constructor(settings: SettingsController, dataSync: DataSyncController, repo: MapDataRepository) {
-    super({ visible: nothingVisible, notice: null });
+    super({ visible: nothingVisible, notice: null, driver: null, focus: null, driverOffCentre: false });
     this.settings = settings;
     this.dataSync = dataSync;
     this.repo = repo;
@@ -125,6 +150,36 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
   onDataUpdated(t: LayerType): void {
     if (t !== "HOTSPOT") this.clusters.set(t, new LayerClusters<Locatable>(this.repo.getByLayerType(t)));
     this.recompute();
+  }
+
+  /**
+   * The driver moved (LocationController). The map centres on the session's first live fix, and opens on a saved
+   * position until then; after that it never moves by itself (D31).
+   */
+  onLocationUpdated(position: DriverPosition): void {
+    this.setState({ ...this.getSnapshot(), driver: position });
+    if (position.live && !this.centredOnLiveFix) {
+      this.centredOnLiveFix = true;
+      this.focusOn(position.location);
+    } else if (!position.live && !this.getSnapshot().focus) {
+      this.focusOn(position.location);
+    }
+    this.recompute();
+  }
+
+  /** The design model's focusOn: move the map to `loc`, zoomed in to at least street level. */
+  focusOn(loc: Location): void {
+    const seq = (this.getSnapshot().focus?.seq ?? 0) + 1;
+    this.setState({
+      ...this.getSnapshot(),
+      focus: { location: loc, zoom: Math.max(this.viewport.zoom, DRIVER_ZOOM), seq },
+    });
+  }
+
+  /** The re-centre button (UC 0013 3a). */
+  centreOnDriver(): void {
+    const driver = this.getSnapshot().driver;
+    if (driver) this.focusOn(driver.location);
   }
 
   dismissNotice(): void {
@@ -206,6 +261,9 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
       CHARGING: this.viewOf("CHARGING"),
       HAWKER: this.viewOf("HAWKER"),
     };
-    this.setState({ ...this.getSnapshot(), visible });
+    const driver = this.getSnapshot().driver;
+    const screen = this.viewport.screen ?? this.viewport.bounds;
+    const driverOffCentre = driver !== null && !inside(middleOf(screen), driver.location);
+    this.setState({ ...this.getSnapshot(), visible, driverOffCentre });
   }
 }
