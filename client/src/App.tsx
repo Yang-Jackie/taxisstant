@@ -1,4 +1,4 @@
-import { useCallback, useContext } from "react";
+import { useCallback, useContext, useEffect } from "react";
 import { FilterTool } from "./boundary/FilterTool";
 import { MapView } from "./boundary/MapView";
 import { Toast } from "./boundary/Toast";
@@ -19,6 +19,17 @@ export function App() {
   const display = useStore(mapDisplay);
   const dismissNotice = useCallback(() => mapDisplay.dismissNotice(), [mapDisplay]);
   const onPan = useCallback((viewport: Viewport) => mapDisplay.refreshVisible(viewport), [mapDisplay]);
+
+  // Live layers poll only while the app is on screen (D25)
+  useEffect(() => {
+    const update = () => mapDisplay.setForeground(document.visibilityState === "visible");
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      document.removeEventListener("visibilitychange", update);
+      mapDisplay.setForeground(false);
+    };
+  }, [mapDisplay]);
 
   return (
     <div className="app">

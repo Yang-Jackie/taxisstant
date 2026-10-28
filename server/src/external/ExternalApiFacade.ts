@@ -32,11 +32,23 @@ export class ExternalApiFacade {
   private readonly keys: ApiKeyStore;
   private readonly fetchFn: typeof fetch;
   private readonly timeoutMs: number;
+  private readonly retryDelaysMs: readonly number[];
 
-  constructor(keys: ApiKeyStore, fetchFn: typeof fetch = fetch, timeoutMs = 60_000) {
+  /**
+   * `retryDelaysMs`: how long to wait before each retry of a request that hit a server error (5xx) or a dropped
+   * connection. Providers have short hiccups (LTA's crowd API answered 500 four syncs running on 28 Oct); retrying
+   * quickly beats waiting a minute for the next sync. Answers like 404 or 429 and timeouts aren't retried.
+   */
+  constructor(
+    keys: ApiKeyStore,
+    fetchFn: typeof fetch = fetch,
+    timeoutMs = 60_000,
+    retryDelaysMs: readonly number[] = [1_000, 3_000],
+  ) {
     this.keys = keys;
     this.fetchFn = fetchFn;
     this.timeoutMs = timeoutMs;
+    this.retryDelaysMs = retryDelaysMs;
   }
 
   /**
@@ -101,16 +113,34 @@ export class ExternalApiFacade {
     return result;
   }
 
-  /** One HTTP call with a timeout. Errors name the host and path only: query strings may hold signatures. */
+  /** One HTTP call, with a timeout and quick retries. Errors name the host and path only: query strings may hold signatures. */
   private async request(url: string, init: RequestInit = {}): Promise<Response> {
+    for (let attempt = 0; ; attempt++) {
+      const outcome = await this.attempt(url, init);
+      if ("res" in outcome) return outcome.res;
+      const delay = outcome.retry ? this.retryDelaysMs[attempt] : undefined;
+      if (delay === undefined) throw new Error(outcome.failure);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  /** One try: the response, or what went wrong and whether trying again could help. */
+  private async attempt(
+    url: string,
+    init: RequestInit,
+  ): Promise<{ res: Response } | { failure: string; retry: boolean }> {
     const { host, pathname } = new URL(url);
+    const signal = AbortSignal.timeout(this.timeoutMs);
     let res: Response;
     try {
-      res = await this.fetchFn(url, { ...init, signal: AbortSignal.timeout(this.timeoutMs) });
+      res = await this.fetchFn(url, { ...init, signal });
     } catch (err) {
-      throw new Error(`${host}${pathname} failed: ${err instanceof Error ? err.message : String(err)}`);
+      if (signal.aborted)
+        return { failure: `${host}${pathname} failed: timed out after ${this.timeoutMs} ms`, retry: false };
+      return { failure: `${host}${pathname} failed: ${err instanceof Error ? err.message : String(err)}`, retry: true };
     }
-    if (!res.ok) throw new Error(`${host}${pathname} answered ${res.status} ${res.statusText}`.trim());
-    return res;
+    if (res.ok) return { res };
+    // 5xx is the provider's own hiccup; 4xx (404, 429 "too busy") means it, so retrying won't help
+    return { failure: `${host}${pathname} answered ${res.status} ${res.statusText}`.trim(), retry: res.status >= 500 };
   }
 }

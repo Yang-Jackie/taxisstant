@@ -2,17 +2,18 @@
 // its observers (DataSyncObserver) which layer changed. A fake fetch stands in for the server.
 // M7 adds the cache: loadCached() at startup, a daily ETag re-check, and the saved copy when offline (D1).
 // Package 2b: every static layer (D18). refreshLayer(t) is one layer, as a toggle needs it; refreshStatic() is all of them.
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Carpark } from "../entity/Carpark";
 import { ChargingStation } from "../entity/ChargingStation";
 import { FuelStation } from "../entity/FuelStation";
 import { HawkerCentre } from "../entity/HawkerCentre";
 import { STATIC_LAYERS } from "../entity/LayerType";
 import { MapDataRepository } from "../entity/MapDataRepository";
+import { Taxi } from "../entity/Taxi";
 import { TaxiStand } from "../entity/TaxiStand";
 import { CacheManager } from "../services/CacheManager";
 import { DataApiClient } from "../services/DataApiClient";
-import { callsTo, fakeServer, offline, ok, status, STANDS, type Answer } from "../testing/fakeServer";
+import { CARPARKS, callsTo, fakeServer, offline, ok, status, STANDS, type Answer } from "../testing/fakeServer";
 import { DataSyncController } from "./DataSyncController";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -274,3 +275,127 @@ describe("DataSyncController.refreshStatic — every static layer at once (packa
 function fuelStation() {
   return { id: "node/1", name: "Esso Test", brand: "Esso", latitude: 1.3, longitude: 103.8 };
 }
+
+// Package 2d — live data (D22, D25): refreshLive(layers) asks for what is on, together; refreshLiveLayer(t) for a toggle.
+describe("DataSyncController — live layers (package 2d)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("refreshLive asks only for the live data of the layers given, all at once", async () => {
+    const { fetchFn, dataSync } = setUp();
+
+    await dataSync.refreshLive(new Set(["TAXIS", "CARPARK", "FUEL"]));
+
+    expect(callsTo(fetchFn, "/taxis")).toBe(1);
+    expect(callsTo(fetchFn, "/carparks/availability")).toBe(1); // a carpark layer's live part
+    expect(callsTo(fetchFn, "/hotspots")).toBe(0);
+    expect(callsTo(fetchFn, "/charging-stations/availability")).toBe(0);
+    expect(fetchFn).toHaveBeenCalledTimes(2); // fuel has no live data; nothing static is fetched
+  });
+
+  it("puts taxis in the repository as real Taxis, seen at the server's asOf, and tells observers", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
+    const { repo, dataSync, observer } = setUp();
+
+    await dataSync.refreshLive(new Set(["TAXIS"]));
+
+    const taxis = repo.getByLayerType("TAXIS");
+    expect(taxis).toHaveLength(4);
+    expect(taxis[0]).toBeInstanceOf(Taxi);
+    expect(taxis[0]!.seenAt.toISOString()).toBe("2026-10-28T13:00:00.000Z");
+    expect(observer.onDataUpdated).toHaveBeenCalledWith("TAXIS");
+  });
+
+  it("keeps only busy stations as hotspots (D23)", async () => {
+    const { repo, dataSync } = setUp();
+    await dataSync.refreshLive(new Set(["HOTSPOT"]));
+    expect(repo.getByLayerType("HOTSPOT").map((h) => [h.id, h.density])).toEqual([
+      ["city-hall", "HIGH"],
+      ["dhoby-ghaut", "MEDIUM"],
+    ]);
+  });
+
+  it("puts free lots and chargers onto the carparks and charging stations", async () => {
+    const { repo, dataSync, observer } = setUp();
+    await dataSync.refreshStatic();
+
+    await dataSync.refreshLive(new Set(["CARPARK", "CHARGING"]));
+
+    expect(repo.getByLayerType("CARPARK").map((c) => [c.id, c.availableLots])).toEqual([
+      ["1", 117],
+      ["A2", 3],
+    ]);
+    expect(repo.getByLayerType("CHARGING")[0]!.availablePoints).toBe(2);
+    expect(observer.onDataUpdated).toHaveBeenCalledWith("CARPARK");
+  });
+
+  it("keeps availability that arrived before its layer: the carpark list gets it when it lands", async () => {
+    let release = () => {};
+    const slowList = new Promise<void>((resolve) => (release = resolve));
+    const { repo, dataSync } = setUp({ "/carparks": async (init) => (await slowList, ok(CARPARKS)(init)) });
+
+    const list = dataSync.refreshLayer("CARPARK");
+    await dataSync.refreshLive(new Set(["CARPARK"])); // availability first, as can happen at startup
+    release();
+    await list;
+
+    expect(repo.getByLayerType("CARPARK").map((c) => c.availableLots)).toEqual([117, 3]);
+  });
+
+  it("refreshLive never rejects, even with the server down", async () => {
+    const { dataSync } = setUp({ "*": offline });
+    await expect(dataSync.refreshLive(new Set(["TAXIS", "HOTSPOT", "CARPARK"]))).resolves.toBeUndefined();
+  });
+
+  it("refreshLiveLayer rejects when nothing was ever saved and the download fails (exception 4a)", async () => {
+    const { dataSync } = setUp({ "*": status(503) });
+    await expect(dataSync.refreshLiveLayer("TAXIS")).rejects.toThrow(/503/);
+  });
+
+  it("refreshLiveLayer accepts a saved copy while it is recent enough, and not after (D22)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
+    const p = phone();
+    await p.open().dataSync.refreshLiveLayer("TAXIS");
+
+    vi.setSystemTime(new Date("2026-10-28T13:04:00Z"));
+    await expect(p.open({ "*": offline }).dataSync.refreshLiveLayer("TAXIS")).resolves.toBeUndefined();
+
+    vi.setSystemTime(new Date("2026-10-28T13:06:00Z"));
+    await expect(p.open({ "*": offline }).dataSync.refreshLiveLayer("TAXIS")).rejects.toThrow();
+  });
+
+  it("counts a 304 as confirmed now: the server says its latest data is the copy we have", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
+    const p = phone();
+    await p.open().dataSync.refreshLiveLayer("TAXIS");
+
+    vi.setSystemTime(new Date("2026-10-28T13:06:00Z"));
+    const next = p.open({ "/taxis": status(304) });
+    await next.dataSync.refreshLiveLayer("TAXIS");
+
+    expect(next.repo.getByLayerType("TAXIS")[0]!.seenAt.toISOString()).toBe("2026-10-28T13:06:00.000Z");
+  });
+
+  it("shares one request between a poll and a toggle that arrive together", async () => {
+    const { fetchFn, dataSync } = setUp();
+    await Promise.all([dataSync.refreshLive(new Set(["TAXIS"])), dataSync.refreshLiveLayer("TAXIS")]);
+    expect(callsTo(fetchFn, "/taxis")).toBe(1);
+  });
+
+  it("asks again on the next poll: live data is never 'done for the session'", async () => {
+    const { fetchFn, dataSync } = setUp();
+    await dataSync.refreshLive(new Set(["TAXIS"]));
+    await dataSync.refreshLive(new Set(["TAXIS"]));
+    expect(callsTo(fetchFn, "/taxis")).toBe(2);
+  });
+
+  it("loadCached brings back saved live data too", async () => {
+    const p = phone();
+    await p.open().dataSync.refreshLive(new Set(["TAXIS"]));
+    const next = p.open({ "*": offline });
+    await next.dataSync.loadCached();
+    expect(next.repo.getByLayerType("TAXIS")).toHaveLength(4);
+  });
+});

@@ -59,6 +59,9 @@
 .landmark-details__muted {
   color: #6a6d73;
 }
+.landmark-details__live {
+  font-weight: 700;
+}
 .landmark-details__alert {
   color: #b42318;
   font-weight: 700;

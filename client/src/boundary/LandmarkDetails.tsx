@@ -3,11 +3,20 @@ import { Carpark } from "../entity/Carpark";
 import { ChargingStation } from "../entity/ChargingStation";
 import { FuelStation } from "../entity/FuelStation";
 import { HawkerCentre, type Closure } from "../entity/HawkerCentre";
+import type { Hotspot } from "../entity/Hotspot";
 import type { Landmark } from "../entity/Landmark";
 import { TaxiStand } from "../entity/TaxiStand";
 
 const shortDate = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", timeZone: "Asia/Singapore" });
 const day = (isoDate: string) => shortDate.format(new Date(`${isoDate}T00:00:00+08:00`));
+const clock = new Intl.DateTimeFormat("en-SG", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Singapore",
+});
+/** "as of 20:50", in Singapore time: how old a live figure is (D22). */
+const asOf = (at: Date | undefined) => (at ? ` · as of ${clock.format(at)}` : "");
 const range = (c: Closure) => (c.from === c.to ? day(c.from) : `${day(c.from)} – ${day(c.to)}`);
 const why = (c: Closure) => (c.reason === "cleaning" ? "cleaning" : (c.remarks ?? "works").toLowerCase());
 
@@ -37,7 +46,17 @@ function Facts({ item, now }: { item: Landmark; now: Date }) {
     );
   }
   if (item instanceof Carpark) {
-    return <p>{[`${item.agency} carpark`, item.area].filter(Boolean).join(" · ")}</p>;
+    const free = item.availableLotsAt(now);
+    return (
+      <>
+        <p>{[`${item.agency} carpark`, item.area].filter(Boolean).join(" · ")}</p>
+        {free !== undefined && (
+          <p className="landmark-details__live">
+            {free} lot{free === 1 ? "" : "s"} free{asOf(item.availabilityAsOf)}
+          </p>
+        )}
+      </>
+    );
   }
   if (item instanceof FuelStation) {
     return (
@@ -54,9 +73,15 @@ function Facts({ item, now }: { item: Landmark; now: Date }) {
       item.maxPowerKw && `up to ${item.maxPowerKw} kW`,
       item.hasDcFast && "DC fast",
     ];
+    const free = item.availablePointsAt(now);
     return (
       <>
         <p>{speed.filter(Boolean).join(" · ")}</p>
+        {free !== undefined && (
+          <p className="landmark-details__live">
+            {free} of {item.chargePoints} free{asOf(item.availabilityAsOf)}
+          </p>
+        )}
         <p>{item.plugTypes.join(", ")}</p>
         {item.name !== item.location.address && <p>{item.location.address}</p>}
         <p className="landmark-details__muted">{item.operators.join(", ")}</p>
@@ -73,6 +98,19 @@ function Facts({ item, now }: { item: Landmark; now: Date }) {
     );
   }
   return null;
+}
+
+/** What a hotspot's popup says: how busy the station's platforms were, and when (D20, D23). */
+export function HotspotDetails({ hotspot }: { hotspot: Hotspot }) {
+  return (
+    <div className="landmark-details">
+      <h2>{hotspot.stationName}</h2>
+      <p className="landmark-details__live">
+        {hotspot.density === "HIGH" ? "Very crowded" : "Crowded"} platforms{asOf(hotspot.validTo)}
+      </p>
+      <p className="landmark-details__muted">{hotspot.codes.join(" · ")}</p>
+    </div>
+  );
 }
 
 /** What a marker's popup says about its landmark, by layer. `now` is read once, when the popup opens. */

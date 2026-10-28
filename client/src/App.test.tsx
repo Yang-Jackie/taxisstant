@@ -110,7 +110,7 @@ describe("App (with controllers)", () => {
     await userEvent.click(button("Carpark"));
 
     await waitFor(() => expect(shown(container)).toBe(5));
-    expect(fetchFn).toHaveBeenCalledTimes(STATIC_PATHS.length);
+    for (const path of STATIC_PATHS) expect(callsTo(fetchFn, path), path).toBe(1); // only live data is asked for again
   });
 
   it("shows a toast and switches the toggle back off when the stands can't be loaded (exception 4a)", async () => {
@@ -200,5 +200,79 @@ describe("App (with controllers)", () => {
 
     await waitFor(() => expect(shown(container)).toBe(2 + 1 + 1 + 1)); // carparks, fuel, chargers, hawker centres
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+// Package 2d — live layers in the whole app.
+describe("App — live layers (package 2d)", () => {
+  it("shows nearby taxis when turned on (UC 0002), clustered over the island", async () => {
+    const fetchFn = serve();
+    const { container } = await openApp();
+
+    await userEvent.click(button("Nearby taxis"));
+
+    await waitFor(() => expect(shown(container)).toBe(4));
+    expect(callsTo(fetchFn, "/taxis")).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows busy stations as hotspots when turned on (UC 0003)", async () => {
+    serve();
+    await openApp();
+
+    await userEvent.click(button("Hotspots"));
+
+    expect(await screen.findByTitle("City Hall: very crowded")).toBeInTheDocument();
+    expect(screen.getByTitle("Dhoby Ghaut: crowded")).toBeInTheDocument();
+    expect(screen.queryByTitle(/Jurong East/)).not.toBeInTheDocument(); // LOW isn't a hotspot (D23)
+  });
+
+  it("gives nearby taxis their toast and switches back when they can't be loaded", async () => {
+    serve({ "/taxis": status(503) });
+    await openApp();
+
+    await userEvent.click(button("Nearby taxis"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/unable to load nearby taxi markers/i);
+    expect(button("Nearby taxis")).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("pauses polling while the page is hidden, and asks again when it is shown (D25)", async () => {
+    const fetchFn = serve();
+    await openApp();
+    await userEvent.click(button("Nearby taxis"));
+    await waitFor(() => expect(callsTo(fetchFn, "/taxis")).toBeGreaterThanOrEqual(1));
+    const before = callsTo(fetchFn, "/taxis");
+
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    visibility.mockReturnValue("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    await waitFor(() => expect(callsTo(fetchFn, "/taxis")).toBe(before + 1)); // coming back asks at once
+  });
+});
+
+describe("App — page visibility (D25)", () => {
+  it("tells the map controller when the page is hidden and shown again, so polling pauses in between", async () => {
+    serve();
+    const controllers = initControllers();
+    await startControllers(controllers);
+    const setForeground = vi.spyOn(controllers.mapDisplay, "setForeground");
+    const visibility = vi.spyOn(document, "visibilityState", "get");
+    render(
+      <ControllersContext.Provider value={controllers}>
+        <App />
+      </ControllersContext.Provider>,
+    );
+    expect(setForeground).toHaveBeenLastCalledWith(true);
+
+    visibility.mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(setForeground).toHaveBeenLastCalledWith(false);
+
+    visibility.mockReturnValue("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(setForeground).toHaveBeenLastCalledWith(true);
+    visibility.mockRestore();
   });
 });

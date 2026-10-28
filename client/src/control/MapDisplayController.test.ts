@@ -2,15 +2,15 @@
 // toggle → settings (saved) → load data if needed → show; on failure, switch back and set a notice (D3).
 // M7: with a copy saved by an earlier session, a failure no longer matters (D1).
 // Package 2b: every static layer (UC 0004–0007), only what is in view (refreshVisible), clustered when zoomed out (D17).
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Viewport } from "../entity/Bounds";
 import { STATIC_LAYERS, type StaticLayer } from "../entity/LayerType";
 import { MapDataRepository } from "../entity/MapDataRepository";
 import { CacheManager } from "../services/CacheManager";
 import { DataApiClient } from "../services/DataApiClient";
-import { callsTo, fakeServer, offline, status, type Answer } from "../testing/fakeServer";
-import { DataSyncController } from "./DataSyncController";
-import { MapDisplayController, SINGAPORE_VIEW } from "./MapDisplayController";
+import { callsTo, fakeServer, hotspotsAt, offline, ok, status, TAXIS, type Answer } from "../testing/fakeServer";
+import { DataSyncController, type LiveLayer } from "./DataSyncController";
+import { LIVE_POLL_MS, MapDisplayController, SINGAPORE_VIEW } from "./MapDisplayController";
 import { SettingsController } from "./SettingsController";
 
 function memoryStore(initial: Record<string, unknown> = {}) {
@@ -89,15 +89,6 @@ describe("MapDisplayController", () => {
     mapDisplay.dismissNotice();
 
     expect(mapDisplay.getSnapshot().notice).toBeNull();
-  });
-
-  it("toggling a live layer (live data comes in package 2d) only changes the setting — nothing is downloaded", async () => {
-    const { fetchFn, settings, mapDisplay } = setUp();
-
-    await mapDisplay.toggleLayer("TAXIS");
-
-    expect(settings.isLayerVisible("TAXIS")).toBe(true);
-    expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it("start() loads and shows Taxi stands if a previous session left them on", async () => {
@@ -263,5 +254,190 @@ describe("MapDisplayController.refreshVisible — what's in view, at what zoom (
     await dataSync.refreshLayer("CARPARK");
 
     expect(ids(mapDisplay, "CARPARK")).toEqual(["A2"]);
+  });
+});
+
+// Package 2d — live layers: taxis (D24) and hotspots (D23), age limits (D22), polling every 30 s together (D25).
+describe("MapDisplayController — live layers (package 2d)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("toggling Nearby taxis on downloads them and shows each taxi at street level", async () => {
+    const { fetchFn, settings, mapDisplay } = setUp();
+
+    await mapDisplay.toggleLayer("TAXIS");
+
+    expect(settings.isLayerVisible("TAXIS")).toBe(true);
+    expect(callsTo(fetchFn, "/taxis")).toBe(1);
+    expect(mapDisplay.getSnapshot().visible.TAXIS.items).toHaveLength(4);
+  });
+
+  it("clusters taxis when zoomed out: density as counts (FR-1.2.2, D24)", async () => {
+    const { mapDisplay } = setUp();
+    await mapDisplay.toggleLayer("TAXIS");
+
+    mapDisplay.refreshVisible(SINGAPORE_VIEW);
+
+    const { items, clusters } = mapDisplay.getSnapshot().visible.TAXIS;
+    expect(clusters.map((c) => c.count)).toEqual([3]); // the three in Orchard
+    expect(items).toHaveLength(1); // the one in Jurong
+  });
+
+  it("shows only busy stations as hotspots, never clustered (D23)", async () => {
+    const { mapDisplay } = setUp();
+    await mapDisplay.toggleLayer("HOTSPOT");
+    mapDisplay.refreshVisible(SINGAPORE_VIEW);
+
+    const { items, clusters } = mapDisplay.getSnapshot().visible.HOTSPOT;
+    expect(items.map((h) => h.id).sort()).toEqual(["city-hall", "dhoby-ghaut"]);
+    expect(clusters).toEqual([]);
+  });
+
+  it("says so when no station is crowded, and keeps Hotspots on: an empty map isn't a failure", async () => {
+    const quiet = () => hotspotsAt(new Date()).map((h) => ({ ...h, density: "LOW" as const }));
+    const { settings, mapDisplay } = setUp({ "/hotspots": ok(quiet) });
+
+    await mapDisplay.toggleLayer("HOTSPOT");
+
+    expect(mapDisplay.getSnapshot().notice).toBe("No stations are crowded right now.");
+    expect(settings.isLayerVisible("HOTSPOT")).toBe(true);
+  });
+
+  const toasts: [LiveLayer, string, RegExp][] = [
+    ["TAXIS", "/taxis", /^Unable to load nearby taxi markers\. Please check your connection\.$/],
+    ["HOTSPOT", "/hotspots", /^Unable to load hotspot markers\. Please check your connection\.$/],
+  ];
+  for (const [layer, path, toast] of toasts) {
+    it(`gives ${layer} its use case's toast and switches back when nothing can be shown (UC 0002/0003)`, async () => {
+      const { settings, mapDisplay } = setUp({ [path]: status(503) });
+
+      await mapDisplay.toggleLayer(layer);
+
+      expect(mapDisplay.getSnapshot().notice).toMatch(toast);
+      expect(settings.isLayerVisible(layer)).toBe(false);
+    });
+  }
+
+  it("takes taxis off the map once they are over 5 minutes old, even with no new data (D22)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
+    let online = true;
+    const { mapDisplay } = setUp({ "/taxis": (init) => (online ? ok(TAXIS)(init) : offline(init)) });
+    await mapDisplay.toggleLayer("TAXIS");
+    mapDisplay.setForeground(true);
+    online = false;
+
+    await vi.advanceTimersByTimeAsync(4.5 * 60 * 1000);
+    expect(mapDisplay.getSnapshot().visible.TAXIS.items).toHaveLength(4);
+
+    await vi.advanceTimersByTimeAsync(60 * 1000);
+    expect(mapDisplay.getSnapshot().visible.TAXIS.items).toHaveLength(0);
+    mapDisplay.setForeground(false);
+  });
+
+  it("takes a hotspot off the map once its slot ended over 30 minutes ago (D22)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
+    const { mapDisplay } = setUp({ "/hotspots": ok(hotspotsAt(new Date("2026-10-28T13:00:00Z"))) }); // slot ended 12:45
+    await mapDisplay.toggleLayer("HOTSPOT");
+    mapDisplay.setForeground(true);
+
+    await vi.advanceTimersByTimeAsync(14 * 60 * 1000); // 13:14: the slot ended 29 minutes ago
+    expect(mapDisplay.getSnapshot().visible.HOTSPOT.items).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(2 * 60 * 1000); // 13:16: 31 minutes
+    expect(mapDisplay.getSnapshot().visible.HOTSPOT.items).toHaveLength(0);
+    mapDisplay.setForeground(false);
+  });
+});
+
+describe("MapDisplayController — polling (D25)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("asks for the live layers that are on every 30 seconds, together", async () => {
+    const { fetchFn, mapDisplay } = setUp();
+    await mapDisplay.toggleLayer("TAXIS");
+    await mapDisplay.toggleLayer("HOTSPOT");
+    mapDisplay.setForeground(true);
+    await vi.advanceTimersByTimeAsync(0);
+    fetchFn.mockClear();
+
+    await vi.advanceTimersByTimeAsync(LIVE_POLL_MS);
+
+    expect(callsTo(fetchFn, "/taxis")).toBe(1);
+    expect(callsTo(fetchFn, "/hotspots")).toBe(1);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    mapDisplay.setForeground(false);
+  });
+
+  it("keeps carpark and charger availability current: asks every 30 seconds while those layers are on", async () => {
+    const { fetchFn, mapDisplay } = setUp();
+    await mapDisplay.toggleLayer("CARPARK");
+    mapDisplay.setForeground(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mapDisplay.getSnapshot().visible.CARPARK.items.map((c) => c.availableLots)).toEqual([117, 3]);
+    fetchFn.mockClear();
+
+    await vi.advanceTimersByTimeAsync(LIVE_POLL_MS);
+
+    expect(callsTo(fetchFn, "/carparks/availability")).toBe(1);
+    mapDisplay.setForeground(false);
+  });
+
+  it("asks for availability as soon as Carpark or Charge is turned on, not at the next tick", async () => {
+    const { fetchFn, mapDisplay } = setUp();
+    mapDisplay.setForeground(true);
+    fetchFn.mockClear();
+
+    await mapDisplay.toggleLayer("CHARGING");
+    await vi.advanceTimersByTimeAsync(0); // no time passes: no timer tick
+
+    expect(callsTo(fetchFn, "/charging-stations/availability")).toBe(1);
+    expect(mapDisplay.getSnapshot().visible.CHARGING.items[0]?.availablePoints).toBe(2);
+    mapDisplay.setForeground(false);
+  });
+
+  it("asks for nothing while no live layer (or availability layer) is on", async () => {
+    const { fetchFn, mapDisplay } = setUp();
+    await mapDisplay.toggleLayer("FUEL");
+    mapDisplay.setForeground(true);
+    fetchFn.mockClear();
+
+    await vi.advanceTimersByTimeAsync(5 * LIVE_POLL_MS);
+
+    expect(fetchFn).not.toHaveBeenCalled();
+    mapDisplay.setForeground(false);
+  });
+
+  it("stops while the app is in the background, and asks at once when it comes back", async () => {
+    const { fetchFn, mapDisplay } = setUp();
+    await mapDisplay.toggleLayer("TAXIS");
+    mapDisplay.setForeground(true);
+    await vi.advanceTimersByTimeAsync(0);
+    mapDisplay.setForeground(false);
+    fetchFn.mockClear();
+
+    await vi.advanceTimersByTimeAsync(5 * LIVE_POLL_MS);
+    expect(fetchFn).not.toHaveBeenCalled();
+
+    mapDisplay.setForeground(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(callsTo(fetchFn, "/taxis")).toBe(1);
+    mapDisplay.setForeground(false);
+  });
+
+  it("stops polling when the last live layer is turned off", async () => {
+    const { fetchFn, mapDisplay } = setUp();
+    await mapDisplay.toggleLayer("TAXIS");
+    mapDisplay.setForeground(true);
+    await mapDisplay.toggleLayer("TAXIS");
+    fetchFn.mockClear();
+
+    await vi.advanceTimersByTimeAsync(5 * LIVE_POLL_MS);
+
+    expect(fetchFn).not.toHaveBeenCalled();
+    mapDisplay.setForeground(false);
   });
 });

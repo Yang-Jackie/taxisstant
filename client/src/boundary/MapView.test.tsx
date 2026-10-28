@@ -9,7 +9,9 @@ import type { VisibleLayers } from "../control/MapDisplayController";
 import { Carpark } from "../entity/Carpark";
 import type { Viewport } from "../entity/Bounds";
 import { FuelStation } from "../entity/FuelStation";
+import { Hotspot } from "../entity/Hotspot";
 import { Location } from "../entity/Location";
+import { Taxi } from "../entity/Taxi";
 import { TaxiStand } from "../entity/TaxiStand";
 import { MapView } from "./MapView";
 
@@ -176,5 +178,58 @@ describe("MapView.onPan (FR-1.5.3)", () => {
     const onPan = vi.fn();
     render(<MapView visible={visibleWith()} onPan={onPan} />);
     expect(onPan).not.toHaveBeenCalled();
+  });
+});
+
+// Package 2d — live layers: taxis (D24) and hotspot circles (D23).
+describe("MapView — live layers (package 2d)", () => {
+  const seen = new Date("2026-10-28T13:00:00Z");
+  const taxis = [new Taxi(new Location(1.3045, 103.8335), seen), new Taxi(new Location(1.3329, 103.7436), seen)];
+  const slot = { validFrom: new Date("2026-10-28T12:40:00Z"), validTo: new Date("2026-10-28T12:50:00Z") };
+  const cityHall = new Hotspot({
+    id: "city-hall",
+    centre: new Location(1.2931, 103.852),
+    stationName: "City Hall",
+    codes: ["EW13", "NS25"],
+    density: "HIGH",
+    ...slot,
+  });
+  const dhoby = new Hotspot({
+    id: "dhoby-ghaut",
+    centre: new Location(1.2989, 103.8457),
+    stationName: "Dhoby Ghaut",
+    codes: ["NS24"],
+    density: "MEDIUM",
+    ...slot,
+  });
+
+  it("draws each available taxi as the mockup's amber car marker", () => {
+    render(<MapView visible={visibleWith({ TAXIS: { items: taxis, clusters: [] } })} />);
+    const markers = screen.getAllByTitle("Available taxi");
+    expect(markers).toHaveLength(2);
+    expect(markers[0]).toHaveClass("marker-chip--find");
+  });
+
+  it("draws a cluster of taxis as a bubble with its count", () => {
+    render(<MapView visible={visibleWith({ TAXIS: { items: [], clusters: [{ ...carparkCluster, count: 12 }] } })} />);
+    expect(screen.getByTitle("12 available taxis: tap to zoom in")).toHaveTextContent("12");
+  });
+
+  it("draws a hotspot as a heat circle with a flame to tap, the circle bigger for a very crowded station", () => {
+    const { container } = render(
+      <MapView visible={visibleWith({ HOTSPOT: { items: [cityHall, dhoby], clusters: [] } })} />,
+    );
+    expect(container.querySelectorAll("path.leaflet-interactive")).toHaveLength(2);
+    expect(screen.getByTitle("City Hall: very crowded")).toBeInTheDocument();
+    expect(screen.getByTitle("Dhoby Ghaut: crowded")).toBeInTheDocument();
+    expect(cityHall.radius).toBeGreaterThan(dhoby.radius);
+  });
+
+  it("removes the circles when hotspots go away", () => {
+    const { container, rerender } = render(
+      <MapView visible={visibleWith({ HOTSPOT: { items: [cityHall], clusters: [] } })} />,
+    );
+    rerender(<MapView visible={visibleWith()} />);
+    expect(container.querySelectorAll("path.leaflet-interactive")).toHaveLength(0);
   });
 });

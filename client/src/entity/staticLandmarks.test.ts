@@ -50,3 +50,42 @@ describe("ChargingStation", () => {
     expect(station.operators).toHaveLength(2);
   });
 });
+
+// Package 2d — live availability on carparks and charging stations (the design model's availableLots, availablePoints).
+describe("availability", () => {
+  const asOf = new Date("2026-10-28T13:00:00Z");
+  const carpark = new Carpark({ id: "1", name: "Suntec City", location: here, agency: "LTA" });
+
+  it("withAvailability gives an updated copy and leaves the original alone", () => {
+    const updated = carpark.withAvailability(117, asOf);
+    expect(updated).not.toBe(carpark);
+    expect(updated).toBeInstanceOf(Carpark);
+    expect([updated.availableLots, updated.availabilityAsOf]).toEqual([117, asOf]);
+    expect(carpark.availableLots).toBeUndefined();
+    expect(updated.location).toBe(carpark.location); // same Location: the map doesn't move its marker
+  });
+
+  it("free lots count for 15 minutes after they were reported (D22), then they're unknown", () => {
+    const updated = carpark.withAvailability(117, asOf);
+    expect(updated.availableLotsAt(new Date("2026-10-28T13:15:00Z"))).toBe(117);
+    expect(updated.availableLotsAt(new Date("2026-10-28T13:15:01Z"))).toBeUndefined();
+    expect(carpark.availableLotsAt(asOf)).toBeUndefined(); // never reported
+  });
+
+  it("works the same for free chargers", () => {
+    const station = new ChargingStation({
+      id: "x",
+      name: "X",
+      location: here,
+      operators: ["A"],
+      chargePoints: 5,
+      hasDcFast: false,
+      plugTypes: ["Type 2"],
+    });
+    const updated = station.withAvailability(2, asOf);
+    expect(updated).toBeInstanceOf(ChargingStation);
+    expect(updated.availablePointsAt(new Date("2026-10-28T13:10:00Z"))).toBe(2);
+    expect(updated.chargePoints).toBe(5);
+    expect(updated.availablePointsAt(new Date("2026-10-28T14:00:00Z"))).toBeUndefined();
+  });
+});

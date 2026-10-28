@@ -1,11 +1,15 @@
 import type { LatLngTuple } from "leaflet";
-import { useCallback, useEffect } from "react";
-import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { useCallback, useEffect, type ReactNode } from "react";
+import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import type { Viewport } from "../entity/Bounds";
+import type { Hotspot } from "../entity/Hotspot";
+import type { Landmark } from "../entity/Landmark";
+import { STATIC_LAYERS, type LayerType } from "../entity/LayerType";
+import type { Locatable } from "../entity/Locatable";
 import type { Location } from "../entity/Location";
-import { STATIC_LAYERS, type StaticLayer } from "../entity/LayerType";
+import type { LayerView } from "../control/LayerClusters";
 import type { VisibleLayers } from "../control/MapDisplayController";
-import { LandmarkDetails } from "./LandmarkDetails";
+import { HotspotDetails, LandmarkDetails } from "./LandmarkDetails";
 import { clusterIcon, markerIcon } from "./markerIcons";
 import {
   MAX_ZOOM,
@@ -23,7 +27,8 @@ export const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors';
 
 /** How each layer's markers are described when grouped. */
-const PLURAL: Record<StaticLayer, string> = {
+const PLURAL: Record<Exclude<LayerType, "HOTSPOT">, string> = {
+  TAXIS: "available taxis",
   TAXI_STAND: "taxi stands",
   CARPARK: "carparks",
   FUEL: "fuel stations",
@@ -79,16 +84,28 @@ function OsmCredit() {
   return null;
 }
 
-function LayerMarkers({ layer, visible }: { layer: StaticLayer; visible: VisibleLayers }) {
+interface PointMarkersProps<T extends Locatable> {
+  layer: Exclude<LayerType, "HOTSPOT">;
+  view: LayerView<T>;
+  keyOf: (item: T, index: number) => string;
+  titleOf: (item: T) => string;
+  popupOf?: (item: T) => ReactNode;
+}
+
+/** One layer's markers and cluster bubbles; tapping a bubble zooms to where it splits (D17). */
+function PointMarkers<T extends Locatable>({ layer, view, keyOf, titleOf, popupOf }: PointMarkersProps<T>) {
   const map = useMap();
-  const { items, clusters } = visible[layer];
+  const { items, clusters } = view;
   return (
     <>
-      {items.map((item) => (
-        <Marker key={item.id} position={positionOf(item.location)} icon={markerIcon(layer)} title={item.name}>
-          <Popup>
-            <LandmarkDetails item={item} />
-          </Popup>
+      {items.map((item, i) => (
+        <Marker
+          key={keyOf(item, i)}
+          position={positionOf(item.getLocation())}
+          icon={markerIcon(layer)}
+          title={titleOf(item)}
+        >
+          {popupOf && <Popup>{popupOf(item)}</Popup>}
         </Marker>
       ))}
       {clusters.map((c) => (
@@ -99,6 +116,35 @@ function LayerMarkers({ layer, visible }: { layer: StaticLayer; visible: Visible
           title={`${c.count} ${PLURAL[layer]}: tap to zoom in`}
           eventHandlers={{ click: () => map.setView([c.location.latitude, c.location.longitude], c.zoomTo) }}
         />
+      ))}
+    </>
+  );
+}
+
+/** The mockup's heat circles: amber, larger and stronger for very crowded stations (D23), with a flame to tap. */
+function HotspotCircles({ hotspots }: { hotspots: readonly Hotspot[] }) {
+  const busy = (h: Hotspot) => (h.density === "HIGH" ? "very crowded" : "crowded");
+  return (
+    <>
+      {hotspots.map((h) => (
+        <Circle
+          key={h.id}
+          center={positionOf(h.centre)}
+          radius={h.radius}
+          pathOptions={{ weight: 0, fillColor: "#e8930c", fillOpacity: h.density === "HIGH" ? 0.35 : 0.2 }}
+        />
+      ))}
+      {hotspots.map((h) => (
+        <Marker
+          key={`flame-${h.id}`}
+          position={positionOf(h.centre)}
+          icon={markerIcon("HOTSPOT")}
+          title={`${h.stationName}: ${busy(h)}`}
+        >
+          <Popup>
+            <HotspotDetails hotspot={h} />
+          </Popup>
+        </Marker>
       ))}
     </>
   );
@@ -118,9 +164,18 @@ export function MapView({ visible, onPan }: MapViewProps) {
       <TileLayer url={ONEMAP_TILE_URL} attribution={ONEMAP_ATTRIBUTION} />
       {onPan && <ViewportReporter onPan={onPan} />}
       {fuelShown && <OsmCredit />}
+      <HotspotCircles hotspots={visible.HOTSPOT.items} />
       {STATIC_LAYERS.map((t) => (
-        <LayerMarkers key={t} layer={t} visible={visible} />
+        <PointMarkers<Landmark>
+          key={t}
+          layer={t}
+          view={visible[t]}
+          keyOf={(item) => item.id}
+          titleOf={(item) => item.name}
+          popupOf={(item) => <LandmarkDetails item={item} />}
+        />
       ))}
+      <PointMarkers layer="TAXIS" view={visible.TAXIS} keyOf={(_, i) => String(i)} titleOf={() => "Available taxi"} />
     </MapContainer>
   );
 }

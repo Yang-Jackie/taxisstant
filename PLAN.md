@@ -326,9 +326,13 @@ I review and approve before the next package starts. Claude asks me whenever a d
      - [x] `DatasetAdapter.getPaths()` (D21)
      - [x] taxis (data.gov.sg, one snapshot), carpark availability (LTA only, D19), charger availability (EV batch) and hotspots (real-time crowd density, D20)
      - [x] intervals: taxis every 30 s, carpark availability every minute and chargers every 5 minutes (LTA's own pace, within the diagram's 1–5), hotspots every 10 minutes (D20)
-   - **2d. Live layers, client**
-     - [ ] `refreshLive(layers, kinds)`, polling only what's toggled on, pausing when the app is in the background
-     - [ ] `MapDataRepository.updateAvailability`; taxis with clustering or density; hotspots as circles
+   - **2d. Live layers, client** ✅
+     - [x] `Taxi`, `Site` → `Hotspot` entities; age limits per layer (D22)
+     - [x] `DataSyncController.refreshLive(layers)` (suggestion `kinds` join in package 7) and `refreshLiveLayer(t)`; a 304 counts as confirmed now
+     - [x] polling every 30 s, together, only what's on, paused in the background (D25); availability asked for as soon as Carpark or Charge is turned on
+     - [x] `MapDataRepository.updateAvailability`; free lots and chargers in popups, "as of" their time
+     - [x] taxis clustered (D24); busy stations as the mockup's heat circles (D23); UC 0002/0003 toasts
+     - [x] the server retries a provider's hiccups quickly (D26)
    - **2e. HTTP hardening**
      - [ ] rate limiting, a CORS allow-list, and no `X-Powered-By` header (gzip moved to 2b)
 3. **Suggested sites on the server (Strategy pattern)**
@@ -414,6 +418,11 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D19 — Carpark availability from LTA only (my decision, 28 Oct).** LTA's feed gives free lots for every HDB, URA and LTA carpark; data.gov.sg would add total lots for HDB carparks only. `Carpark.totalLots` is optional ([0..1]) in the design, so it stays empty, and the diagram's data.gov.sg "HDB carpark availability" feed is not used.
 - **D20 — Hotspots are real-time crowd levels (my decision, 28 Oct).** The documents say "crowd forecast" (FR-1.2.3, the data dictionary, the deployment diagram); we serve LTA's real-time platform crowd density instead (`PCDRealTime`, 10-minute slots, one request per train line), refreshed every 10 minutes rather than the diagram's 30. `Hotspot.validFrom`/`validTo` hold the slot. LTA publishes a slot only after it ends, so "real time" is the last completed slot, about 10–25 minutes old (seen on 28 Oct: at 21:08 the newest slot was 20:40–20:50); 2d decides how old a slot may be and still show. Package 3's pickup scoring uses the same real-time levels.
 - **D21 — Adapters declare a list of paths (my decision, 28 Oct).** LTA's crowd API takes one train line per request, so `DatasetAdapter.getPath()` becomes `getPaths()`: SyncService makes one request per path and `prepare()` receives the answers in order. Most adapters have one path. If any request fails, the sync retries and the last good copy stays (D7).
+- **D22 — How old live data may be (my decision, 28 Oct).** UC 0002/0003 want the cache "not older than 5 minutes" and the app online; the deployment note keeps stale data for offline use. Each live layer gets a limit: taxis 5 minutes (the use cases), carpark and charger availability 15 minutes, hotspots whose slot ended up to 30 minutes ago (LTA's slots run 10–25 minutes late, D20). Older counts as nothing to show: toggling then gives the use case's toast and switches back (exception 4a). Popups say how old live figures are ("as of 20:50"). This reads D1's "5-minute rule" as the taxis' age limit, not a polling interval.
+- **D23 — Only busy stations are hotspots (my decision, 28 Oct).** Stations at MEDIUM or HIGH get the mockup's heat circle (HIGH larger and stronger); LOW stations aren't drawn. At 21:08 on 28 Oct, 183 of 185 stations were LOW.
+- **D24 — Nearby taxis are clustered (my decision, 28 Oct).** FR-1.2.2's "location and density" comes from D17's clusters: bubbles with counts when zoomed out, the mockup's amber car marker per taxi when zoomed in.
+- **D25 — Live layers are polled every 30 seconds, together (my decision, 28 Oct).** One timer asks for every live layer that's on (and for carpark and charger availability while those layers are on), as the deployment note says; unchanged data answers 304. The timer stops while the app is in the background or no live layer is on. Taxis cost about 1.4 MB an hour while shown.
+- **D26 — Quick retries for providers' hiccups (28 Oct, extends D7).** On 28 Oct, LTA's crowd API answered 500 on four syncs running, so hotspots took four minutes to appear after a server start; LTA's EV file and Overpass had one-off 500s and 502s too. `ExternalApiFacade` now retries a request that hit a server error (5xx) or a dropped connection after 1 s and again after 3 s, before the sync fails and waits its minute (D7). Answers the provider means (404, 429 "too busy") and timeouts aren't retried.
 
 ---
 

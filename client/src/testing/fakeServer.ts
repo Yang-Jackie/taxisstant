@@ -1,5 +1,15 @@
 // Test helpers: a fake server for the static endpoints, answering with small bodies that fit the shared contract.
-import type { CarparkDto, ChargingStationDto, FuelStationDto, HawkerCentreDto, TaxiStandDto } from "@taxisstant/shared";
+import type {
+  CarparkAvailabilityDto,
+  CarparkDto,
+  ChargerAvailabilityDto,
+  ChargingStationDto,
+  FuelStationDto,
+  HawkerCentreDto,
+  HotspotDto,
+  TaxiDto,
+  TaxiStandDto,
+} from "@taxisstant/shared";
 import { vi } from "vitest";
 
 export const STANDS: TaxiStandDto[] = [
@@ -70,8 +80,63 @@ export const HAWKERS: HawkerCentreDto[] = [
   },
 ];
 
-/** Each static endpoint's data, by path under /api. */
-export const DATA: Record<string, unknown[]> = {
+/** Three taxis in Orchard, within 200 m of each other, and one in Jurong. */
+export const TAXIS: TaxiDto[] = [
+  { latitude: 1.3045, longitude: 103.8335 },
+  { latitude: 1.3048, longitude: 103.8345 },
+  { latitude: 1.3041, longitude: 103.8352 },
+  { latitude: 1.3329, longitude: 103.7436 },
+];
+export const CARPARK_LOTS: CarparkAvailabilityDto[] = [
+  { id: "1", availableLots: 117 },
+  { id: "A2", availableLots: 3 },
+];
+export const CHARGER_POINTS: ChargerAvailabilityDto[] = [{ id: "179024:103.846728", availablePoints: 2 }];
+
+/** City Hall very crowded, Dhoby Ghaut crowded, Jurong East quiet, in the 10-minute slot that ended 15 minutes before `now`. */
+export function hotspotsAt(now: Date): HotspotDto[] {
+  const validTo = new Date(now.getTime() - 15 * 60 * 1000);
+  const slot = {
+    validFrom: new Date(validTo.getTime() - 10 * 60 * 1000).toISOString(),
+    validTo: validTo.toISOString(),
+  };
+  return [
+    {
+      id: "city-hall",
+      stationName: "City Hall",
+      codes: ["EW13", "NS25"],
+      latitude: 1.2931,
+      longitude: 103.852,
+      density: "HIGH",
+      ...slot,
+    },
+    {
+      id: "dhoby-ghaut",
+      stationName: "Dhoby Ghaut",
+      codes: ["CC1", "NE6", "NS24"],
+      latitude: 1.2989,
+      longitude: 103.8457,
+      density: "MEDIUM",
+      ...slot,
+    },
+    {
+      id: "jurong-east",
+      stationName: "Jurong East",
+      codes: ["EW24", "NS1"],
+      latitude: 1.3332,
+      longitude: 103.7422,
+      density: "LOW",
+      ...slot,
+    },
+  ];
+}
+
+/** Each endpoint's data, by path under /api. Live data is made at the moment it is asked for, so it is current. */
+export const DATA: Record<string, unknown[] | (() => unknown[])> = {
+  "/taxis": TAXIS,
+  "/carparks/availability": CARPARK_LOTS,
+  "/charging-stations/availability": CHARGER_POINTS,
+  "/hotspots": () => hotspotsAt(new Date()),
   "/taxi-stands": STANDS,
   "/carparks": CARPARKS,
   "/fuel-stations": FUEL,
@@ -81,10 +146,16 @@ export const DATA: Record<string, unknown[]> = {
 
 export type Answer = (init?: RequestInit) => Promise<Response>;
 
+/** A 200 with `data`, as of the moment it is answered (live layers check how old their data is, D22). */
 export const ok =
-  (data: unknown[], etag = '"v1"'): Answer =>
+  (data: unknown[] | (() => unknown[]), etag = '"v1"'): Answer =>
   async () =>
-    new Response(JSON.stringify({ asOf: "2026-10-27T00:00:00.000Z", etag, data }), { status: 200 });
+    new Response(
+      JSON.stringify({ asOf: new Date().toISOString(), etag, data: typeof data === "function" ? data() : data }),
+      {
+        status: 200,
+      },
+    );
 export const status =
   (code: number): Answer =>
   async () =>

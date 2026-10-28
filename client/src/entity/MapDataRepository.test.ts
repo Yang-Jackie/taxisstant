@@ -1,13 +1,13 @@
 // M1 acceptance tests — MapDataRepository «container» (design model, 23 Oct): getByLayerType, replaceLayer.
 // updateAvailability and the suggestion methods come in Phase 2, with Carpark, ChargingStation and SuggestedSite.
 import { describe, expect, expectTypeOf, it } from "vitest";
-import type { Locatable } from "./Locatable";
 import { Location } from "./Location";
 import { MapDataRepository } from "./MapDataRepository";
-import type { Carpark } from "./Carpark";
 import type { ChargingStation } from "./ChargingStation";
 import type { FuelStation } from "./FuelStation";
 import type { HawkerCentre } from "./HawkerCentre";
+import { Carpark } from "./Carpark";
+import { Taxi } from "./Taxi";
 import { TaxiStand } from "./TaxiStand";
 
 function stand(id: string, latitude: number, longitude: number): TaxiStand {
@@ -20,10 +20,9 @@ function stand(id: string, latitude: number, longitude: number): TaxiStand {
   });
 }
 
-/** Anything with getLocation() is Locatable — a plain object works too (TypeScript checks shapes, not class names). */
-function taxiAt(latitude: number, longitude: number): Locatable {
-  const position = new Location(latitude, longitude);
-  return { getLocation: () => position };
+/** A Taxi is Locatable without being a Landmark (no id or name). */
+function taxiAt(latitude: number, longitude: number): Taxi {
+  return new Taxi(new Location(latitude, longitude), new Date("2026-10-28T13:00:00Z"));
 }
 
 const a = stand("A", 1.301, 103.8);
@@ -100,6 +99,34 @@ describe("MapDataRepository", () => {
         repo.replaceLayer("TAXI_STAND", [taxiAt(1.3, 103.8)]);
       };
       expect(typeof tryIt).toBe("function");
+    });
+  });
+
+  describe("updateAvailability (package 2d, the design model's updateAvailability)", () => {
+    const asOf = new Date("2026-10-28T13:00:00Z");
+    const carpark = (id: string) => new Carpark({ id, name: id, location: new Location(1.3, 103.8), agency: "HDB" });
+
+    it("sets each carpark's free lots by id, and marks ones missing from the report unknown", () => {
+      const repo = new MapDataRepository();
+      repo.replaceLayer("CARPARK", [carpark("A"), carpark("B")]);
+
+      repo.updateAvailability("CARPARK", new Map([["A", 12]]), asOf);
+
+      expect(repo.getByLayerType("CARPARK").map((c) => [c.id, c.availableLots])).toEqual([
+        ["A", 12],
+        ["B", undefined],
+      ]);
+    });
+
+    it("replaces items with copies, so arrays handed out before keep their old values", () => {
+      const repo = new MapDataRepository();
+      repo.replaceLayer("CARPARK", [carpark("A")]);
+      const before = repo.getByLayerType("CARPARK");
+
+      repo.updateAvailability("CARPARK", new Map([["A", 12]]), asOf);
+
+      expect(before[0]!.availableLots).toBeUndefined();
+      expect(repo.getByLayerType("CARPARK")[0]!.availableLots).toBe(12);
     });
   });
 });

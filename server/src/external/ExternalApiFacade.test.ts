@@ -232,3 +232,66 @@ describe("ExternalApiFacade — timeouts (package 2a)", () => {
     );
   });
 });
+
+describe("ExternalApiFacade — quick retries (package 2d: LTA answered 500 four syncs running)", () => {
+  const NO_WAIT = [0, 0];
+
+  it("retries a server error (5xx) and succeeds when the provider recovers", async () => {
+    const fetchFn = answering(new Response("oops", { status: 500 }), json({ elements: [] }));
+    const result = await new ExternalApiFacade(noKeys, fetchFn, 1000, NO_WAIT).fetch("OSM_OVERPASS", "q");
+    expect(result).toEqual({ elements: [] });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a dropped connection", async () => {
+    const fetchFn = vi.fn<(url: string | URL | Request, init?: RequestInit) => Promise<Response>>();
+    fetchFn.mockRejectedValueOnce(new TypeError("fetch failed")).mockResolvedValueOnce(json({ elements: [] }));
+    await new ExternalApiFacade(noKeys, fetchFn, 1000, NO_WAIT).fetch("OSM_OVERPASS", "q");
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after its retries, with the last failure", async () => {
+    const fetchFn = vi.fn(async () => new Response("down", { status: 503, statusText: "Service Unavailable" }));
+    await expect(new ExternalApiFacade(noKeys, fetchFn, 1000, NO_WAIT).fetch("OSM_OVERPASS", "q")).rejects.toThrow(
+      /503/,
+    );
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it("doesn't retry answers the provider means (404, 429) or timeouts", async () => {
+    for (const status of [404, 429]) {
+      const fetchFn = vi.fn(async () => new Response("no", { status }));
+      await expect(new ExternalApiFacade(noKeys, fetchFn, 1000, NO_WAIT).fetch("OSM_OVERPASS", "q")).rejects.toThrow(
+        String(status),
+      );
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    }
+    const neverAnswers = vi.fn(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) =>
+          init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))),
+        ),
+    );
+    await expect(new ExternalApiFacade(noKeys, neverAnswers, 20, NO_WAIT).fetch("OSM_OVERPASS", "q")).rejects.toThrow(
+      /timed out/,
+    );
+    expect(neverAnswers).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits 1 s, then 3 s, between tries by default", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchFn = vi.fn(async () => new Response("down", { status: 500 }));
+      const done = new ExternalApiFacade(noKeys, fetchFn).fetch("OSM_OVERPASS", "q").catch(() => "rejected");
+      await vi.advanceTimersByTimeAsync(999);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(fetchFn).toHaveBeenCalledTimes(3);
+      expect(await done).toBe("rejected");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
