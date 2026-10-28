@@ -112,6 +112,8 @@ const SERVES: Record<keyof typeof ENDPOINTS, Dataset> = {
   carparkAvailability: "CARPARK_AVAILABILITY",
   chargerAvailability: "CHARGER_AVAILABILITY",
   hotspots: "HOTSPOTS",
+  pickupSites: "PICKUP_SITES",
+  restStopSites: "REST_STOP_SITES",
 };
 
 describe("every endpoint in ENDPOINTS (package 2a)", () => {

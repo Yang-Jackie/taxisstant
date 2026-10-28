@@ -8,6 +8,7 @@ import { TaxiStandDto } from "./TaxiStandDto.js";
 import { CarparkAvailabilityDto } from "./CarparkAvailabilityDto.js";
 import { ChargerAvailabilityDto } from "./ChargerAvailabilityDto.js";
 import { HotspotDto } from "./HotspotDto.js";
+import { SuggestedPickupDto, SuggestedRestStopDto } from "./SuggestedSiteDtos.js";
 import { TaxiDto } from "./TaxiDto.js";
 
 /** One GET endpoint of our API: where it is, what it's for, and the exact shape of its JSON body. */
@@ -82,5 +83,21 @@ export const ENDPOINTS = {
     summary: "How crowded each MRT and LRT station is right now",
     description: "Live data from LTA DataMall's platform crowd density, refreshed every 10 minutes.",
     data: z.array(HotspotDto),
+  }),
+  pickupSites: endpoint("PickupSites", {
+    path: "/pickup-sites",
+    summary: "Taxi stands scored for picking up passengers (UC 0009)",
+    description:
+      "Built by the server whenever taxis or hotspots change (D28), best first. The client ranks them by score and " +
+      "distance from the driver.",
+    data: z.array(SuggestedPickupDto),
+  }),
+  restStopSites: endpoint("RestStopSites", {
+    path: "/rest-stop-sites",
+    summary: "Hawker centres scored for a rest stop (UC 0008)",
+    description:
+      "Built by the server whenever its inputs change (D29), best first. Energy stops are flagged, not scored: the " +
+      "client matches them to the driver's vehicle type.",
+    data: z.array(SuggestedRestStopDto),
   }),
 };

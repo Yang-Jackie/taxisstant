@@ -20,6 +20,8 @@ const ROUTES: readonly Route[] = [
   { endpoint: ENDPOINTS.carparkAvailability, dataset: "CARPARK_AVAILABILITY", label: "Carpark availability" },
   { endpoint: ENDPOINTS.chargerAvailability, dataset: "CHARGER_AVAILABILITY", label: "Charger availability" },
   { endpoint: ENDPOINTS.hotspots, dataset: "HOTSPOTS", label: "Hotspot" },
+  { endpoint: ENDPOINTS.pickupSites, dataset: "PICKUP_SITES", label: "Suggested pickup" },
+  { endpoint: ENDPOINTS.restStopSites, dataset: "REST_STOP_SITES", label: "Suggested rest stop" },
 ];
 
 export class DataApiController {

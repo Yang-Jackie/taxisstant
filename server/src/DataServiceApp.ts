@@ -12,6 +12,8 @@ import { HawkerCentreAdapter } from "./sync/adapters/HawkerCentreAdapter.js";
 import { HotspotAdapter } from "./sync/adapters/HotspotAdapter.js";
 import { TaxiAdapter } from "./sync/adapters/TaxiAdapter.js";
 import { TaxiStandAdapter } from "./sync/adapters/TaxiStandAdapter.js";
+import { PickupSuggestionStrategy } from "./sync/strategies/PickupSuggestionStrategy.js";
+import { RestStopSuggestionStrategy } from "./sync/strategies/RestStopSuggestionStrategy.js";
 import { SyncService } from "./sync/SyncService.js";
 
 class DataServiceApp {
@@ -22,17 +24,24 @@ class DataServiceApp {
     console.log(`Data service starting on port ${port}`);
     const cache = new ServerDataCache();
     const facade = new ExternalApiFacade(new ApiKeyStore());
-    const sync = new SyncService(facade, cache, [
-      new TaxiStandAdapter(),
-      new CarparkAdapter(),
-      new HawkerCentreAdapter(),
-      new FuelStationAdapter(),
-      new ChargingStationAdapter(),
-      new TaxiAdapter(),
-      new CarparkAvailabilityAdapter(),
-      new ChargerAvailabilityAdapter(),
-      new HotspotAdapter(),
-    ]);
+    const strategies = [new PickupSuggestionStrategy(), new RestStopSuggestionStrategy()];
+    const sync = new SyncService(
+      facade,
+      cache,
+      [
+        new TaxiStandAdapter(),
+        new CarparkAdapter(),
+        new HawkerCentreAdapter(),
+        new FuelStationAdapter(),
+        new ChargingStationAdapter(),
+        new TaxiAdapter(),
+        new CarparkAvailabilityAdapter(),
+        new ChargerAvailabilityAdapter(),
+        new HotspotAdapter(),
+      ],
+      60_000,
+      strategies,
+    );
 
     createHttpApp(cache, {
       corsOrigins: config.CORS_ORIGINS,

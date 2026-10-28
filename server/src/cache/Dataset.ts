@@ -7,4 +7,6 @@ export type Dataset =
   | "TAXIS"
   | "CARPARK_AVAILABILITY"
   | "CHARGER_AVAILABILITY"
-  | "HOTSPOTS";
+  | "HOTSPOTS"
+  | "PICKUP_SITES"
+  | "REST_STOP_SITES";

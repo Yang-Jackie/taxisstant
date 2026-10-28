@@ -2,7 +2,9 @@
 // each adapter's own interval. Keeps the last good copy when anything fails (D7).
 // Vitest's fake timers let these tests "wait" a whole day in milliseconds.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Dataset } from "../cache/Dataset.js";
 import type { DatasetAdapter } from "./DatasetAdapter.js";
+import type { SuggestionStrategy } from "./strategies/SuggestionStrategy.js";
 import { ServerDataCache } from "../cache/ServerDataCache.js";
 import { SyncService } from "./SyncService.js";
 
@@ -187,5 +189,73 @@ describe("SyncService with a several-path adapter", () => {
     facade.fetch.mockResolvedValue("back");
     await vi.advanceTimersByTimeAsync(RETRY);
     expect(cache.get("TAXI_STANDS")?.data).toEqual(["back", "back", "back"]);
+  });
+});
+
+// Package 3 — buildSuggestions: strategies rebuild their sites whenever one of their inputs changes.
+describe("SyncService.buildSuggestions (package 3)", () => {
+  /** A strategy that counts its builds and stores how many stands it saw. */
+  function countingStrategy(inputs: Dataset[], fail = false): SuggestionStrategy<number[]> & { builds: number } {
+    return {
+      builds: 0,
+      getDataset: () => "PICKUP_SITES",
+      getInputs: () => inputs,
+      buildSites(c) {
+        this.builds++;
+        if (fail) throw new Error("bad formula");
+        const stands = c.get("TAXI_STANDS")?.data as unknown[] | undefined;
+        return stands ? [stands.length] : undefined;
+      },
+    };
+  }
+
+  it("rebuilds a strategy's sites after a sync of one of its inputs, and stores them", async () => {
+    const facade = fakeFacade();
+    facade.fetch.mockResolvedValue(["stand A", "stand B"]);
+    const strategy = countingStrategy(["TAXI_STANDS"]);
+    sync = new SyncService(facade, cache, [adapter], RETRY, [strategy]);
+
+    await sync.start();
+
+    expect(strategy.builds).toBe(1);
+    expect(cache.get("PICKUP_SITES")?.data).toEqual([2]);
+  });
+
+  it("leaves a strategy alone when the dataset that changed isn't one of its inputs", async () => {
+    const facade = fakeFacade();
+    facade.fetch.mockResolvedValue(["stand A"]);
+    const strategy = countingStrategy(["HOTSPOTS"]);
+    sync = new SyncService(facade, cache, [adapter], RETRY, [strategy]);
+
+    await sync.start();
+
+    expect(strategy.builds).toBe(0);
+  });
+
+  it("stores nothing while the strategy can't build yet (an input it needs isn't loaded)", async () => {
+    const facade = fakeFacade();
+    facade.fetch.mockResolvedValue(["x"]);
+    const notYet: SuggestionStrategy<unknown> = {
+      getDataset: () => "PICKUP_SITES",
+      getInputs: () => ["TAXI_STANDS"],
+      buildSites: () => undefined,
+    };
+    sync = new SyncService(facade, cache, [adapter], RETRY, [notYet]);
+
+    await sync.start();
+
+    expect(cache.get("PICKUP_SITES")).toBeUndefined();
+  });
+
+  it("logs a strategy that fails, without failing the sync that triggered it", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const facade = fakeFacade();
+    facade.fetch.mockResolvedValue(["stand A"]);
+    sync = new SyncService(facade, cache, [adapter], RETRY, [countingStrategy(["TAXI_STANDS"], true)]);
+
+    await sync.start();
+
+    expect(cache.get("TAXI_STANDS")?.data).toEqual(["stand A"]); // the sync still stored its data
+    expect(errors).toHaveBeenCalledWith(expect.stringMatching(/Building PICKUP_SITES failed: bad formula/));
   });
 });

@@ -338,9 +338,9 @@ I review and approve before the next package starts. Claude asks me whenever a d
      - [x] a CORS allow-list from `CORS_ORIGINS`, empty by default (same origin); `TRUST_PROXY` for a reverse proxy; no `X-Powered-By`; `Cache-Control: no-cache`
      - [x] settings checked at startup (`ServerConfig.ts`); `.env.example` lists them (gzip moved to 2b)
 3. **Suggested sites on the server (Strategy pattern)**
-   - [ ] `SuggestionStrategy` with `PickupSuggestionStrategy.calculateProbability` and `RestStopSuggestionStrategy.calculateAmenities`
-   - [ ] `SyncService.buildSuggestions()`
-   - [ ] the `/api/pickup-sites` and `/api/rest-stop-sites` endpoints
+   - [x] `SuggestionStrategy` (`buildSites(cache)`, plus its output dataset and inputs) with `PickupSuggestionStrategy.calculateProbability` (D28) and `RestStopSuggestionStrategy.calculateAmenities` (D29)
+   - [x] `SyncService.buildSuggestions()`: a strategy rebuilds whenever one of its inputs syncs
+   - [x] the `/api/pickup-sites` and `/api/rest-stop-sites` endpoints, contract-tested on the real samples
 6. **Location (UC 0013)**
    - [ ] `GPSInterface`, `LocationController` and `LocationObserver`
    - [ ] driver pin
@@ -426,6 +426,8 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D25 — Live layers are polled every 30 seconds, together (my decision, 28 Oct).** One timer asks for every live layer that's on (and for carpark and charger availability while those layers are on), as the deployment note says; unchanged data answers 304. The timer stops while the app is in the background or no live layer is on. Taxis cost about 1.4 MB an hour while shown.
 - **D26 — Quick retries for providers' hiccups (28 Oct, extends D7).** On 28 Oct, LTA's crowd API answered 500 on four syncs running, so hotspots took four minutes to appear after a server start; LTA's EV file and Overpass had one-off 500s and 502s too. `ExternalApiFacade` now retries a request that hit a server error (5xx) or a dropped connection after 1 s and again after 3 s, before the sync fails and waits its minute (D7). Answers the provider means (404, 429 "too busy") and timeouts aren't retried.
 - **D27 — Rate limit and CORS (my decision, 28 Oct).** The design model's `DataApiController -rateLimiter` allows each client address 300 requests a minute (`RATE_LIMIT_PER_MINUTE`): one phone uses about 10–15, and mobile carriers put many phones behind one address. Over it, the answer is 429 with `Retry-After`, and the client falls back to its saved copy (D1, D22). The deployment diagram's "CORS allow-list" is `CORS_ORIGINS`, empty by default, because the plan is for the server to also host the app (one origin, so no CORS headers at all); a separate frontend host would be listed there. Behind a reverse proxy, `TRUST_PROXY` lets the limit see each client's own address; without it, `X-Forwarded-For` is ignored so clients can't fake their way past the limit.
+- **D28 — How pickup spots are scored (my decision, 28 Oct).** `PickupSuggestionStrategy` scores every taxi stand (where pickups can legally happen): *demand* is the busiest station within 500 m (HIGH 1, MEDIUM 0.6, LOW 0.25, no station 0.1); *competition* is 1 + (empty taxis within 300 m) ÷ 5; `calculateProbability` = demand ÷ competition, between 0 and 1. Crowd levels older than D22's limit and taxi positions over 5 minutes old are left out. FR-1.3.1 says "high taxi density" counts in favour; but the taxi data counts empty taxis, and empty taxis waiting nearby are competition, so they count against.
+- **D29 — How rest stops are scored (my decision, 28 Oct).** `RestStopSuggestionStrategy` scores every hawker centre not closed today (D13) that has cooked food (wet markets with no food stalls are left out): `calculateAmenities` = ½ × food choice (cooked-food stalls ÷ 60, capped at 1) + ½ × parking (the best carpark within 500 m: free lots ÷ 50, capped at 1, or 0.5 when its lots aren't known). First built as food 1 plus parking, it gave all 119 open centres 1.00 on real data (parking near hawker centres is never scarce: even the worst-off tenth have about 87 free lots nearby), so food choice was added on 28 Oct. `hasFuel` and `hasCharging` say what's within 500 m but aren't scored: only the client knows the vehicle type, so `rank(…, prefs)` uses them (FR-2.1.1, package 7).
 
 ---
 
@@ -433,7 +435,6 @@ I review and approve before the next package starts. Claude asks me whenever a d
 
 | When | Decision |
 |---|---|
-| Package 3 | How to score pickup spots and rest stops (`calculateProbability`, `calculateAmenities`). |
 | Package 8 | `Bookmark` has no `id` and holds the whole `Landmark`, yet `BookmarkList.remove(id)` needs an id. Should bookmarks get an `id` and store a `landmarkId`? |
 | Package 10 | How to get access to the school lab server, and whether it can serve HTTPS. |
 | Package 10 | Should the app itself open with no connection (a service worker)? M7 caches the *data*; the page's own files still come from the server. |
@@ -448,6 +449,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **Diagrams vs report:** the team repo's PNGs (15 Oct) don't match the current `.drawio` files.
 - **UC 0008/0009 (and FR-1.3) are now out of date:** they say the client calculates suggestions from amenities and probabilities. The 23 Oct design has the server score them and the client only rank them.
 - **The data dictionary swaps the definitions** of *Suggested Pickup* and *Suggested Rest Stop*.
+- **FR-1.3.1 counts "high taxi density" in favour of a pickup spot,** but the taxi data counts empty taxis, which are competition (D28). No formula is given anywhere for `calculateProbability` or `calculateAmenities` (D28, D29).
 - **UC 0001 and UC 0004–0007 contradict themselves twice:**
   - The "cache under 5 minutes" precondition clashes with their own note that the data is static.
   - "Markers available offline" clashes with the exception "fails to retrieve from the server".
