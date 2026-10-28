@@ -308,7 +308,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
    - [x] `shared/openapi.json` generated from the schemas (`npm run openapi -w shared`), tested against the OpenAPI 3.1 schema and for being up to date
    - [x] the client checks every downloaded and cached response against its endpoint's schema; the server has a contract test on the real LTA data
    - [x] Prettier for the whole repo, and Oxlint extended to the server and `shared/`; `npm run check` runs type-check, lint, format check and all tests
-2. **Map layers, built end to end** (decided 28 Oct: each checkpoint takes layers from the source to the map, so every one has a demo; this absorbs the old packages 4 and 5)
+2. **Map layers, built end to end** ✅ (decided 28 Oct: each checkpoint takes layers from the source to the map, so every one has a demo; this absorbs the old packages 4 and 5)
    - **2a. Static layers, server** ✅
      - [x] research: sources checked with real calls; decisions D12–D15
      - [x] `ExternalApiFacade`: one client per provider (LTA paging that keeps an existing query string, LTA download links, data.gov.sg poll-then-download, Overpass POST), with timeouts
@@ -333,8 +333,10 @@ I review and approve before the next package starts. Claude asks me whenever a d
      - [x] `MapDataRepository.updateAvailability`; free lots and chargers in popups, "as of" their time
      - [x] taxis clustered (D24); busy stations as the mockup's heat circles (D23); UC 0002/0003 toasts
      - [x] the server retries a provider's hiccups quickly (D26)
-   - **2e. HTTP hardening**
-     - [ ] rate limiting, a CORS allow-list, and no `X-Powered-By` header (gzip moved to 2b)
+   - **2e. HTTP hardening** ✅
+     - [x] a rate limit of 300 requests a minute per client address, answering 429 with `Retry-After` (D27); 429 in the OpenAPI document
+     - [x] a CORS allow-list from `CORS_ORIGINS`, empty by default (same origin); `TRUST_PROXY` for a reverse proxy; no `X-Powered-By`; `Cache-Control: no-cache`
+     - [x] settings checked at startup (`ServerConfig.ts`); `.env.example` lists them (gzip moved to 2b)
 3. **Suggested sites on the server (Strategy pattern)**
    - [ ] `SuggestionStrategy` with `PickupSuggestionStrategy.calculateProbability` and `RestStopSuggestionStrategy.calculateAmenities`
    - [ ] `SyncService.buildSuggestions()`
@@ -365,7 +367,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
     - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
     - [ ] the mockup's layer tools: a bottom sheet with icon buttons that collapses to icons only (replaces M4's text row in `FilterTool`)
     - [ ] wider test coverage
-    - [ ] HTTPS deployment. `shared/` has runtime code since package 1, so the server runs with `tsx` or gets bundled
+    - [ ] HTTPS deployment. `shared/` has runtime code since package 1, so the server runs with `tsx` or gets bundled. Set `TRUST_PROXY` if a reverse proxy sits in front, and `CORS_ORIGINS` only if the app is hosted elsewhere (D27)
 
 ---
 
@@ -423,6 +425,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D24 — Nearby taxis are clustered (my decision, 28 Oct).** FR-1.2.2's "location and density" comes from D17's clusters: bubbles with counts when zoomed out, the mockup's amber car marker per taxi when zoomed in.
 - **D25 — Live layers are polled every 30 seconds, together (my decision, 28 Oct).** One timer asks for every live layer that's on (and for carpark and charger availability while those layers are on), as the deployment note says; unchanged data answers 304. The timer stops while the app is in the background or no live layer is on. Taxis cost about 1.4 MB an hour while shown.
 - **D26 — Quick retries for providers' hiccups (28 Oct, extends D7).** On 28 Oct, LTA's crowd API answered 500 on four syncs running, so hotspots took four minutes to appear after a server start; LTA's EV file and Overpass had one-off 500s and 502s too. `ExternalApiFacade` now retries a request that hit a server error (5xx) or a dropped connection after 1 s and again after 3 s, before the sync fails and waits its minute (D7). Answers the provider means (404, 429 "too busy") and timeouts aren't retried.
+- **D27 — Rate limit and CORS (my decision, 28 Oct).** The design model's `DataApiController -rateLimiter` allows each client address 300 requests a minute (`RATE_LIMIT_PER_MINUTE`): one phone uses about 10–15, and mobile carriers put many phones behind one address. Over it, the answer is 429 with `Retry-After`, and the client falls back to its saved copy (D1, D22). The deployment diagram's "CORS allow-list" is `CORS_ORIGINS`, empty by default, because the plan is for the server to also host the app (one origin, so no CORS headers at all); a separate frontend host would be listed there. Behind a reverse proxy, `TRUST_PROXY` lets the limit see each client's own address; without it, `X-Forwarded-For` is ignored so clients can't fake their way past the limit.
 
 ---
 

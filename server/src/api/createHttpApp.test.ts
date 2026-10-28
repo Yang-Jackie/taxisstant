@@ -55,3 +55,91 @@ describe("createHttpApp", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// Package 2e — HTTP hardening (D27): no framework header, a per-client rate limit, a CORS allow-list.
+describe("createHttpApp — hardening (package 2e)", () => {
+  const withStands = (options: Parameters<typeof createHttpApp>[1] = {}) => {
+    const cache = new ServerDataCache();
+    cache.put("TAXI_STANDS", [{ id: "A01" }]);
+    return createHttpApp(cache, { log: false, ...options });
+  };
+
+  it("doesn't say it runs Express", async () => {
+    const res = await request(withStands()).get("/api/taxi-stands");
+    expect(res.headers["x-powered-by"]).toBeUndefined();
+  });
+
+  it("asks clients to re-check a saved copy with its ETag before reusing it (Cache-Control: no-cache)", async () => {
+    const app = withStands();
+    const first = await request(app).get("/api/taxi-stands");
+    expect(first.headers["cache-control"]).toBe("no-cache");
+    const again = await request(app).get("/api/taxi-stands").set("If-None-Match", first.headers["etag"]!);
+    expect(again.status).toBe(304);
+  });
+
+  it("answers 429 with a reason and a Retry-After once a client goes over its requests for the minute", async () => {
+    const app = withStands({ rateLimitPerMinute: 3 });
+    for (let i = 0; i < 3; i++) expect((await request(app).get("/api/taxi-stands")).status).toBe(200);
+
+    const over = await request(app).get("/api/taxi-stands");
+
+    expect(over.status).toBe(429);
+    expect(over.body).toEqual({ error: "Too many requests. Please try again in a minute." });
+    expect(Number(over.headers["retry-after"])).toBeGreaterThan(0);
+    expect(over.headers["ratelimit-policy"]).toMatch(/q=3/);
+  });
+
+  it("counts each client separately when it knows their real addresses behind a proxy (TRUST_PROXY)", async () => {
+    const app = withStands({ rateLimitPerMinute: 1, trustProxy: 1 });
+    expect((await request(app).get("/api/taxi-stands").set("X-Forwarded-For", "203.0.113.1")).status).toBe(200);
+    expect((await request(app).get("/api/taxi-stands").set("X-Forwarded-For", "203.0.113.1")).status).toBe(429);
+    expect((await request(app).get("/api/taxi-stands").set("X-Forwarded-For", "203.0.113.2")).status).toBe(200);
+  });
+
+  it("ignores X-Forwarded-For when there's no proxy, so a client can't dodge the limit by faking it", async () => {
+    const app = withStands({ rateLimitPerMinute: 1 });
+    await request(app).get("/api/taxi-stands").set("X-Forwarded-For", "203.0.113.1");
+    expect((await request(app).get("/api/taxi-stands").set("X-Forwarded-For", "203.0.113.2")).status).toBe(429);
+  });
+
+  it("sends no CORS headers by default, not even to a preflight: the app is served from the same origin (D27)", async () => {
+    const res = await request(withStands()).get("/api/taxi-stands").set("Origin", "https://elsewhere.example");
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+
+    const preflight = await request(withStands())
+      .options("/api/taxi-stands")
+      .set("Origin", "https://elsewhere.example")
+      .set("Access-Control-Request-Method", "GET");
+    expect(Object.keys(preflight.headers).filter((h) => h.startsWith("access-control-"))).toEqual([]);
+  });
+
+  it("allows only the listed origins, and lets them read the ETag", async () => {
+    const app = withStands({ corsOrigins: ["https://taxi.example"] });
+
+    const allowed = await request(app).get("/api/taxi-stands").set("Origin", "https://taxi.example");
+    expect(allowed.headers["access-control-allow-origin"]).toBe("https://taxi.example");
+    expect(allowed.headers["access-control-expose-headers"]).toBe("ETag");
+
+    const other = await request(app).get("/api/taxi-stands").set("Origin", "https://elsewhere.example");
+    expect(other.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("answers a listed origin's preflight for an ETag re-check (If-None-Match isn't a simple header)", async () => {
+    const res = await request(withStands({ corsOrigins: ["https://taxi.example"] }))
+      .options("/api/taxi-stands")
+      .set("Origin", "https://taxi.example")
+      .set("Access-Control-Request-Method", "GET")
+      .set("Access-Control-Request-Headers", "if-none-match");
+    expect(res.status).toBe(204);
+    expect(res.headers["access-control-allow-headers"]).toMatch(/If-None-Match/i);
+    expect(res.headers["access-control-allow-methods"]).toBe("GET");
+  });
+
+  it("keeps a 429 readable by an allowed site", async () => {
+    const app = withStands({ corsOrigins: ["https://taxi.example"], rateLimitPerMinute: 1 });
+    await request(app).get("/api/taxi-stands").set("Origin", "https://taxi.example");
+    const over = await request(app).get("/api/taxi-stands").set("Origin", "https://taxi.example");
+    expect(over.status).toBe(429);
+    expect(over.headers["access-control-allow-origin"]).toBe("https://taxi.example");
+  });
+});

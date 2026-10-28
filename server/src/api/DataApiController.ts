@@ -46,6 +46,7 @@ export class DataApiController {
       return;
     }
     res.set("ETag", entry.etag);
+    res.set("Cache-Control", "no-cache"); // a saved copy may be reused only after an ETag re-check
     if (req.get("If-None-Match") === entry.etag) {
       res.status(304).end();
       return;

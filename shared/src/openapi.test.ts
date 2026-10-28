@@ -30,12 +30,12 @@ describe("OpenAPI document", () => {
     expect(result.valid).toBe(true);
   });
 
-  it("has every endpoint, each with its 200, 304 and 503 answers and the If-None-Match header", () => {
+  it("has every endpoint, each with its 200, 304, 429 and 503 answers and the If-None-Match header", () => {
     const { paths } = buildOpenApi();
     for (const e of Object.values(ENDPOINTS)) {
       const get = paths[e.path]?.get;
       expect(get?.operationId).toBe(`get${e.name}`);
-      expect(Object.keys(get?.responses ?? {})).toEqual(["200", "304", "503"]);
+      expect(Object.keys(get?.responses ?? {})).toEqual(["200", "304", "429", "503"]);
       expect(get?.parameters).toEqual([{ $ref: "#/components/parameters/IfNoneMatch" }]);
     }
   });

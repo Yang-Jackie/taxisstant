@@ -1,4 +1,5 @@
 import { createHttpApp } from "./api/createHttpApp.js";
+import { readConfig } from "./ServerConfig.js";
 import { ServerDataCache } from "./cache/ServerDataCache.js";
 import { ApiKeyStore } from "./external/ApiKeyStore.js";
 import { ExternalApiFacade } from "./external/ExternalApiFacade.js";
@@ -15,11 +16,8 @@ import { SyncService } from "./sync/SyncService.js";
 
 class DataServiceApp {
   static main(): void {
-    const port = Number(process.env.PORT ?? "3000");
-
-    if (!Number.isInteger(port) || port <= 0) {
-      throw new Error(`PORT must be a positive whole number, got "${process.env.PORT}"`);
-    }
+    const config = readConfig();
+    const port = config.PORT;
 
     console.log(`Data service starting on port ${port}`);
     const cache = new ServerDataCache();
@@ -36,7 +34,11 @@ class DataServiceApp {
       new HotspotAdapter(),
     ]);
 
-    createHttpApp(cache).listen(port, () => {
+    createHttpApp(cache, {
+      corsOrigins: config.CORS_ORIGINS,
+      trustProxy: config.TRUST_PROXY,
+      rateLimitPerMinute: config.RATE_LIMIT_PER_MINUTE,
+    }).listen(port, () => {
       console.log(`Data service listening on http://localhost:${port}`);
     });
 

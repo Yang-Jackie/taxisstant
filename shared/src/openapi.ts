@@ -39,6 +39,7 @@ export function buildOpenApi() {
               description: "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
               headers: { ETag: { $ref: "#/components/headers/ETag" } },
             },
+            "429": { $ref: "#/components/responses/TooManyRequests" },
             "503": { $ref: "#/components/responses/NotLoadedYet" },
           },
         },
@@ -72,6 +73,14 @@ export function buildOpenApi() {
         ETag: { description: "The fingerprint of the data, the same as the body's etag.", schema: { type: "string" } },
       },
       responses: {
+        TooManyRequests: {
+          description:
+            "Too Many Requests: this client address used up its requests for the minute (D27). Try again after Retry-After seconds.",
+          headers: {
+            "Retry-After": { description: "Seconds until requests are accepted again.", schema: { type: "integer" } },
+          },
+          content: { "application/json": { schema: schemaRef("ApiError") } },
+        },
         NotLoadedYet: {
           description: "Service Unavailable: the server hasn't loaded this data yet (it is still starting up).",
           content: { "application/json": { schema: schemaRef("ApiError") } },
