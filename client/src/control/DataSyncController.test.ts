@@ -1,38 +1,21 @@
 // M6 acceptance tests — DataSyncController «control»: loads server data into MapDataRepository and tells
 // its observers (DataSyncObserver) which layer changed. A fake fetch stands in for the server.
 // M7 adds the cache: loadCached() at startup, a daily ETag re-check, and the saved copy when offline (D1).
+// Package 2b: every static layer (D18). refreshLayer(t) is one layer, as a toggle needs it; refreshStatic() is all of them.
 import { describe, expect, it, vi } from "vitest";
+import { Carpark } from "../entity/Carpark";
+import { ChargingStation } from "../entity/ChargingStation";
+import { FuelStation } from "../entity/FuelStation";
+import { HawkerCentre } from "../entity/HawkerCentre";
+import { STATIC_LAYERS } from "../entity/LayerType";
 import { MapDataRepository } from "../entity/MapDataRepository";
 import { TaxiStand } from "../entity/TaxiStand";
 import { CacheManager } from "../services/CacheManager";
 import { DataApiClient } from "../services/DataApiClient";
+import { callsTo, fakeServer, offline, ok, status, STANDS, type Answer } from "../testing/fakeServer";
 import { DataSyncController } from "./DataSyncController";
 
 const DAY = 24 * 60 * 60 * 1000;
-const stands = [
-  {
-    id: "A01",
-    name: "Lucky Plaza",
-    latitude: 1.304294727,
-    longitude: 103.8338467,
-    standType: "Stand",
-    isBarrierFree: true,
-  },
-  {
-    id: "A05",
-    name: "Mt Elizabeth",
-    latitude: 1.304571786,
-    longitude: 103.835547,
-    standType: "Stand",
-    isBarrierFree: true,
-  },
-];
-const okBody = { asOf: "2026-10-27T00:00:00.000Z", etag: '"v1"', data: stands };
-
-type Answer = () => Promise<Response>;
-const serving: Answer = async () => new Response(JSON.stringify(okBody), { status: 200 });
-const notModified: Answer = async () => new Response(null, { status: 304 });
-const offline: Answer = () => Promise.reject(new TypeError("Failed to fetch"));
 
 function memoryStore() {
   const data = new Map<string, unknown>();
@@ -47,8 +30,8 @@ function phone() {
     later(ms: number) {
       now += ms;
     },
-    open(answer: Answer = serving) {
-      const fetchFn = vi.fn<(input: string | URL | Request, init?: RequestInit) => Promise<Response>>(answer);
+    open(answers: Record<string, Answer> = {}) {
+      const fetchFn = fakeServer(answers);
       const repo = new MapDataRepository();
       const dataSync = new DataSyncController(new DataApiClient({ fetchFn }), repo, new CacheManager(store, () => now));
       const observer = { onDataUpdated: vi.fn() };
@@ -58,19 +41,20 @@ function phone() {
   };
 }
 
-const setUp = (answer?: Answer) => phone().open(answer);
+const setUp = (answers?: Record<string, Answer>) => phone().open(answers);
 const shownIds = (repo: MapDataRepository) => repo.getByLayerType("TAXI_STAND").map((s) => s.id);
-const sentEtag = (fetchFn: ReturnType<typeof setUp>["fetchFn"]) =>
+const sentEtag = (fetchFn: ReturnType<typeof fakeServer>) =>
   new Headers(fetchFn.mock.calls[0]![1]?.headers).get("If-None-Match");
 
-describe("DataSyncController.refreshStatic", () => {
+describe("DataSyncController.refreshLayer — one layer, as a toggle needs it", () => {
   it("loads the taxi stands from /api/taxi-stands into the repository, as real TaxiStand objects", async () => {
     const { fetchFn, repo, dataSync } = setUp();
 
-    await dataSync.refreshStatic();
+    await dataSync.refreshLayer("TAXI_STAND");
 
-    expect(String(fetchFn.mock.calls[0]![0])).toBe("/api/taxi-stands");
-    expect(shownIds(repo)).toEqual(["A01", "A05"]);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(callsTo(fetchFn, "/taxi-stands")).toBe(1);
+    expect(shownIds(repo)).toEqual(["A01", "A05", "A06"]);
     expect(repo.getByLayerType("TAXI_STAND")[0]).toBeInstanceOf(TaxiStand);
   });
 
@@ -79,29 +63,29 @@ describe("DataSyncController.refreshStatic", () => {
     const second = { onDataUpdated: vi.fn() };
     dataSync.attach(second);
 
-    await dataSync.refreshStatic();
+    await dataSync.refreshLayer("TAXI_STAND");
 
     expect(observer.onDataUpdated).toHaveBeenCalledWith("TAXI_STAND");
     expect(second.onDataUpdated).toHaveBeenCalledWith("TAXI_STAND");
   });
 
-  it("downloads static data only once per session", async () => {
+  it("downloads a layer only once per session", async () => {
     const { fetchFn, dataSync } = setUp();
-    await dataSync.refreshStatic();
-    await dataSync.refreshStatic();
+    await dataSync.refreshLayer("TAXI_STAND");
+    await dataSync.refreshLayer("TAXI_STAND");
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
   it("shares one request between calls made at the same time (e.g. a quick double tap)", async () => {
     const { fetchFn, dataSync } = setUp();
-    await Promise.all([dataSync.refreshStatic(), dataSync.refreshStatic()]);
+    await Promise.all([dataSync.refreshLayer("TAXI_STAND"), dataSync.refreshLayer("TAXI_STAND")]);
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
   it("rejects when loading fails and nothing was ever saved; stores nothing and notifies no one", async () => {
-    const { repo, dataSync, observer } = setUp(async () => new Response("{}", { status: 503 }));
+    const { repo, dataSync, observer } = setUp({ "/taxi-stands": status(503) });
 
-    await expect(dataSync.refreshStatic()).rejects.toThrow(/503/);
+    await expect(dataSync.refreshLayer("TAXI_STAND")).rejects.toThrow(/503/);
 
     expect(repo.getByLayerType("TAXI_STAND")).toEqual([]);
     expect(observer.onDataUpdated).not.toHaveBeenCalled();
@@ -109,23 +93,20 @@ describe("DataSyncController.refreshStatic", () => {
 
   it("tries again on the next call after a failure", async () => {
     let attempt = 0;
-    const { fetchFn, repo, dataSync } = setUp(async () => {
-      attempt += 1;
-      return attempt === 1
-        ? new Response("{}", { status: 503 })
-        : new Response(JSON.stringify(okBody), { status: 200 });
+    const { fetchFn, repo, dataSync } = setUp({
+      "/taxi-stands": (init) => (++attempt === 1 ? status(503)(init) : ok(STANDS)(init)),
     });
 
-    await expect(dataSync.refreshStatic()).rejects.toThrow();
-    await dataSync.refreshStatic();
+    await expect(dataSync.refreshLayer("TAXI_STAND")).rejects.toThrow();
+    await dataSync.refreshLayer("TAXI_STAND");
 
     expect(fetchFn).toHaveBeenCalledTimes(2);
-    expect(shownIds(repo)).toHaveLength(2);
+    expect(shownIds(repo)).toHaveLength(3);
   });
 });
 
 describe("DataSyncController.loadCached (M7)", () => {
-  it("does nothing on a phone that has never downloaded the stands", async () => {
+  it("does nothing on a phone that has never downloaded anything", async () => {
     const { fetchFn, repo, dataSync, observer } = setUp();
 
     await dataSync.loadCached();
@@ -137,37 +118,48 @@ describe("DataSyncController.loadCached (M7)", () => {
 
   it("shows what an earlier session downloaded, as real TaxiStands, without using the network", async () => {
     const p = phone();
-    await p.open().dataSync.refreshStatic();
+    await p.open().dataSync.refreshLayer("TAXI_STAND");
 
-    const next = p.open(offline);
+    const next = p.open({ "*": offline });
     await next.dataSync.loadCached();
 
-    expect(shownIds(next.repo)).toEqual(["A01", "A05"]);
+    expect(shownIds(next.repo)).toEqual(["A01", "A05", "A06"]);
     expect(next.repo.getByLayerType("TAXI_STAND")[0]).toBeInstanceOf(TaxiStand);
     expect(next.observer.onDataUpdated).toHaveBeenCalledWith("TAXI_STAND");
     expect(next.fetchFn).not.toHaveBeenCalled();
   });
-});
 
-describe("DataSyncController.refreshStatic with a saved copy (M7, D1)", () => {
-  it("doesn't contact the server again within a day of the last check", async () => {
+  it("fills every static layer an earlier session saved (package 2b)", async () => {
     const p = phone();
     await p.open().dataSync.refreshStatic();
+
+    const next = p.open({ "*": offline });
+    await next.dataSync.loadCached();
+
+    for (const t of STATIC_LAYERS) expect(next.repo.getByLayerType(t), t).not.toHaveLength(0);
+    expect(next.observer.onDataUpdated).toHaveBeenCalledTimes(STATIC_LAYERS.length);
+  });
+});
+
+describe("DataSyncController.refreshLayer with a saved copy (M7, D1)", () => {
+  it("doesn't contact the server again within a day of the last check", async () => {
+    const p = phone();
+    await p.open().dataSync.refreshLayer("TAXI_STAND");
     p.later(DAY - 1);
 
     const next = p.open();
-    await next.dataSync.refreshStatic();
+    await next.dataSync.refreshLayer("TAXI_STAND");
 
     expect(next.fetchFn).not.toHaveBeenCalled();
   });
 
   it("re-checks once a day has passed, sending the saved ETag (If-None-Match)", async () => {
     const p = phone();
-    await p.open().dataSync.refreshStatic();
+    await p.open().dataSync.refreshLayer("TAXI_STAND");
     p.later(DAY);
 
-    const next = p.open(notModified);
-    await next.dataSync.refreshStatic();
+    const next = p.open({ "*": status(304) });
+    await next.dataSync.refreshLayer("TAXI_STAND");
 
     expect(next.fetchFn).toHaveBeenCalledTimes(1);
     expect(sentEtag(next.fetchFn)).toBe('"v1"');
@@ -175,48 +167,110 @@ describe("DataSyncController.refreshStatic with a saved copy (M7, D1)", () => {
 
   it("on 304 Not Modified, keeps the saved copy and counts as checked for another day", async () => {
     const p = phone();
-    await p.open().dataSync.refreshStatic();
+    await p.open().dataSync.refreshLayer("TAXI_STAND");
     p.later(DAY);
-    await p.open(notModified).dataSync.refreshStatic();
+    await p.open({ "*": status(304) }).dataSync.refreshLayer("TAXI_STAND");
     p.later(DAY - 1);
 
     const next = p.open();
     await next.dataSync.loadCached();
-    await next.dataSync.refreshStatic();
+    await next.dataSync.refreshLayer("TAXI_STAND");
 
     expect(next.fetchFn).not.toHaveBeenCalled(); // the 304 a day ago counts as a check
-    expect(shownIds(next.repo)).toEqual(["A01", "A05"]);
+    expect(shownIds(next.repo)).toEqual(["A01", "A05", "A06"]);
   });
 
   it("when the re-check brings new data, saves it and shows it", async () => {
     const p = phone();
-    await p.open().dataSync.refreshStatic();
+    await p.open().dataSync.refreshLayer("TAXI_STAND");
     p.later(DAY);
-    const newStand = { ...stands[0]!, id: "B07", name: "New stand" };
-    const v2 = { asOf: "2026-10-28T00:00:00.000Z", etag: '"v2"', data: [...stands, newStand] };
+    const withNew = [...STANDS, { ...STANDS[0]!, id: "B07", name: "New stand" }];
 
-    const next = p.open(async () => new Response(JSON.stringify(v2), { status: 200 }));
+    const next = p.open({ "/taxi-stands": ok(withNew, '"v2"') });
     await next.dataSync.loadCached();
     next.observer.onDataUpdated.mockClear();
-    await next.dataSync.refreshStatic();
+    await next.dataSync.refreshLayer("TAXI_STAND");
 
-    expect(shownIds(next.repo)).toEqual(["A01", "A05", "B07"]);
+    expect(shownIds(next.repo)).toEqual(["A01", "A05", "A06", "B07"]);
     expect(next.observer.onDataUpdated).toHaveBeenCalledWith("TAXI_STAND");
-    const afterThat = p.open(offline);
+    const afterThat = p.open({ "*": offline });
     await afterThat.dataSync.loadCached();
-    expect(shownIds(afterThat.repo)).toEqual(["A01", "A05", "B07"]);
+    expect(shownIds(afterThat.repo)).toEqual(["A01", "A05", "A06", "B07"]);
   });
 
   it("when the re-check fails, resolves without an error and keeps showing the saved copy", async () => {
     const p = phone();
-    await p.open().dataSync.refreshStatic();
+    await p.open().dataSync.refreshLayer("TAXI_STAND");
     p.later(DAY);
 
-    const next = p.open(offline);
+    const next = p.open({ "*": offline });
     await next.dataSync.loadCached();
-    await expect(next.dataSync.refreshStatic()).resolves.toBeUndefined();
+    await expect(next.dataSync.refreshLayer("TAXI_STAND")).resolves.toBeUndefined();
 
     expect(next.fetchFn).toHaveBeenCalledTimes(1);
-    expect(shownIds(next.repo)).toEqual(["A01", "A05"]);
+    expect(shownIds(next.repo)).toEqual(["A01", "A05", "A06"]);
   });
 });
+
+describe("DataSyncController.refreshStatic — every static layer at once (package 2b, D18)", () => {
+  it("downloads each static layer once, as real entities of its own type", async () => {
+    const { fetchFn, repo, dataSync } = setUp();
+
+    await dataSync.refreshStatic();
+
+    for (const path of ["/taxi-stands", "/carparks", "/fuel-stations", "/charging-stations", "/hawker-centres"]) {
+      expect(callsTo(fetchFn, path), path).toBe(1);
+    }
+    expect(repo.getByLayerType("TAXI_STAND")[0]).toBeInstanceOf(TaxiStand);
+    expect(repo.getByLayerType("CARPARK")[0]).toBeInstanceOf(Carpark);
+    expect(repo.getByLayerType("FUEL")[0]).toBeInstanceOf(FuelStation);
+    expect(repo.getByLayerType("CHARGING")[0]).toBeInstanceOf(ChargingStation);
+    expect(repo.getByLayerType("HAWKER")[0]).toBeInstanceOf(HawkerCentre);
+  });
+
+  it("tells observers about each layer separately", async () => {
+    const { dataSync, observer } = setUp();
+    await dataSync.refreshStatic();
+    for (const t of STATIC_LAYERS) expect(observer.onDataUpdated).toHaveBeenCalledWith(t);
+  });
+
+  it("never rejects: a layer that fails doesn't stop the others", async () => {
+    const { repo, dataSync } = setUp({ "/fuel-stations": status(503) });
+
+    await expect(dataSync.refreshStatic()).resolves.toBeUndefined();
+
+    expect(repo.getByLayerType("FUEL")).toEqual([]);
+    expect(repo.getByLayerType("CARPARK")).not.toHaveLength(0);
+  });
+
+  it("leaves a failed layer to be tried again when it is toggled on", async () => {
+    let attempt = 0;
+    const { fetchFn, repo, dataSync } = setUp({
+      "/fuel-stations": (init) => (++attempt === 1 ? offline(init) : ok([{ ...fuelStation() }])(init)),
+    });
+
+    await dataSync.refreshStatic();
+    await dataSync.refreshLayer("FUEL");
+
+    expect(callsTo(fetchFn, "/fuel-stations")).toBe(2);
+    expect(repo.getByLayerType("FUEL")).toHaveLength(1);
+  });
+
+  it("is shared with a toggle that comes while it is still downloading: one request per endpoint", async () => {
+    const { fetchFn, dataSync } = setUp();
+
+    await Promise.all([dataSync.refreshStatic(), dataSync.refreshLayer("CHARGING")]);
+
+    expect(callsTo(fetchFn, "/charging-stations")).toBe(1);
+  });
+
+  it("checks each downloaded layer against its own schema: a broken one is treated as a failure", async () => {
+    const { repo, dataSync } = setUp({ "/carparks": ok([{ id: "1", name: "Suntec City" }]) }); // no coordinates
+    await expect(dataSync.refreshLayer("CARPARK")).rejects.toThrow(/breaks the contract/);
+    expect(repo.getByLayerType("CARPARK")).toEqual([]);
+  });
+});
+
+function fuelStation() {
+  return { id: "node/1", name: "Esso Test", brand: "Esso", latitude: 1.3, longitude: 103.8 };
+}

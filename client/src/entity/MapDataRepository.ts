@@ -1,3 +1,7 @@
+import type { Carpark } from "./Carpark";
+import type { ChargingStation } from "./ChargingStation";
+import type { FuelStation } from "./FuelStation";
+import type { HawkerCentre } from "./HawkerCentre";
 import type { LayerType } from "./LayerType";
 import type { Locatable } from "./Locatable";
 import type { TaxiStand } from "./TaxiStand";
@@ -6,10 +10,10 @@ export interface LayerItems {
   TAXI_STAND: TaxiStand;
   TAXIS: Locatable;
   HOTSPOT: Locatable;
-  CARPARK: Locatable;
-  FUEL: Locatable;
-  CHARGING: Locatable;
-  HAWKER: Locatable;
+  CARPARK: Carpark;
+  FUEL: FuelStation;
+  CHARGING: ChargingStation;
+  HAWKER: HawkerCentre;
 }
 
 export class MapDataRepository {

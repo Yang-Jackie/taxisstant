@@ -1,7 +1,7 @@
 // M1 acceptance tests — LayerType (design model «enumeration» LayerType, as a string union per the AI report).
 // The expectTypeOf / @ts-expect-error lines are checked by `npm run typecheck`, not at runtime.
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { isLayerType, LAYER_TYPES, type LayerType } from "./LayerType";
+import { isLayerType, isStaticLayer, LAYER_TYPES, STATIC_LAYERS, type LayerType } from "./LayerType";
 
 describe("LayerType", () => {
   it("lists the seven map layers from the design model, in order", () => {
@@ -35,5 +35,14 @@ describe("isLayerType", () => {
     if (isLayerType(fromStorage)) {
       expectTypeOf(fromStorage).toEqualTypeOf<LayerType>(); // inside the if, TypeScript knows it's a LayerType
     }
+  });
+});
+
+// Package 2b — the static layers: downloaded at startup, re-checked daily, kept offline (D18).
+
+describe("STATIC_LAYERS", () => {
+  it("are the five landmark layers; nearby taxis and hotspots are live data", () => {
+    expect(STATIC_LAYERS).toEqual(["TAXI_STAND", "CARPARK", "FUEL", "CHARGING", "HAWKER"]);
+    expect(LAYER_TYPES.filter((t) => !isStaticLayer(t))).toEqual(["TAXIS", "HOTSPOT"]);
   });
 });

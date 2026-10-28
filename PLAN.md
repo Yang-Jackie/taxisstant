@@ -52,6 +52,7 @@ The PNGs in the team repo (`lab3/Diagrams/`, 15 Oct) are **out of date**. They s
 | Folder | Layer | Classes, from the design model | Built in |
 |---|---|---|---|
 | `entity/` | Domain objects | `LayerType`, `Location`, **`Locatable`** (interface) | M1 |
+| | | `Bounds` and `Viewport` (the design model's Bounds, plus zoom: D17) | 2b |
 | | | abstract `Landmark` → `TaxiStand` | M1 |
 | | | **`MapDataRepository`** («container»): `getByLayerType`, `replaceLayer` | M1 |
 | | | `MapDataRepository`: `updateAvailability`, `getSuggestions`, `replaceSuggestions` | Phase 2 |
@@ -61,13 +62,16 @@ The PNGs in the team repo (`lab3/Diagrams/`, 15 Oct) are **out of date**. They s
 | | | `UserPreferences`, `Bookmark`, `BookmarkList`, `TaxiDriver` | M6 / Phase 2 |
 | | | `Language`, `VehicleType`, `RecommendationKind`, `DensityLevel` | when needed |
 | `services/` | Data access & device services | `DataApiClient` | M5 |
+| | | one DTO-to-entity converter per static layer (`toTaxiStand`, `toCarpark`, …) | M5, 2b |
 | | | `LocalStore` | M6 |
 | | | `CacheManager` | M7 |
 | | | `GPSInterface`, `NavigationGateway` | Phase 2 |
 | `control/` | Application logic | `MapDisplayController`, `SettingsController`, `DataSyncController` | M6 |
 | | | `DataSyncObserver`, `LocationObserver` (interfaces) | M6 / Phase 2 |
+| | | `LayerClusters` (Supercluster): what `refreshVisible` shows at each zoom (D17) | 2b |
 | | | `LocationController`, `NavigationController`, `RecommendationController`, `BookmarkController` | Phase 2 |
 | `boundary/` | Presentation (React) | `MapView`, `FilterTool` | M4 |
+| | | `LandmarkDetails` (marker popups), `markerIcons` | 2b |
 | | | `Sidemenu`, `RecommendationCard`, `BookmarkPanel`, `SettingsView` | Phase 2 |
 | `startup.ts`, `main.tsx` | «startup» | `initControllers()` creates the services and controllers once, outside React; `App` gets them through `ControllersContext`; `loadCached()` joins in M7 | M6 |
 
@@ -310,10 +314,12 @@ I review and approve before the next package starts. Claude asks me whenever a d
      - [x] adapters, `ENDPOINTS` entries and routes for carparks (LTA, car lots only), hawker centres (NEA, D13), fuel stations (OpenStreetMap, D12) and charging stations (LTA EV batch, D15), refreshed daily
      - [x] adapters skip a few bad rows but reject a dataset whose format changed (the last good copy stays)
      - [x] recorded samples and contract tests for every endpoint
-   - **2b. Static layers, client**
-     - [ ] `DataSyncController`, `CacheManager` use and `MapDataRepository` generalised from taxi stands to every static layer
-     - [ ] `Carpark`, `FuelStation`, `ChargingStation`, `HawkerCentre` entities; `MapDisplayController` for every layer
-     - [ ] a marker style and details popup per layer; "© OpenStreetMap contributors" while Fuel is shown (D12)
+   - **2b. Static layers, client** ✅
+     - [x] `DataSyncController`, `CacheManager` use and `MapDataRepository` generalised from taxi stands to every static layer; every static layer downloaded at startup (D18)
+     - [x] `Carpark`, `FuelStation`, `ChargingStation`, `HawkerCentre` entities (`HawkerCentre.isOpen` in Singapore dates, D13); `MapDisplayController` for every layer, with each use case's toast
+     - [x] `refreshVisible(viewport)`: only what's in view, clustered while zoomed out (D17)
+     - [x] the mockup's markers per layer (Tabler icons, amber and green groups), a details popup per layer, and "© OpenStreetMap contributors" while Fuel is shown (D12)
+     - [x] gzip on the server (moved forward from 2e): charging stations go out as 115 kB instead of 785 kB
    - **2c. Live layers, server**
      - [ ] the station coordinates file and its generator script (D14)
      - [ ] taxis, carpark availability (LTA, plus HDB total lots from data.gov.sg), charger availability (EV batch) and hotspots (crowd density)
@@ -322,7 +328,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
      - [ ] `refreshLive(layers, kinds)`, polling only what's toggled on, pausing when the app is in the background
      - [ ] `MapDataRepository.updateAvailability`; taxis with clustering or density; hotspots as circles
    - **2e. HTTP hardening**
-     - [ ] gzip, rate limiting and a CORS allow-list
+     - [ ] rate limiting, a CORS allow-list, and no `X-Powered-By` header (gzip moved to 2b)
 3. **Suggested sites on the server (Strategy pattern)**
    - [ ] `SuggestionStrategy` with `PickupSuggestionStrategy.calculateProbability` and `RestStopSuggestionStrategy.calculateAmenities`
    - [ ] `SyncService.buildSuggestions()`
@@ -351,6 +357,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
    - [ ] Help & Support page (from the dialog map)
 10. **Hardening and deployment**
     - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
+    - [ ] the mockup's layer tools: a bottom sheet with icon buttons that collapses to icons only (replaces M4's text row in `FilterTool`)
     - [ ] wider test coverage
     - [ ] HTTPS deployment. `shared/` has runtime code since package 1, so the server runs with `tsx` or gets bundled
 
@@ -400,6 +407,8 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D14 — Station coordinates are a committed file; OneMap leaves the runtime (my decision, 28 Oct).** LTA's crowd data has station codes only. A dev script builds `train-stations.json` from LTA's station-code table joined with LTA's station-exit coordinates (data.gov.sg), with OneMap search for codes newer than the table. Regenerate it when a line opens. The server never calls OneMap, so `ApiKeyStore.oneMapToken` and `refreshOneMapToken` are dropped, and NF-2.2 (no expired-token problems) holds by construction. (OneMap search now warns that it will require a token.)
 - **D15 — Charging stations: several operators, and charging speed (28 Oct).** 42 of 2,806 LTA locations have more than one operator, so `ChargingStation.operator: String` becomes `operators: string[]`. Added `maxPowerKw` and `hasDcFast`: an EV taxi mid-shift needs DC fast charging (50 kW+), which 620 locations have.
 - **D16 — How adapters treat imperfect data (28 Oct, extends D7).** Real feeds have odd rows: 116 EV locations have no name, one carpark has no location. Adapters therefore skip rows that don't fit and log a warning, but reject the whole download when more than 5% of rows don't fit (the format changed) or when it is implausibly small (cut short or emptied). LTA's paged feeds also don't always come from one snapshot: on 28 Oct, for several minutes, rows shifted between pages, so 40 carparks came twice and 40 others went missing. `CarparkAdapter` accepts up to 1% repeated rows (keeping one of each) and rejects anything worse. A rejected download keeps the last good copy and retries a minute later (D7). The live LTA feeds in 2c need the same check. `TaxiStandAdapter` follows the same rule since 2a (it used to reject the whole dataset over one bad row).
+- **D17 — Dense layers are clustered (my decision, 28 Oct).** With every layer on, the island has about 5,000 landmarks: slow on a phone, and unreadable. `MapDisplayController.refreshVisible` keeps what's in view and merges nearby markers into a bubble with the layer's icon and a count while zoomed out (Supercluster, radius 60 px); from zoom 17 every marker shows on its own, and tapping a bubble zooms to where it splits. This changes the design model's `refreshVisible(bounds)` and `MapView.onPan(bounds)` to take a viewport: the bounds plus the zoom (FR-1.5.3 says "moves or zooms"). Measured: 2,996 chargers and fuel stations drawn as 233 markers, repainted in 36 ms.
+- **D18 — Every static layer is downloaded at startup (my decision, 28 Oct).** After `loadCached()`, `startControllers()` calls `DataSyncController.refreshStatic()`, which brings every static layer up to date in the background, re-checking daily. That way every layer works offline, even one never turned on while online (the "markers available offline" requirement of UC 0004–0007), and toggles are instant. It never shows a toast. A toggle calls the new `refreshLayer(t)` for its one layer, which shares a download already under way and rejects (the toast) only when there is nothing to show. Cost: about 190 kB once, gzipped.
 
 ---
 

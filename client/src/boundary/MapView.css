@@ -1,3 +1,65 @@
 .map-view {
   height: 100%;
 }
+
+/* Package 2b: markers in the mockup's style (a white circle, the layer's icon in its group colour) */
+.marker-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
+}
+.marker-chip svg {
+  width: 20px;
+  height: 20px;
+}
+.marker-chip--find {
+  color: #e8930c; /* the mockup's amber */
+}
+.marker-chip--rest {
+  color: #0e7a57; /* the mockup's green */
+}
+
+.marker-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+}
+.marker-cluster svg {
+  width: 14px;
+  height: 14px;
+}
+.marker-cluster span {
+  line-height: 1;
+}
+.marker-cluster--find {
+  background: #e8930c;
+}
+.marker-cluster--rest {
+  background: #0e7a57;
+}
+
+.landmark-details h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.landmark-details p {
+  margin: 2px 0;
+  font-size: 13px;
+}
+.landmark-details__muted {
+  color: #6a6d73;
+}
+.landmark-details__alert {
+  color: #b42318;
+  font-weight: 700;
+}

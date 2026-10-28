@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "",
   "devDependencies": {
+    "@types/compression": "^1.8.1",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
     "@types/supertest": "^7.2.1",
@@ -23,6 +24,7 @@
   "type": "module",
   "dependencies": {
     "@taxisstant/shared": "^1.0.0",
+    "compression": "^1.8.2",
     "csv-parse": "^7.0.3",
     "express": "^5.3.0",
     "zod": "^4.6.7"

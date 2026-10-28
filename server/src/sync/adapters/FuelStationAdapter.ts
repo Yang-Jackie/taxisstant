@@ -72,10 +72,14 @@ export class FuelStationAdapter implements DatasetAdapter<FuelStationDto[]> {
     return kept.map((e) => {
       const { lat, lon } = positionOf(e);
       const brand = brandOf(e.tags);
+      const tagged = e.tags["name:en"] ?? e.tags.name;
+      // A name that only repeats the brand takes our spelling: OpenStreetMap has both "ESSO" and "Esso"
+      const name =
+        tagged && brand && tagged.toLowerCase() === brand.toLowerCase() ? brand : (tagged ?? brand ?? "Fuel station");
       const street = [e.tags["addr:housenumber"], e.tags["addr:street"]].filter(Boolean).join(" ");
       return {
         id: `${e.type}/${e.id}`,
-        name: e.tags["name:en"] ?? e.tags.name ?? brand ?? "Fuel station",
+        name,
         ...(brand && { brand }),
         latitude: lat,
         longitude: lon,

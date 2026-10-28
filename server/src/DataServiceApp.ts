@@ -1,5 +1,4 @@
-import express, { type NextFunction, type Request, type Response } from "express";
-import { DataApiController } from "./api/DataApiController.js";
+import { createHttpApp } from "./api/createHttpApp.js";
 import { ServerDataCache } from "./cache/ServerDataCache.js";
 import { ApiKeyStore } from "./external/ApiKeyStore.js";
 import { ExternalApiFacade } from "./external/ExternalApiFacade.js";
@@ -29,23 +28,11 @@ class DataServiceApp {
       new ChargingStationAdapter(),
     ]);
 
-    const app = express();
-    app.use(DataServiceApp.logRequests);
-    app.use("/api", new DataApiController(cache).router());
-
-    app.listen(port, () => {
+    createHttpApp(cache).listen(port, () => {
       console.log(`Data service listening on http://localhost:${port}`);
     });
 
     void sync.start(); // in the background: the server answers 503 until the first sync lands (D7)
-  }
-
-  private static logRequests(req: Request, res: Response, next: NextFunction): void {
-    const started = Date.now();
-    res.on("finish", () => {
-      console.log(`${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - started} ms)`);
-    });
-    next();
   }
 }
 

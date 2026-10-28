@@ -10,5 +10,7 @@ export default defineConfig({
   test: {
     environment: "jsdom", // a simulated browser (document, window, clicks) for component tests
     setupFiles: ["./src/test-setup.ts"],
+    // Far from Singapore (UTC+8), so code that forgets to count days in Singapore time fails its tests
+    env: { TZ: "America/Los_Angeles" },
   },
 });

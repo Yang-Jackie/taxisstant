@@ -28,7 +28,9 @@ export function initControllers(): Controllers {
 export async function startControllers({ settings, dataSync, mapDisplay }: Controllers): Promise<void> {
   await settings.load();
   await dataSync.loadCached();
-  await mapDisplay.start();
+  const prefetch = dataSync.refreshStatic(); // every static layer, in the background (D18)
+  await mapDisplay.start(); // layers left on share the downloads the prefetch just started
+  await prefetch;
 }
 
 export const ControllersContext = createContext<Controllers | null>(null);

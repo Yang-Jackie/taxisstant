@@ -102,6 +102,12 @@ describe("FuelStationAdapter", () => {
       });
     });
 
+    it("spells a name that only repeats the brand our way (OpenStreetMap has both ESSO and Esso)", () => {
+      const result = adapter.prepare(withExtra(node(6, 1.2401, 103.6401, { name: "ESSO", brand: "ESSO" })));
+      expect(result.find((s) => s.id === "node/6")).toMatchObject({ name: "Esso", brand: "Esso" });
+      expect(stations.filter((s) => s.name.toLowerCase() === "esso").every((s) => s.name === "Esso")).toBe(true);
+    });
+
     it('calls a station with no name and no brand "Fuel station"', () => {
       const result = adapter.prepare(withExtra(node(5, 1.2301, 103.6301, {})));
       expect(result.find((s) => s.id === "node/5")).toEqual({

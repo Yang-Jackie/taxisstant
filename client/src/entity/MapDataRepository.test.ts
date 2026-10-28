@@ -4,6 +4,10 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import type { Locatable } from "./Locatable";
 import { Location } from "./Location";
 import { MapDataRepository } from "./MapDataRepository";
+import type { Carpark } from "./Carpark";
+import type { ChargingStation } from "./ChargingStation";
+import type { FuelStation } from "./FuelStation";
+import type { HawkerCentre } from "./HawkerCentre";
 import { TaxiStand } from "./TaxiStand";
 
 function stand(id: string, latitude: number, longitude: number): TaxiStand {
@@ -78,6 +82,14 @@ describe("MapDataRepository", () => {
       const stands = repo.getByLayerType("TAXI_STAND");
       expectTypeOf(stands).toEqualTypeOf<TaxiStand[]>();
       expect(stands.map((s) => s.name)).toEqual(["Stand A"]);
+    });
+
+    it("returns each static layer's own entity type (package 2b)", () => {
+      const repo = new MapDataRepository();
+      expectTypeOf(repo.getByLayerType("CARPARK")).toEqualTypeOf<Carpark[]>();
+      expectTypeOf(repo.getByLayerType("FUEL")).toEqualTypeOf<FuelStation[]>();
+      expectTypeOf(repo.getByLayerType("CHARGING")).toEqualTypeOf<ChargingStation[]>();
+      expectTypeOf(repo.getByLayerType("HAWKER")).toEqualTypeOf<HawkerCentre[]>();
     });
 
     it("refuses items of the wrong type for a layer", () => {
