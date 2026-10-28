@@ -32,4 +32,3 @@ export async function startControllers({ settings, dataSync, mapDisplay }: Contr
 }
 
 export const ControllersContext = createContext<Controllers | null>(null);
-

@@ -10,8 +10,22 @@ import { DataSyncController } from "./DataSyncController";
 
 const DAY = 24 * 60 * 60 * 1000;
 const stands = [
-  { id: "A01", name: "Lucky Plaza", latitude: 1.304294727, longitude: 103.8338467, standType: "Stand", isBarrierFree: true },
-  { id: "A05", name: "Mt Elizabeth", latitude: 1.304571786, longitude: 103.835547, standType: "Stand", isBarrierFree: true },
+  {
+    id: "A01",
+    name: "Lucky Plaza",
+    latitude: 1.304294727,
+    longitude: 103.8338467,
+    standType: "Stand",
+    isBarrierFree: true,
+  },
+  {
+    id: "A05",
+    name: "Mt Elizabeth",
+    latitude: 1.304571786,
+    longitude: 103.835547,
+    standType: "Stand",
+    isBarrierFree: true,
+  },
 ];
 const okBody = { asOf: "2026-10-27T00:00:00.000Z", etag: '"v1"', data: stands };
 
@@ -97,7 +111,9 @@ describe("DataSyncController.refreshStatic", () => {
     let attempt = 0;
     const { fetchFn, repo, dataSync } = setUp(async () => {
       attempt += 1;
-      return attempt === 1 ? new Response("{}", { status: 503 }) : new Response(JSON.stringify(okBody), { status: 200 });
+      return attempt === 1
+        ? new Response("{}", { status: 503 })
+        : new Response(JSON.stringify(okBody), { status: 200 });
     });
 
     await expect(dataSync.refreshStatic()).rejects.toThrow();

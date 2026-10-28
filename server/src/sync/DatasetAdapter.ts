@@ -1,7 +1,6 @@
 import type { Dataset } from "../cache/Dataset.js";
 import type { Provider } from "../external/Provider.js";
 
-
 /** One per dataset: where it comes from, how often, and how to turn raw data into ours. */
 export interface DatasetAdapter<T> {
   getDataset(): Dataset;

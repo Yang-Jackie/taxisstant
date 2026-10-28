@@ -4,7 +4,6 @@ import type { TaxiStandDto } from "@taxisstant/shared";
 import type { Provider } from "../../external/Provider.js";
 import type { DatasetAdapter } from "../DatasetAdapter.js";
 
-
 /** What one LTA taxi-stand row must look like. Anything else is rejected. */
 const LtaTaxiStand = z.object({
   TaxiCode: z.string(),
@@ -16,19 +15,30 @@ const LtaTaxiStand = z.object({
 });
 
 export class TaxiStandAdapter implements DatasetAdapter<TaxiStandDto[]> {
-  getDataset(): Dataset { return "TAXI_STANDS"; }
-  getSource(): Provider { return "LTA_DATAMALL"; }
-  getPath(): string { return "/TaxiStands"; }
-  getRefreshInterval(): number { return 24 * 60 * 60 * 1000; } // daily: static data (D1)
+  getDataset(): Dataset {
+    return "TAXI_STANDS";
+  }
+  getSource(): Provider {
+    return "LTA_DATAMALL";
+  }
+  getPath(): string {
+    return "/TaxiStands";
+  }
+  getRefreshInterval(): number {
+    return 24 * 60 * 60 * 1000;
+  } // daily: static data (D1)
 
   prepare(raw: unknown): TaxiStandDto[] {
-    return z.array(LtaTaxiStand).parse(raw).map((row) => ({
-      id: row.TaxiCode,
-      name: row.Name,
-      latitude: row.Latitude,
-      longitude: row.Longitude,
-      standType: row.Type,
-      isBarrierFree: row.Bfa === "Yes",
-    }));
+    return z
+      .array(LtaTaxiStand)
+      .parse(raw)
+      .map((row) => ({
+        id: row.TaxiCode,
+        name: row.Name,
+        latitude: row.Latitude,
+        longitude: row.Longitude,
+        standType: row.Type,
+        isBarrierFree: row.Bfa === "Yes",
+      }));
   }
 }

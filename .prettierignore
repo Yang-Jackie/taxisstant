@@ -1,0 +1,7 @@
+# Written by tools, or recorded from a real API: their exact bytes matter
+package-lock.json
+shared/openapi.json
+server/src/sample-data/
+
+# Prose: Prettier would re-wrap PLAN.md's lists and tables
+*.md

@@ -1,6 +1,13 @@
 /* Base styles for a full-screen, mobile-sized map app. Component styles go next to their components. */
 :root {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   line-height: 1.4;
   color: #17181a;
   background: #ffffff;

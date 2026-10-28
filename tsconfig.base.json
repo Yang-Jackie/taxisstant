@@ -1,10 +1,10 @@
 {
-    "compilerOptions": {
-        "strict": true,
-        "target": "ES2022",
-        "noUncheckedIndexedAccess": true,
-        "skipLibCheck": true,
-        "verbatimModuleSyntax": true,
-        "erasableSyntaxOnly": true
-    }
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true
+  }
 }

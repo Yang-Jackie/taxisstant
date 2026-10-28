@@ -14,7 +14,11 @@ export class DataApiClient {
   private readonly timeoutMs: number;
   private readonly fetchFn: typeof fetch;
 
-  constructor({ baseUrl = "/api", timeoutMs = 7_000, fetchFn = (input, init) => fetch(input, init) }: DataApiClientOptions = {}) {
+  constructor({
+    baseUrl = "/api",
+    timeoutMs = 7_000,
+    fetchFn = (input, init) => fetch(input, init),
+  }: DataApiClientOptions = {}) {
     this.baseUrl = baseUrl;
     this.timeoutMs = timeoutMs;
     this.fetchFn = fetchFn;
@@ -29,7 +33,11 @@ export class DataApiClient {
     try {
       res = await this.fetchFn(`${this.baseUrl}${endpoint}`, { headers, signal });
     } catch (err) {
-      throw new Error(signal.aborted ? `GET ${endpoint} timed out after ${this.timeoutMs} ms` : `GET ${endpoint} failed: ${String(err)}`);
+      throw new Error(
+        signal.aborted
+          ? `GET ${endpoint} timed out after ${this.timeoutMs} ms`
+          : `GET ${endpoint} failed: ${String(err)}`,
+      );
     }
 
     if (res.status === 304) return { status: "not-modified" };

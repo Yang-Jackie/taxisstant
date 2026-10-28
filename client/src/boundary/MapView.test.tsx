@@ -7,7 +7,13 @@ import { TaxiStand } from "../entity/TaxiStand";
 import { MapView } from "./MapView";
 
 function stand(id: string, name: string, latitude: number, longitude: number) {
-  return new TaxiStand({ id, name, location: new Location(latitude, longitude), standType: "Stand", isBarrierFree: true });
+  return new TaxiStand({
+    id,
+    name,
+    location: new Location(latitude, longitude),
+    standType: "Stand",
+    isBarrierFree: true,
+  });
 }
 
 const stands = [

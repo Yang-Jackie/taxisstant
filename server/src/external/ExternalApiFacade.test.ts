@@ -78,9 +78,9 @@ describe("ExternalApiFacade.fetch", () => {
 
   it("never calls out without a key", async () => {
     const fetchFn = fakeFetch(recorded);
-    await expect(new ExternalApiFacade(new ApiKeyStore({}), fetchFn).fetch("LTA_DATAMALL", "/TaxiStands")).rejects.toThrow(
-      /LTA_ACCOUNT_KEY/,
-    );
+    await expect(
+      new ExternalApiFacade(new ApiKeyStore({}), fetchFn).fetch("LTA_DATAMALL", "/TaxiStands"),
+    ).rejects.toThrow(/LTA_ACCOUNT_KEY/);
     expect(fetchFn).not.toHaveBeenCalled();
   });
 });

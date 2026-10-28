@@ -8,7 +8,7 @@ export const ONEMAP_TILE_URL = "https://www.onemap.gov.sg/maps/tiles/Default/{z}
 export const ONEMAP_ATTRIBUTION =
   '<img src="https://www.onemap.gov.sg/web-assets/images/logo/om_logo.png" style="height:20px;width:20px;vertical-align:middle" alt="" />' +
   '&nbsp;<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener noreferrer">OneMap</a>' +
-  '&nbsp;&copy;&nbsp;contributors&nbsp;&#124;&nbsp;' +
+  "&nbsp;&copy;&nbsp;contributors&nbsp;&#124;&nbsp;" +
   '<a href="https://www.sla.gov.sg/" target="_blank" rel="noopener noreferrer">Singapore Land Authority</a>';
 
 /** Roughly the middle of Singapore. */

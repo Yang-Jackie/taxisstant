@@ -86,13 +86,13 @@ describe("GET /api/taxi-stands", () => {
 
     const res = await request(app).get("/api/taxi-stands");
     expect(res.status).toBe(503);
-    expect(res.body).toMatchObject({error: expect.any(String)});
+    expect(res.body).toMatchObject({ error: expect.any(String) });
   });
 
   it("answers 404 for paths it doesn't serve", async () => {
     const app = appWith(cacheWithStands());
-    
+
     const res = await request(app).get("/api/none");
     expect(res.status).toBe(404);
-  })
+  });
 });

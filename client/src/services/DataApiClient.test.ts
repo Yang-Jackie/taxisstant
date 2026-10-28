@@ -46,9 +46,9 @@ describe("DataApiClient.get", () => {
   });
 
   it("rejects on an error status, e.g. 503 before the server has data", async () => {
-    await expect(new DataApiClient({ fetchFn: answering(503, { error: "not loaded" }) }).get("/taxi-stands")).rejects.toThrow(
-      /503/,
-    );
+    await expect(
+      new DataApiClient({ fetchFn: answering(503, { error: "not loaded" }) }).get("/taxi-stands"),
+    ).rejects.toThrow(/503/);
   });
 
   it("rejects when the network fails", async () => {

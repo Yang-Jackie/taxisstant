@@ -10,10 +10,25 @@ import { MapDisplayController } from "./MapDisplayController";
 import { SettingsController } from "./SettingsController";
 
 const stands = [
-  { id: "A01", name: "Lucky Plaza", latitude: 1.304294727, longitude: 103.8338467, standType: "Stand", isBarrierFree: true },
-  { id: "A05", name: "Mt Elizabeth", latitude: 1.304571786, longitude: 103.835547, standType: "Stand", isBarrierFree: true },
+  {
+    id: "A01",
+    name: "Lucky Plaza",
+    latitude: 1.304294727,
+    longitude: 103.8338467,
+    standType: "Stand",
+    isBarrierFree: true,
+  },
+  {
+    id: "A05",
+    name: "Mt Elizabeth",
+    latitude: 1.304571786,
+    longitude: 103.835547,
+    standType: "Stand",
+    isBarrierFree: true,
+  },
 ];
-const ok = () => Promise.resolve(new Response(JSON.stringify({ asOf: "x", etag: '"v1"', data: stands }), { status: 200 }));
+const ok = () =>
+  Promise.resolve(new Response(JSON.stringify({ asOf: "x", etag: '"v1"', data: stands }), { status: 200 }));
 const unavailable = () => Promise.resolve(new Response("{}", { status: 503 }));
 const offline = () => Promise.reject(new TypeError("Failed to fetch"));
 

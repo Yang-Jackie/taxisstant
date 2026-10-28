@@ -8,9 +8,30 @@ import { App } from "./App";
 import { ControllersContext, initControllers, startControllers } from "./startup";
 
 const stands = [
-  { id: "A01", name: "Orchard Rd along driveway of Lucky Plaza", latitude: 1.304294727, longitude: 103.8338467, standType: "Stand", isBarrierFree: true },
-  { id: "A05", name: "Mt Elizabeth Rd at Mt Elizabeth Hospital", latitude: 1.304571786, longitude: 103.835547, standType: "Stand", isBarrierFree: true },
-  { id: "A06", name: "Cairnhill Rd at Cairnhill Nine", latitude: 1.303519805, longitude: 103.8376729, standType: "Stop", isBarrierFree: true },
+  {
+    id: "A01",
+    name: "Orchard Rd along driveway of Lucky Plaza",
+    latitude: 1.304294727,
+    longitude: 103.8338467,
+    standType: "Stand",
+    isBarrierFree: true,
+  },
+  {
+    id: "A05",
+    name: "Mt Elizabeth Rd at Mt Elizabeth Hospital",
+    latitude: 1.304571786,
+    longitude: 103.835547,
+    standType: "Stand",
+    isBarrierFree: true,
+  },
+  {
+    id: "A06",
+    name: "Cairnhill Rd at Cairnhill Nine",
+    latitude: 1.303519805,
+    longitude: 103.8376729,
+    standType: "Stop",
+    isBarrierFree: true,
+  },
 ];
 const okBody = { asOf: "2026-10-27T00:00:00.000Z", etag: '"v1"', data: stands };
 

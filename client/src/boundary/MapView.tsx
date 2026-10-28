@@ -1,6 +1,14 @@
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import type { TaxiStand } from "../entity/TaxiStand";
-import { MAX_ZOOM, MIN_ZOOM, ONEMAP_ATTRIBUTION, ONEMAP_TILE_URL, SINGAPORE_BOUNDS, SINGAPORE_CENTRE, START_ZOOM } from "./onemap";
+import {
+  MAX_ZOOM,
+  MIN_ZOOM,
+  ONEMAP_ATTRIBUTION,
+  ONEMAP_TILE_URL,
+  SINGAPORE_BOUNDS,
+  SINGAPORE_CENTRE,
+  START_ZOOM,
+} from "./onemap";
 import "./MapView.css";
 
 export interface MapViewProps {

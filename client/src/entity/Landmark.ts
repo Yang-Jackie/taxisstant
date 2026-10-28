@@ -8,7 +8,7 @@ export interface LandmarkProps {
   location: Location;
 }
 
-export abstract class Landmark implements Locatable{
+export abstract class Landmark implements Locatable {
   readonly id: string;
   readonly name: string;
   readonly location: Location;
