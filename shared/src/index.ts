@@ -1,3 +1,4 @@
-// @taxisstant/shared — the API contract used by both client and server (types only).
-export type { ApiResponse } from "./ApiResponse.js";
-export type { TaxiStandDto } from "./TaxiStandDto.js";
+// @taxisstant/shared — the API contract used by both client and server: zod schemas, and the types inferred from them.
+export { ApiError, apiResponse, type ApiResponse } from "./ApiResponse.js";
+export { ENDPOINTS, type Endpoint } from "./endpoints.js";
+export { TaxiStandDto } from "./TaxiStandDto.js";

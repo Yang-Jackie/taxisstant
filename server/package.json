@@ -13,7 +13,8 @@
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "dev": "tsx watch --env-file-if-exists=.env src/DataServiceApp.ts"
+    "dev": "tsx watch --env-file-if-exists=.env src/DataServiceApp.ts",
+    "lint": "oxlint"
   },
   "keywords": [],
   "author": "",

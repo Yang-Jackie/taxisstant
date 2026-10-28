@@ -1,0 +1,171 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Taxi Assistant data API",
+    "version": "1.0.0",
+    "description": "Read-only data for the Taxi Assistant client. The server fetches and prepares government data on a schedule; clients only ever talk to this API. Unknown paths answer 404 with an ApiError body."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "paths": {
+    "/taxi-stands": {
+      "get": {
+        "operationId": "getTaxiStands",
+        "summary": "Every taxi stand and taxi stop in Singapore",
+        "description": "Static data from LTA DataMall. The server refreshes it daily; clients re-check it daily.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxiStandsResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/NotLoadedYet"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "What went wrong, in plain English."
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "TaxiStandDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "LTA's taxi stand code, e.g. A01."
+          },
+          "name": {
+            "type": "string",
+            "description": "Where it is, e.g. Orchard Rd along driveway of Lucky Plaza."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "WGS 84 degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "WGS 84 degrees."
+          },
+          "standType": {
+            "type": "string",
+            "description": "LTA's type, e.g. \"Stand\" or \"Stop\"."
+          },
+          "isBarrierFree": {
+            "type": "boolean",
+            "description": "Whether it has barrier-free access."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "latitude",
+          "longitude",
+          "standType",
+          "isBarrierFree"
+        ],
+        "additionalProperties": false
+      },
+      "TaxiStandsResponse": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server got this data from its source (ISO 8601, UTC)."
+          },
+          "etag": {
+            "type": "string",
+            "description": "A fingerprint of the data. Send it back as If-None-Match to get 304 if nothing changed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaxiStandDto"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "etag",
+          "data"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "parameters": {
+      "IfNoneMatch": {
+        "name": "If-None-Match",
+        "in": "header",
+        "required": false,
+        "description": "The etag of the copy the client already has. If it is still current, the answer is 304.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "headers": {
+      "ETag": {
+        "description": "The fingerprint of the data, the same as the body's etag.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "NotLoadedYet": {
+        "description": "Service Unavailable: the server hasn't loaded this data yet (it is still starting up).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      }
+    }
+  }
+}

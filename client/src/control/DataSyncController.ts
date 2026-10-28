@@ -1,11 +1,11 @@
-import type { TaxiStandDto } from "@taxisstant/shared";
+import { ENDPOINTS, type TaxiStandDto } from "@taxisstant/shared";
 import type { MapDataRepository } from "../entity/MapDataRepository";
 import type { CacheManager } from "../services/CacheManager";
 import type { ApiResult, DataApiClient } from "../services/DataApiClient";
 import { toTaxiStand } from "../services/toTaxiStand";
 import type { DataSyncObserver } from "./DataSyncObserver";
 
-const TAXI_STANDS = "/taxi-stands";
+const TAXI_STANDS = ENDPOINTS.taxiStands;
 /** Static layers are re-checked with the server once a day (D1). */
 const STATIC_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -28,7 +28,7 @@ export class DataSyncController {
 
   /** At startup: fill the repository with what an earlier session saved. Never touches the network. */
   async loadCached(): Promise<void> {
-    const cached = await this.cache.get<TaxiStandDto[]>(TAXI_STANDS);
+    const cached = await this.cache.get(TAXI_STANDS.path, TAXI_STANDS.response);
     if (cached) this.showTaxiStands(cached.data);
   }
 
@@ -42,22 +42,22 @@ export class DataSyncController {
   }
 
   private async refreshTaxiStands(): Promise<void> {
-    const cached = await this.cache.get<TaxiStandDto[]>(TAXI_STANDS);
-    if (cached && !(await this.cache.isStale(TAXI_STANDS, STATIC_TTL_MS))) return;
+    const cached = await this.cache.get(TAXI_STANDS.path, TAXI_STANDS.response);
+    if (cached && !(await this.cache.isStale(TAXI_STANDS.path, STATIC_TTL_MS))) return;
 
     let result: ApiResult<TaxiStandDto[]>;
     try {
-      result = await this.api.get<TaxiStandDto[]>(TAXI_STANDS, cached?.etag);
+      result = await this.api.get(TAXI_STANDS, cached?.etag);
     } catch (err) {
       if (cached) return; // offline or server down: the saved copy is still on the map
       throw err; // nothing saved and nothing downloaded: UC 0001 exception 4a
     }
 
     if (result.status === "ok") {
-      await this.cache.put(TAXI_STANDS, result.response);
+      await this.cache.put(TAXI_STANDS.path, result.response);
       this.showTaxiStands(result.response.data);
     } else if (cached) {
-      await this.cache.put(TAXI_STANDS, cached); // 304: same data, but saving it again records today's check
+      await this.cache.put(TAXI_STANDS.path, cached); // 304: same data, but saving it again records today's check
     }
   }
 

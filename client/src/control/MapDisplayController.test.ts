@@ -28,7 +28,9 @@ const stands = [
   },
 ];
 const ok = () =>
-  Promise.resolve(new Response(JSON.stringify({ asOf: "x", etag: '"v1"', data: stands }), { status: 200 }));
+  Promise.resolve(
+    new Response(JSON.stringify({ asOf: "2026-10-27T00:00:00.000Z", etag: '"v1"', data: stands }), { status: 200 }),
+  );
 const unavailable = () => Promise.resolve(new Response("{}", { status: 503 }));
 const offline = () => Promise.reject(new TypeError("Failed to fetch"));
 

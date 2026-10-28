@@ -1,3 +1,4 @@
+import { ENDPOINTS, type ApiError } from "@taxisstant/shared";
 import { Router, type Request, type Response } from "express";
 import type { ServerDataCache } from "../cache/ServerDataCache.js";
 
@@ -10,9 +11,9 @@ export class DataApiController {
 
   router(): Router {
     const router = Router();
-    router.get("/taxi-stands", (req, res) => this.getTaxiStands(req, res));
+    router.get(ENDPOINTS.taxiStands.path, (req, res) => this.getTaxiStands(req, res));
     router.use((req, res) => {
-      res.status(404).json({ error: `No such endpoint: ${req.originalUrl}` });
+      res.status(404).json({ error: `No such endpoint: ${req.originalUrl}` } satisfies ApiError);
     });
     return router;
   }
@@ -20,7 +21,7 @@ export class DataApiController {
   getTaxiStands(req: Request, res: Response): void {
     const entry = this.cache.get("TAXI_STANDS");
     if (!entry) {
-      res.status(503).json({ error: "Taxi stand data is not loaded yet" });
+      res.status(503).json({ error: "Taxi stand data is not loaded yet" } satisfies ApiError);
       return;
     }
     res.set("ETag", entry.etag);

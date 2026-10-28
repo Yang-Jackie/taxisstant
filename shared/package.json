@@ -2,12 +2,26 @@
   "name": "@taxisstant/shared",
   "private": true,
   "version": "1.0.0",
-  "description": "The API contract: types used by both client and server.",
+  "description": "The API contract: zod schemas, and the types inferred from them, used by both client and server.",
   "type": "module",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
+    "openapi": "tsx scripts/write-openapi.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@seriousme/openapi-schema-validator": "^2.11.0",
+    "@types/node": "^24.19.2",
+    "tsx": "^4.23.15"
   }
 }

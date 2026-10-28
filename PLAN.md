@@ -28,7 +28,7 @@ The PNGs in the team repo (`lab3/Diagrams/`, 15 Oct) are **out of date**. They s
 - **Monorepo:** npm workspaces with `client/`, `server/` and `shared/`, all under the `@taxisstant/` package scope
 - **Client:** React, TypeScript, Vite, react-leaflet with OneMap tiles, IndexedDB (`idb`), i18next (EN/ZH)
 - **Server:** Node, Express and TypeScript; a timer-based scheduled sync (`setTimeout`, no node-cron: adapters declare intervals, not clock times); an in-memory cache and no database; API keys kept in `.env`
-- **Contract:** shared TypeScript types in `shared/`. In Phase 2 these get generated from zod schemas via OpenAPI.
+- **Contract:** zod schemas in `shared/`; the TypeScript types are inferred from them, and `shared/openapi.json` is generated from them (D11).
 - **Tests:** Vitest, Supertest, Testing Library, fake-indexeddb
 - **TypeScript 7:** `strict` is on by default, and `@types` packages are only loaded when listed in `types`.
 
@@ -105,7 +105,7 @@ server/src/
 | `Dataset`, `Provider` | server-side string unions | M2–M3 |
 | `SuggestionStrategy` → `PickupSuggestionStrategy`, `RestStopSuggestionStrategy` | score sites from the cached data | Phase 2 |
 
-**Shared, in `shared/src/` (`@taxisstant/shared`):** `ApiResponse<T>` and the DTO types, starting with `TaxiStandDto` (moved there from `server/src/contract/` in M5). Types only, so no build step.
+**Shared, in `shared/src/` (`@taxisstant/shared`):** the zod schemas (`apiResponse(data)`, `ApiError`, the DTOs, starting with `TaxiStandDto`), the types inferred from them, and `ENDPOINTS`, the list of every endpoint with its path and response schema. Since package 1 it contains runtime code, but still needs no build step: Vite and `tsx` read its TypeScript directly.
 
 **Tests** sit next to the code they test, named `*.test.ts` (or `*.test.tsx`).
 
@@ -298,19 +298,21 @@ UC 0001 runs through every part of the architecture once:
 
 I review and approve before the next package starts. Claude asks me whenever a decision comes up (see "Decisions I'll be asked about").
 
-1. **Contract and tooling**
-   - [ ] zod schemas → OpenAPI → generated types in `shared/`, replacing the hand-written DTOs
-   - [ ] Prettier, and Oxlint (already set up in the client by the Vite template) extended to the server
-2. **Server data**
-   - [ ] adapters for the other 4 static endpoints (carparks, hawker centres, fuel stations, charging stations)
-   - [ ] adapters for the live endpoints: taxis, carpark availability, charger availability, hotspots
-   - [ ] intervals from the deployment diagram:
-     - taxis every 30 s
-     - availability every 1–5 min
-     - hotspots every 30 min
-     - static data daily
-   - [ ] gzip, rate limiting and a CORS allow-list
-   - [ ] OneMap token refresh
+1. **Contract and tooling** ✅
+   - [x] zod schemas in `shared/` replace the hand-written DTOs: types via `z.infer`, `ENDPOINTS` lists every endpoint (D11)
+   - [x] `shared/openapi.json` generated from the schemas (`npm run openapi -w shared`), tested against the OpenAPI 3.1 schema and for being up to date
+   - [x] the client checks every downloaded and cached response against its endpoint's schema; the server has a contract test on the real LTA data
+   - [x] Prettier for the whole repo, and Oxlint extended to the server and `shared/`; `npm run check` runs type-check, lint, format check and all tests
+2. **Server data** (split into three checkpoints)
+   - **2a. Static datasets**
+     - [ ] research first: the fuel-station source, and coordinates for hotspots (LTA gives MRT station names only)
+     - [ ] adapters and endpoints for the other 4 static datasets (carparks, hawker centres, fuel stations, charging stations), refreshed daily
+   - **2b. Live datasets**
+     - [ ] adapters and endpoints for taxis, carpark availability, charger availability and hotspots
+     - [ ] intervals from the deployment diagram: taxis every 30 s, availability every 1–5 min, hotspots every 30 min
+   - **2c. HTTP hardening**
+     - [ ] gzip, rate limiting and a CORS allow-list
+     - [ ] OneMap token refresh, only if something turns out to need a token (the tiles don't)
 3. **Suggested sites on the server (Strategy pattern)**
    - [ ] `SuggestionStrategy` with `PickupSuggestionStrategy.calculateProbability` and `RestStopSuggestionStrategy.calculateAmenities`
    - [ ] `SyncService.buildSuggestions()`
@@ -349,7 +351,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 10. **Hardening and deployment**
     - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
     - [ ] wider test coverage
-    - [ ] HTTPS deployment
+    - [ ] HTTPS deployment. `shared/` has runtime code since package 1, so the server runs with `tsx` or gets bundled
 
 ---
 
@@ -391,6 +393,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
   - The diagram only defines `getLocation()` and `getType()`, with no getters for `id` or `name`.
 - **D9 — Suggestion updates (my decision, 23 Oct).** `DataSyncObserver` gets a second method, `onRecommendationUpdated(k: RecommendationKind)`. `onDataUpdated(t: LayerType)` stays for map layers. Added in Phase 2, package 4.
 - **D10 — One `CacheManager`, passed in (my decision, 27 Oct).** The diagram marks `CacheManager` «Singleton». Instead, `initControllers()` creates exactly one and passes it to `DataSyncController`, like `LocalStore`. There is still only one instance, but the startup code guarantees it rather than a static `getInstance()`, so tests can use a fresh one and dependencies show in constructors.
+- **D11 — The contract is zod, in `shared/` (my decision, 28 Oct).** The diagram generates TypeScript types *from* an OpenAPI spec. We go the other way: each response shape is written once as a zod schema in `shared/`, both sides infer their types from it, and the OpenAPI document is generated from the same schemas. One source of truth and no code-generation step for the code; the client also uses the schemas to check what it downloads and what it saved.
 
 ---
 

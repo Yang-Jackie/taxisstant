@@ -1,12 +1,17 @@
 // M7 acceptance tests — CacheManager: server responses saved on the phone, and how old each one is.
 // The design model makes it a «singleton»; here startup.ts makes exactly one and passes it in (D10).
 // Each test controls the clock by passing `now`, the same way DataApiClient takes a fake fetchFn.
-import { describe, expect, it } from "vitest";
+// Package 1: get() also checks the saved data against the endpoint's schema.
+import { apiResponse, type ApiResponse } from "@taxisstant/shared";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { z } from "zod";
 import { CacheManager } from "./CacheManager";
 import { LocalStore } from "./LocalStore";
 
 const DAY = 24 * 60 * 60 * 1000;
 const response = { asOf: "2026-10-27T00:00:00.000Z", etag: '"v1"', data: [{ id: "A01", name: "Lucky Plaza" }] };
+/** A small schema of our own, so these tests don't depend on the real TaxiStandDto. */
+const Shape = apiResponse(z.array(z.object({ id: z.string(), name: z.string() })));
 
 /** An in-memory stand-in for LocalStore — anything with read() and write() will do. */
 function memoryStore(initial: Record<string, unknown> = {}) {
@@ -16,24 +21,24 @@ function memoryStore(initial: Record<string, unknown> = {}) {
 
 describe("CacheManager", () => {
   it("has nothing for a key that was never saved", async () => {
-    expect(await new CacheManager(memoryStore()).get("/taxi-stands")).toBeUndefined();
+    expect(await new CacheManager(memoryStore()).get("/taxi-stands", Shape)).toBeUndefined();
   });
 
   it("gives back what was saved", async () => {
     const cache = new CacheManager(memoryStore());
     await cache.put("/taxi-stands", response);
-    expect(await cache.get("/taxi-stands")).toEqual(response);
+    expect(await cache.get("/taxi-stands", Shape)).toEqual(response);
   });
 
   it("keeps it for the next session (a new CacheManager on the same storage)", async () => {
     const store = memoryStore();
     await new CacheManager(store).put("/taxi-stands", response);
-    expect(await new CacheManager(store).get("/taxi-stands")).toEqual(response);
+    expect(await new CacheManager(store).get("/taxi-stands", Shape)).toEqual(response);
   });
 
   it("works on the real LocalStore (IndexedDB)", async () => {
     await new CacheManager(new LocalStore()).put("/taxi-stands", response);
-    expect(await new CacheManager(new LocalStore()).get("/taxi-stands")).toEqual(response);
+    expect(await new CacheManager(new LocalStore()).get("/taxi-stands", Shape)).toEqual(response);
   });
 
   it('saves each response under "cache:<key>", with the time it was saved', async () => {
@@ -50,7 +55,7 @@ describe("CacheManager", () => {
     await cache.put("preferences", response);
 
     expect(store.data.get("preferences")).toEqual(preferences);
-    expect(await cache.get("preferences")).toEqual(response);
+    expect(await cache.get("preferences", Shape)).toEqual(response);
   });
 
   it("treats a damaged entry as nothing saved", async () => {
@@ -65,9 +70,23 @@ describe("CacheManager", () => {
     ];
     for (const entry of damaged) {
       const cache = new CacheManager(memoryStore({ "cache:/taxi-stands": entry }));
-      expect(await cache.get("/taxi-stands")).toBeUndefined();
+      expect(await cache.get("/taxi-stands", Shape)).toBeUndefined();
       expect(await cache.isStale("/taxi-stands", DAY)).toBe(true);
     }
+  });
+
+  it("treats saved data that no longer fits the schema as nothing saved (e.g. saved by an older app version)", async () => {
+    const cache = new CacheManager(memoryStore());
+    await cache.put("/taxi-stands", { ...response, data: [{ id: 42 }] });
+    expect(await cache.get("/taxi-stands", Shape)).toBeUndefined();
+  });
+
+  it("gives back data typed by the schema", async () => {
+    const cache = new CacheManager(memoryStore());
+    await cache.put("/taxi-stands", response);
+    const saved = await cache.get("/taxi-stands", Shape);
+    expectTypeOf(saved).toEqualTypeOf<ApiResponse<{ id: string; name: string }[]> | undefined>();
+    expect(saved?.data[0]?.name).toBe("Lucky Plaza");
   });
 });
 
