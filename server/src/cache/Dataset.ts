@@ -1,1 +1,1 @@
-export type Dataset = "TAXI_STANDS";
+export type Dataset = "TAXI_STANDS" | "CARPARKS" | "HAWKER_CENTRES" | "FUEL_STATIONS" | "CHARGING_STATIONS";

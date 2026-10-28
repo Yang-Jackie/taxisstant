@@ -2,7 +2,7 @@
 // LTA's raw rows into the server's own TaxiStandDto shape, rejecting anything that doesn't fit.
 // Uses a real LTA DataMall response, recorded on 26 Oct 2026 (316 stands).
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TaxiStandAdapter } from "./TaxiStandAdapter.js";
 
 const recorded = JSON.parse(
@@ -58,17 +58,39 @@ describe("TaxiStandAdapter", () => {
       expect(() => adapter.prepare(recorded)).toThrow();
     });
 
-    it("rejects a row with a missing field", () => {
-      const { Name: _dropped, ...noName } = rows[0] as Record<string, unknown>;
-      expect(() => adapter.prepare([noName])).toThrow();
+    // Package 2a (D16): one bad row is skipped instead of freezing the whole layer.
+    describe("a row that doesn't fit is skipped, and the other 315 kept", () => {
+      const withBad = (bad: Record<string, unknown>) => [bad, ...rows.slice(1)];
+      const keptIds = (input: unknown[]) => adapter.prepare(input).map((s) => s.id);
+
+      beforeEach(() => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+      });
+      afterEach(() => vi.restoreAllMocks());
+
+      it("a row with a missing field", () => {
+        const { Name: _dropped, ...noName } = rows[0] as Record<string, unknown>;
+        const ids = keptIds(withBad(noName));
+        expect(ids).toHaveLength(315);
+        expect(ids).not.toContain("A01");
+      });
+
+      it("a latitude sent as text instead of a number", () => {
+        expect(keptIds(withBad(rowWith({ Latitude: "1.3043" })))).not.toContain("A01");
+      });
+
+      it("a Bfa value it can't turn into true/false", () => {
+        expect(keptIds(withBad(rowWith({ Bfa: "Maybe" })))).not.toContain("A01");
+      });
     });
 
-    it("rejects a latitude sent as text instead of a number", () => {
-      expect(() => adapter.prepare([rowWith({ Latitude: "1.3043" })])).toThrow();
+    it("rejects the whole dataset when many rows don't fit: LTA changed its format", () => {
+      const renamed = rows.map((r) => ({ ...r, Latitude: undefined, Lat: r["Latitude"] }));
+      expect(() => adapter.prepare(renamed)).toThrow(/don't fit/);
     });
 
-    it("rejects a Bfa value it can't turn into true/false", () => {
-      expect(() => adapter.prepare([rowWith({ Bfa: "Maybe" })])).toThrow();
+    it("rejects a download that was cut short", () => {
+      expect(() => adapter.prepare(rows.slice(0, 50))).toThrow(/expected at least 200/);
     });
   });
 });

@@ -24,4 +24,9 @@ describe("ApiKeyStore", () => {
   it("treats a blank key as missing", () => {
     expect(() => new ApiKeyStore({ LTA_ACCOUNT_KEY: "   " }).getKey("LTA_DATAMALL")).toThrow(/LTA_ACCOUNT_KEY/);
   });
+
+  it("says so when asked for a key a provider doesn't use (package 2a)", () => {
+    expect(() => new ApiKeyStore({}).getKey("DATA_GOV_SG")).toThrow(/doesn't use an API key/);
+    expect(() => new ApiKeyStore({}).getKey("OSM_OVERPASS")).toThrow(/doesn't use an API key/);
+  });
 });

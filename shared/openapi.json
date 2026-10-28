@@ -50,6 +50,166 @@
           }
         }
       }
+    },
+    "/carparks": {
+      "get": {
+        "operationId": "getCarparks",
+        "summary": "Every HDB, URA and LTA carpark with car lots",
+        "description": "Static data from LTA DataMall, refreshed daily. Free lots are live data, served separately.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarparksResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/NotLoadedYet"
+          }
+        }
+      }
+    },
+    "/hawker-centres": {
+      "get": {
+        "operationId": "getHawkerCentres",
+        "summary": "Every hawker centre, with its closures for cleaning and other works",
+        "description": "Static data from NEA (data.gov.sg, Dates of Hawker Centres Closure), refreshed daily.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HawkerCentresResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/NotLoadedYet"
+          }
+        }
+      }
+    },
+    "/fuel-stations": {
+      "get": {
+        "operationId": "getFuelStations",
+        "summary": "Every petrol station",
+        "description": "Static data from OpenStreetMap, refreshed daily. Data © OpenStreetMap contributors, available under the Open Database Licence: show that credit wherever it is displayed.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FuelStationsResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/NotLoadedYet"
+          }
+        }
+      }
+    },
+    "/charging-stations": {
+      "get": {
+        "operationId": "getChargingStations",
+        "summary": "Every place with EV chargers",
+        "description": "Static data from LTA DataMall, refreshed daily. Free chargers are live data, served separately.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargingStationsResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/NotLoadedYet"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -64,6 +224,253 @@
         },
         "required": [
           "error"
+        ],
+        "additionalProperties": false
+      },
+      "CarparkDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "LTA's carpark ID, e.g. A2. For HDB carparks this is the HDB carpark number."
+          },
+          "name": {
+            "type": "string",
+            "description": "The development or block, e.g. BLK 206/207 ANG MO KIO STREET 22."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "WGS 84 degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "WGS 84 degrees."
+          },
+          "agency": {
+            "type": "string",
+            "description": "Who runs it: \"HDB\", \"URA\" or \"LTA\"."
+          },
+          "area": {
+            "description": "LTA's area for its own carparks, e.g. \"Orchard\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "latitude",
+          "longitude",
+          "agency"
+        ],
+        "additionalProperties": false
+      },
+      "ChargingStationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Postal code and longitude, e.g. 179024:103.846728 (LTA gives locations no id)."
+          },
+          "name": {
+            "type": "string",
+            "description": "e.g. CLARKE QUAY."
+          },
+          "address": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "WGS 84 degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "WGS 84 degrees."
+          },
+          "operators": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Who runs the chargers; a few places have several (D15)."
+          },
+          "chargePoints": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "How many chargers the place has."
+          },
+          "maxPowerKw": {
+            "description": "The fastest charger's power rating, in kW.",
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "hasDcFast": {
+            "type": "boolean",
+            "description": "Whether any charger is DC: fast charging, from 30 kW up (D15)."
+          },
+          "plugTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "e.g. \"Type 2\", \"Combo 2\", \"CHAdeMO\"."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "address",
+          "latitude",
+          "longitude",
+          "operators",
+          "chargePoints",
+          "hasDcFast",
+          "plugTypes"
+        ],
+        "additionalProperties": false
+      },
+      "FuelStationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The OpenStreetMap element, e.g. \"way/123456\"."
+          },
+          "name": {
+            "type": "string",
+            "description": "e.g. \"Shell Dunearn\"; \"Fuel station\" when OpenStreetMap has no name."
+          },
+          "brand": {
+            "description": "e.g. \"Shell\", \"Esso\", \"Caltex\", \"SPC\"; missing when unknown.",
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "WGS 84 degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "WGS 84 degrees."
+          },
+          "address": {
+            "type": "string"
+          },
+          "openingHours": {
+            "description": "In OpenStreetMap's opening_hours format, e.g. \"24/7\", where known.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
+      "HawkerClosure": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The first day closed (Singapore date)."
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The last day closed, inclusive."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "cleaning",
+              "works"
+            ],
+            "description": "Quarterly cleaning, or other works such as repairs."
+          },
+          "remarks": {
+            "description": "NEA's note, e.g. \"Repairs and Redecoration\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "HawkerCentreDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Made from the name, e.g. adam-road-food-centre (NEA gives no stable id)."
+          },
+          "name": {
+            "type": "string",
+            "description": "e.g. Adam Road Food Centre."
+          },
+          "address": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "WGS 84 degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "WGS 84 degrees."
+          },
+          "foodStalls": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Cooked food stalls."
+          },
+          "marketStalls": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Market (wet and dry goods) stalls."
+          },
+          "closures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HawkerClosure"
+            },
+            "description": "This year's closures. Ones NEA lists as \"TBC\" are left out until dated."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "address",
+          "latitude",
+          "longitude",
+          "foodStalls",
+          "marketStalls",
+          "closures"
         ],
         "additionalProperties": false
       },
@@ -125,6 +532,110 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TaxiStandDto"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "etag",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CarparksResponse": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server got this data from its source (ISO 8601, UTC)."
+          },
+          "etag": {
+            "type": "string",
+            "description": "A fingerprint of the data. Send it back as If-None-Match to get 304 if nothing changed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarparkDto"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "etag",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "HawkerCentresResponse": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server got this data from its source (ISO 8601, UTC)."
+          },
+          "etag": {
+            "type": "string",
+            "description": "A fingerprint of the data. Send it back as If-None-Match to get 304 if nothing changed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HawkerCentreDto"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "etag",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "FuelStationsResponse": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server got this data from its source (ISO 8601, UTC)."
+          },
+          "etag": {
+            "type": "string",
+            "description": "A fingerprint of the data. Send it back as If-None-Match to get 304 if nothing changed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FuelStationDto"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "etag",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ChargingStationsResponse": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server got this data from its source (ISO 8601, UTC)."
+          },
+          "etag": {
+            "type": "string",
+            "description": "A fingerprint of the data. Send it back as If-None-Match to get 304 if nothing changed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChargingStationDto"
             }
           }
         },

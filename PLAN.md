@@ -85,11 +85,11 @@ server/src/
 ├── DataServiceApp.ts        «startup»
 ├── api/                     DataApiController
 ├── cache/                   ServerDataCache, Dataset
-├── sync/                    SyncService, DatasetAdapter
-│   ├── adapters/            TaxiStandAdapter (+ Phase 2 adapters)
+├── sync/                    SyncService, DatasetAdapter, parseRows (D16), geo
+│   ├── adapters/            TaxiStand, Carpark, HawkerCentre, FuelStation, ChargingStation adapters (+ live ones in 2c)
 │   └── strategies/          Phase 2: SuggestionStrategy and its two strategies
-├── external/                ExternalApiFacade, ApiKeyStore, Provider
-└── sample-data/             test fixtures, including the recorded LTA response
+├── external/                ExternalApiFacade (one client per provider), ApiKeyStore, Provider
+└── sample-data/             real recorded provider responses for tests; record.ts refreshes them
 ```
 
 
@@ -98,10 +98,10 @@ server/src/
 | `DataServiceApp` | «startup»: builds everything and starts the sync | M0, M2, M3 |
 | `DataApiController` | 11 GET endpoints, with ETag, gzip and rate limit; `/api/taxi-stands` first | M2 |
 | `ServerDataCache` | in-memory last good copy per `Dataset` | M2 |
-| `DatasetAdapter` (interface) | declares its own source, path and refresh interval, and `prepare()`s raw data. `TaxiStandAdapter` is the first one | M3 |
+| `DatasetAdapter` (interface) | declares its own source, path and refresh interval, and `prepare()`s raw data. `TaxiStandAdapter` is the first one; 2a adds four | M3; 2a |
 | `SyncService` | `start()`: runs each adapter on its own interval, then `buildSuggestions()` | M3; suggestions in Phase 2 |
-| `ExternalApiFacade` | `fetch(provider, path)` | M3 |
-| `ApiKeyStore` | keys from `.env`, plus the OneMap token | M3 |
+| `ExternalApiFacade` | `fetch(provider, path)`: LTA DataMall, data.gov.sg and OpenStreetMap Overpass, each with a timeout | M3; 2a |
+| `ApiKeyStore` | keys from `.env` (only LTA needs one; no OneMap token, D14) | M3 |
 | `Dataset`, `Provider` | server-side string unions | M2–M3 |
 | `SuggestionStrategy` → `PickupSuggestionStrategy`, `RestStopSuggestionStrategy` | score sites from the cached data | Phase 2 |
 
@@ -303,36 +303,37 @@ I review and approve before the next package starts. Claude asks me whenever a d
    - [x] `shared/openapi.json` generated from the schemas (`npm run openapi -w shared`), tested against the OpenAPI 3.1 schema and for being up to date
    - [x] the client checks every downloaded and cached response against its endpoint's schema; the server has a contract test on the real LTA data
    - [x] Prettier for the whole repo, and Oxlint extended to the server and `shared/`; `npm run check` runs type-check, lint, format check and all tests
-2. **Server data** (split into three checkpoints)
-   - **2a. Static datasets**
-     - [ ] research first: the fuel-station source, and coordinates for hotspots (LTA gives MRT station names only)
-     - [ ] adapters and endpoints for the other 4 static datasets (carparks, hawker centres, fuel stations, charging stations), refreshed daily
-   - **2b. Live datasets**
-     - [ ] adapters and endpoints for taxis, carpark availability, charger availability and hotspots
+2. **Map layers, built end to end** (decided 28 Oct: each checkpoint takes layers from the source to the map, so every one has a demo; this absorbs the old packages 4 and 5)
+   - **2a. Static layers, server** ✅
+     - [x] research: sources checked with real calls; decisions D12–D15
+     - [x] `ExternalApiFacade`: one client per provider (LTA paging that keeps an existing query string, LTA download links, data.gov.sg poll-then-download, Overpass POST), with timeouts
+     - [x] adapters, `ENDPOINTS` entries and routes for carparks (LTA, car lots only), hawker centres (NEA, D13), fuel stations (OpenStreetMap, D12) and charging stations (LTA EV batch, D15), refreshed daily
+     - [x] adapters skip a few bad rows but reject a dataset whose format changed (the last good copy stays)
+     - [x] recorded samples and contract tests for every endpoint
+   - **2b. Static layers, client**
+     - [ ] `DataSyncController`, `CacheManager` use and `MapDataRepository` generalised from taxi stands to every static layer
+     - [ ] `Carpark`, `FuelStation`, `ChargingStation`, `HawkerCentre` entities; `MapDisplayController` for every layer
+     - [ ] a marker style and details popup per layer; "© OpenStreetMap contributors" while Fuel is shown (D12)
+   - **2c. Live layers, server**
+     - [ ] the station coordinates file and its generator script (D14)
+     - [ ] taxis, carpark availability (LTA, plus HDB total lots from data.gov.sg), charger availability (EV batch) and hotspots (crowd density)
      - [ ] intervals from the deployment diagram: taxis every 30 s, availability every 1–5 min, hotspots every 30 min
-   - **2c. HTTP hardening**
+   - **2d. Live layers, client**
+     - [ ] `refreshLive(layers, kinds)`, polling only what's toggled on, pausing when the app is in the background
+     - [ ] `MapDataRepository.updateAvailability`; taxis with clustering or density; hotspots as circles
+   - **2e. HTTP hardening**
      - [ ] gzip, rate limiting and a CORS allow-list
-     - [ ] OneMap token refresh, only if something turns out to need a token (the tiles don't)
 3. **Suggested sites on the server (Strategy pattern)**
    - [ ] `SuggestionStrategy` with `PickupSuggestionStrategy.calculateProbability` and `RestStopSuggestionStrategy.calculateAmenities`
    - [ ] `SyncService.buildSuggestions()`
    - [ ] the `/api/pickup-sites` and `/api/rest-stop-sites` endpoints
-4. **Client data layer for every endpoint**
-   - [ ] caching and daily re-checks for every static endpoint
-   - [ ] `refreshLive(layers, kinds)`, polling only what's toggled on
-   - [ ] pausing when the app is in the background
-   - [ ] `MapDataRepository.updateAvailability` and the suggestion methods
-5. **Map layers (UC 0002–0007)**
-   - [ ] the other 4 Landmark types, `Taxi`, and `Site` → `Hotspot`
-   - [ ] taxis shown with clustering or density
-   - [ ] hotspots and suggestions drawn as circles
-   - [ ] vehicle type hides irrelevant energy stops (FR-2.1.1)
 6. **Location (UC 0013)**
    - [ ] `GPSInterface`, `LocationController` and `LocationObserver`
    - [ ] driver pin
    - [ ] re-centre button
    - [ ] banner when location permission is denied
 7. **Recommendations (UC 0008–0009)**
+   - [ ] client data for suggestions: `MapDataRepository.getSuggestions` / `replaceSuggestions`, `DataSyncObserver.onRecommendationUpdated` (D9)
    - [ ] `RecommendationController`: `toggle`, plus `rank()` by distance and preferences on the client
    - [ ] `Sidemenu.onToggleSuggestion`
    - [ ] `RecommendationCard`
@@ -391,9 +392,14 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D8 — Visibility.**
   - Fields the diagram marks `#` (protected) or `-` (private) become `readonly` public fields when other layers need to read them, e.g. the map showing a landmark's `name`.
   - The diagram only defines `getLocation()` and `getType()`, with no getters for `id` or `name`.
-- **D9 — Suggestion updates (my decision, 23 Oct).** `DataSyncObserver` gets a second method, `onRecommendationUpdated(k: RecommendationKind)`. `onDataUpdated(t: LayerType)` stays for map layers. Added in Phase 2, package 4.
+- **D9 — Suggestion updates (my decision, 23 Oct).** `DataSyncObserver` gets a second method, `onRecommendationUpdated(k: RecommendationKind)`. `onDataUpdated(t: LayerType)` stays for map layers. Added in Phase 2, package 7.
 - **D10 — One `CacheManager`, passed in (my decision, 27 Oct).** The diagram marks `CacheManager` «Singleton». Instead, `initControllers()` creates exactly one and passes it to `DataSyncController`, like `LocalStore`. There is still only one instance, but the startup code guarantees it rather than a static `getInstance()`, so tests can use a fresh one and dependencies show in constructors.
 - **D11 — The contract is zod, in `shared/` (my decision, 28 Oct).** The diagram generates TypeScript types *from* an OpenAPI spec. We go the other way: each response shape is written once as a zod schema in `shared/`, both sides infer their types from it, and the OpenAPI document is generated from the same schemas. One source of truth and no code-generation step for the code; the client also uses the schemas to check what it downloads and what it saved.
+- **D12 — Fuel stations from OpenStreetMap (my decision, 28 Oct).** No official dataset lists retail stations (Singapore Customs' "licensed petroleum premises" is 21 depots, last updated 2012). OSM, through the Overpass API, has about 200 (Singapore has about 184), refreshed daily. This adds a fourth provider, `OSM_OVERPASS`, which the design doesn't have. OSM's licence (ODbL) requires "© OpenStreetMap contributors" on the map while the Fuel layer is on. Public Overpass servers are sometimes at capacity, so the sync relies on D7's retries and last good copy.
+- **D13 — Hawker centres carry closure dates, not opening hours (my decision, 28 Oct).** Centres have no opening hours (stalls do). NEA's "Dates of Hawker Centres Closure" (data.gov.sg) lists every centre with its quarterly cleaning and other-works closures, so `HawkerCentre.operatingHours` becomes `closures`, and `isOpen(t)` means "not closed for cleaning or works on that day". Package 3's rest-stop scoring should skip a closed centre.
+- **D14 — Station coordinates are a committed file; OneMap leaves the runtime (my decision, 28 Oct).** LTA's crowd data has station codes only. A dev script builds `train-stations.json` from LTA's station-code table joined with LTA's station-exit coordinates (data.gov.sg), with OneMap search for codes newer than the table. Regenerate it when a line opens. The server never calls OneMap, so `ApiKeyStore.oneMapToken` and `refreshOneMapToken` are dropped, and NF-2.2 (no expired-token problems) holds by construction. (OneMap search now warns that it will require a token.)
+- **D15 — Charging stations: several operators, and charging speed (28 Oct).** 42 of 2,806 LTA locations have more than one operator, so `ChargingStation.operator: String` becomes `operators: string[]`. Added `maxPowerKw` and `hasDcFast`: an EV taxi mid-shift needs DC fast charging (50 kW+), which 620 locations have.
+- **D16 — How adapters treat imperfect data (28 Oct, extends D7).** Real feeds have odd rows: 116 EV locations have no name, one carpark has no location. Adapters therefore skip rows that don't fit and log a warning, but reject the whole download when more than 5% of rows don't fit (the format changed) or when it is implausibly small (cut short or emptied). LTA's paged feeds also don't always come from one snapshot: on 28 Oct, for several minutes, rows shifted between pages, so 40 carparks came twice and 40 others went missing. `CarparkAdapter` accepts up to 1% repeated rows (keeping one of each) and rejects anything worse. A rejected download keeps the last good copy and retries a minute later (D7). The live LTA feeds in 2c need the same check. `TaxiStandAdapter` follows the same rule since 2a (it used to reject the whole dataset over one bad row).
 
 ---
 
@@ -401,8 +407,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 
 | When | Decision |
 |---|---|
-| Package 2 | Which fuel-station data source to use (still undecided). |
-| Package 2 | Where hotspot coordinates come from. LTA's crowd forecast gives MRT *station names*, but `Hotspot` is a `Site` with a `centre`, so the station coordinates need another source. |
+| Package 2c | `DatasetAdapter` declares one `getSource()`, but carpark availability joins LTA (available lots) with data.gov.sg (HDB total lots), and the diagram's note says adapters "convert · join · clean". How should one adapter read two sources? |
 | Package 3 | How to score pickup spots and rest stops (`calculateProbability`, `calculateAmenities`). |
 | Package 8 | `Bookmark` has no `id` and holds the whole `Landmark`, yet `BookmarkList.remove(id)` needs an id. Should bookmarks get an `id` and store a `landmarkId`? |
 | Package 10 | How to get access to the school lab server, and whether it can serve HTTPS. |
@@ -425,4 +430,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **UC 0009 has copy-paste errors:** pickup probability is "based on nearby amenities", and its exceptions mention rest stops.
 - **The deployment diagram is out of date:** it still says the framework ("e.g. Next.js / React") and the host are undecided.
 - **`Location.address` is a required `String`** in the diagram, but taxis, hotspots and suggested sites have no address.
+- **The design model has no fuel-station source** (D12), and `HawkerCentre.operatingHours` has no data behind it (D13).
+- **`ChargingStation.operator` is a single string**, but some locations have several operators (D15).
+- **`DatasetAdapter` declares one source and one path,** while the diagram's own note says adapters "convert · join · clean" (to decide in package 2c).
 - **The AI report and the Lab 3 report number the use cases differently.** This plan uses the Lab 3 report's numbering.

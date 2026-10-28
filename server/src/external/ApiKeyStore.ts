@@ -1,7 +1,7 @@
 import type { Provider } from "./Provider.js";
 
-/** Which environment variable holds each provider's key. */
-const ENV_VARIABLE: Record<Provider, string> = { LTA_DATAMALL: "LTA_ACCOUNT_KEY" };
+/** Which environment variable holds each provider's key. Providers not listed here need no key. */
+const ENV_VARIABLE: Partial<Record<Provider, string>> = { LTA_DATAMALL: "LTA_ACCOUNT_KEY" };
 
 export class ApiKeyStore {
   private readonly keys = new Map<Provider, string>();
@@ -14,8 +14,10 @@ export class ApiKeyStore {
   }
 
   getKey(p: Provider): string {
+    const variable = ENV_VARIABLE[p];
+    if (!variable) throw new Error(`${p} doesn't use an API key`);
     const key = this.keys.get(p);
-    if (!key) throw new Error(`No API key for ${p}: set ${ENV_VARIABLE[p]} in server/.env`);
+    if (!key) throw new Error(`No API key for ${p}: set ${variable} in server/.env`);
     return key;
   }
 }

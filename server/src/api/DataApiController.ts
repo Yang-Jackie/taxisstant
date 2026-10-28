@@ -1,6 +1,22 @@
-import { ENDPOINTS, type ApiError } from "@taxisstant/shared";
+import { ENDPOINTS, type ApiError, type Endpoint } from "@taxisstant/shared";
 import { Router, type Request, type Response } from "express";
+import type { Dataset } from "../cache/Dataset.js";
 import type { ServerDataCache } from "../cache/ServerDataCache.js";
+
+/** Which dataset each endpoint serves, and what to call it while it isn't loaded yet. */
+interface Route {
+  readonly endpoint: Endpoint<unknown>;
+  readonly dataset: Dataset;
+  readonly label: string;
+}
+
+const ROUTES: readonly Route[] = [
+  { endpoint: ENDPOINTS.taxiStands, dataset: "TAXI_STANDS", label: "Taxi stand" },
+  { endpoint: ENDPOINTS.carparks, dataset: "CARPARKS", label: "Carpark" },
+  { endpoint: ENDPOINTS.hawkerCentres, dataset: "HAWKER_CENTRES", label: "Hawker centre" },
+  { endpoint: ENDPOINTS.fuelStations, dataset: "FUEL_STATIONS", label: "Fuel station" },
+  { endpoint: ENDPOINTS.chargingStations, dataset: "CHARGING_STATIONS", label: "Charging station" },
+];
 
 export class DataApiController {
   private readonly cache: ServerDataCache;
@@ -11,17 +27,18 @@ export class DataApiController {
 
   router(): Router {
     const router = Router();
-    router.get(ENDPOINTS.taxiStands.path, (req, res) => this.getTaxiStands(req, res));
+    for (const route of ROUTES) router.get(route.endpoint.path, (req, res) => this.serve(route, req, res));
     router.use((req, res) => {
       res.status(404).json({ error: `No such endpoint: ${req.originalUrl}` } satisfies ApiError);
     });
     return router;
   }
 
-  getTaxiStands(req: Request, res: Response): void {
-    const entry = this.cache.get("TAXI_STANDS");
+  /** 200 with the data, 304 if the client's copy is current, or 503 until the first sync lands (D7). */
+  private serve({ dataset, label }: Route, req: Request, res: Response): void {
+    const entry = this.cache.get(dataset);
     if (!entry) {
-      res.status(503).json({ error: "Taxi stand data is not loaded yet" } satisfies ApiError);
+      res.status(503).json({ error: `${label} data is not loaded yet` } satisfies ApiError);
       return;
     }
     res.set("ETag", entry.etag);

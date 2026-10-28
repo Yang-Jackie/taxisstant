@@ -14,7 +14,8 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "dev": "tsx watch --env-file-if-exists=.env src/DataServiceApp.ts",
-    "lint": "oxlint"
+    "lint": "oxlint",
+    "record-samples": "tsx --env-file-if-exists=.env src/sample-data/record.ts"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
   "type": "module",
   "dependencies": {
     "@taxisstant/shared": "^1.0.0",
+    "csv-parse": "^7.0.3",
     "express": "^5.3.0",
     "zod": "^4.6.7"
   }

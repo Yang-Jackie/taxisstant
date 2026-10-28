@@ -1,8 +1,10 @@
 // M2 acceptance tests — DataApiController «boundary»: GET /api/taxi-stands over real HTTP (via Supertest).
+import { ENDPOINTS } from "@taxisstant/shared";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { DataApiController } from "./DataApiController.js";
+import type { Dataset } from "../cache/Dataset.js";
 import { ServerDataCache } from "../cache/ServerDataCache.js";
 
 /** Builds an app the same way DataServiceApp will: the controller's router mounted under /api. */
@@ -94,5 +96,43 @@ describe("GET /api/taxi-stands", () => {
 
     const res = await request(app).get("/api/none");
     expect(res.status).toBe(404);
+  });
+});
+
+// Package 2a — every endpoint in the shared contract is served, each from its own dataset.
+
+/** Which dataset each endpoint must serve (the spec the controller's route table has to match). */
+const SERVES: Record<keyof typeof ENDPOINTS, Dataset> = {
+  taxiStands: "TAXI_STANDS",
+  carparks: "CARPARKS",
+  hawkerCentres: "HAWKER_CENTRES",
+  fuelStations: "FUEL_STATIONS",
+  chargingStations: "CHARGING_STATIONS",
+};
+
+describe("every endpoint in ENDPOINTS (package 2a)", () => {
+  const all = Object.entries(SERVES) as [keyof typeof ENDPOINTS, Dataset][];
+
+  it("is routed: before any data arrives each one answers 503 with a reason, not 404", async () => {
+    const app = appWith(new ServerDataCache());
+    for (const [name] of all) {
+      const res = await request(app).get(`/api${ENDPOINTS[name].path}`);
+      expect(res.status, name).toBe(503);
+      expect(res.body.error, name).toMatch(/not loaded yet/);
+    }
+  });
+
+  it("serves its own dataset, with ETag and 304 like taxi stands", async () => {
+    const cache = new ServerDataCache();
+    for (const [, dataset] of all) cache.put(dataset, [dataset]);
+    const app = appWith(cache);
+
+    for (const [name, dataset] of all) {
+      const res = await request(app).get(`/api${ENDPOINTS[name].path}`);
+      expect(res.status, name).toBe(200);
+      expect(res.body.data, name).toEqual([dataset]);
+      const again = await request(app).get(`/api${ENDPOINTS[name].path}`).set("If-None-Match", res.headers["etag"]!);
+      expect(again.status, name).toBe(304);
+    }
   });
 });
