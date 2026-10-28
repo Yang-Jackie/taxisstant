@@ -10,7 +10,7 @@ import { createHttpApp } from "./createHttpApp.js";
 
 function appWithChargers() {
   const cache = new ServerDataCache();
-  cache.put("CHARGING_STATIONS", new ChargingStationAdapter().prepare(loadSample("chargingStations")));
+  cache.put("CHARGING_STATIONS", new ChargingStationAdapter().prepare([loadSample("chargingStations")]));
   return createHttpApp(cache, { log: false });
 }
 

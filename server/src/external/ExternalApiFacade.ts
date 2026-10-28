@@ -5,6 +5,8 @@ import type { Provider } from "./Provider.js";
 
 const LTA_BASE_URL = "https://datamall2.mytransport.sg/ltaodataservice";
 const DATA_GOV_SG_BASE_URL = "https://api-open.data.gov.sg/v1/public/api/datasets";
+/** data.gov.sg's real-time APIs (taxi availability, …), which answer with JSON directly. */
+const DATA_GOV_SG_REAL_TIME_URL = "https://api.data.gov.sg";
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 
 /** OpenStreetMap's usage policy asks every client to identify itself. */
@@ -38,8 +40,9 @@ export class ExternalApiFacade {
   }
 
   /**
-   * What `path` means depends on the provider: an LTA resource ("/TaxiStands"), a data.gov.sg dataset id
-   * ("d_…"), or an Overpass query. Resolves to the provider's data as JSON; rejects on any failure.
+   * What `path` means depends on the provider: an LTA resource ("/TaxiStands"); for data.gov.sg, a dataset id
+   * ("d_…") or a real-time API ("/v1/transport/taxi-availability"); or an Overpass query.
+   * Resolves to the provider's data as JSON; rejects on any failure.
    */
   async fetch(p: Provider, path: string): Promise<unknown> {
     switch (p) {
@@ -72,8 +75,13 @@ export class ExternalApiFacade {
     return (await this.request(link.data[0].Link)).json(); // a signed link: it needs no key
   }
 
-  /** data.gov.sg hands out each dataset as a file: ask for a link, then download it (CSV becomes an array of rows). */
-  private async fetchDataGovSg(datasetId: string): Promise<unknown> {
+  /**
+   * data.gov.sg's real-time APIs answer directly. Its datasets come as files: ask for a link, then download it
+   * (CSV becomes an array of rows).
+   */
+  private async fetchDataGovSg(path: string): Promise<unknown> {
+    if (path.startsWith("/")) return (await this.request(`${DATA_GOV_SG_REAL_TIME_URL}${path}`)).json();
+    const datasetId = path;
     const poll = await this.request(`${DATA_GOV_SG_BASE_URL}/${encodeURIComponent(datasetId)}/poll-download`);
     const { url } = DataGovSgDownload.parse(await poll.json()).data;
     const file = await this.request(url);

@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "dev": "tsx watch --env-file-if-exists=.env src/DataServiceApp.ts",
     "lint": "oxlint",
-    "record-samples": "tsx --env-file-if-exists=.env src/sample-data/record.ts"
+    "record-samples": "tsx --env-file-if-exists=.env src/sample-data/record.ts",
+    "build-stations": "tsx --env-file-if-exists=.env src/reference-data/build-stations.ts"
   },
   "keywords": [],
   "author": "",

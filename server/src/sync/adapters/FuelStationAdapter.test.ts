@@ -30,14 +30,14 @@ describe("FuelStationAdapter", () => {
     it("feeds the FUEL_STATIONS dataset", () => expect(adapter.getDataset()).toBe("FUEL_STATIONS"));
     it("comes from OpenStreetMap's Overpass API (D12)", () => expect(adapter.getSource()).toBe("OSM_OVERPASS"));
     it("asks for every amenity=fuel inside Singapore", () => {
-      expect(adapter.getPath()).toContain('area["ISO3166-1"="SG"]');
-      expect(adapter.getPath()).toContain('nwr["amenity"="fuel"]');
+      expect(adapter.getPaths()[0]).toContain('area["ISO3166-1"="SG"]');
+      expect(adapter.getPaths()[0]).toContain('nwr["amenity"="fuel"]');
     });
     it("refreshes once a day (static data, D1)", () => expect(adapter.getRefreshInterval()).toBe(24 * 60 * 60 * 1000));
   });
 
   describe("prepare()", () => {
-    const stations = adapter.prepare(sample);
+    const stations = adapter.prepare([sample]);
 
     it("gives each station its OpenStreetMap element as its id, and a position even for areas (ways)", () => {
       const way = stations.find((s) => s.id.startsWith("way/"))!;
@@ -60,26 +60,26 @@ describe("FuelStationAdapter", () => {
     });
 
     it("keeps two different brands even when they are next to each other", () => {
-      const result = adapter.prepare(
+      const result = adapter.prepare([
         withExtra(node(1, 1.2001, 103.6001, { brand: "Shell" }), node(2, 1.2002, 103.6002, { brand: "Esso" })),
-      );
+      ]);
       expect(result.filter((s) => ["node/1", "node/2"].includes(s.id))).toHaveLength(2);
     });
 
     it("keeps two stations of one brand that are far enough apart", () => {
-      const result = adapter.prepare(
+      const result = adapter.prepare([
         withExtra(node(1, 1.2001, 103.6001, { brand: "Shell" }), node(2, 1.2031, 103.6001, { brand: "Shell" })),
-      ); // about 330 m apart
+      ]); // about 330 m apart
       expect(result.filter((s) => ["node/1", "node/2"].includes(s.id))).toHaveLength(2);
     });
 
     it("leaves out private pumps", () => {
-      const result = adapter.prepare(withExtra(node(3, 1.2101, 103.6101, { name: "Depot pump", access: "private" })));
+      const result = adapter.prepare([withExtra(node(3, 1.2101, 103.6101, { name: "Depot pump", access: "private" }))]);
       expect(result.find((s) => s.id === "node/3")).toBeUndefined();
     });
 
     it("builds an address from OpenStreetMap's parts, and keeps the opening hours where known", () => {
-      const result = adapter.prepare(
+      const result = adapter.prepare([
         withExtra(
           node(4, 1.2201, 103.6201, {
             brand: "Caltex",
@@ -90,7 +90,7 @@ describe("FuelStationAdapter", () => {
             opening_hours: "24/7",
           }),
         ),
-      );
+      ]);
       expect(result.find((s) => s.id === "node/4")).toEqual({
         id: "node/4",
         name: "Caltex Test",
@@ -103,13 +103,13 @@ describe("FuelStationAdapter", () => {
     });
 
     it("spells a name that only repeats the brand our way (OpenStreetMap has both ESSO and Esso)", () => {
-      const result = adapter.prepare(withExtra(node(6, 1.2401, 103.6401, { name: "ESSO", brand: "ESSO" })));
+      const result = adapter.prepare([withExtra(node(6, 1.2401, 103.6401, { name: "ESSO", brand: "ESSO" }))]);
       expect(result.find((s) => s.id === "node/6")).toMatchObject({ name: "Esso", brand: "Esso" });
       expect(stations.filter((s) => s.name.toLowerCase() === "esso").every((s) => s.name === "Esso")).toBe(true);
     });
 
     it('calls a station with no name and no brand "Fuel station"', () => {
-      const result = adapter.prepare(withExtra(node(5, 1.2301, 103.6301, {})));
+      const result = adapter.prepare([withExtra(node(5, 1.2301, 103.6301, {}))]);
       expect(result.find((s) => s.id === "node/5")).toEqual({
         id: "node/5",
         name: "Fuel station",
@@ -119,7 +119,7 @@ describe("FuelStationAdapter", () => {
     });
 
     it("rejects an answer that was cut short", () => {
-      expect(() => adapter.prepare({ elements: sample.elements.slice(0, 20) })).toThrow(/expected at least 100/);
+      expect(() => adapter.prepare([{ elements: sample.elements.slice(0, 20) }])).toThrow(/expected at least 100/);
     });
   });
 });

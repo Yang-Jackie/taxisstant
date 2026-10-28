@@ -13,9 +13,9 @@ const RETRY = 1_000;
 const adapter: DatasetAdapter<unknown[]> = {
   getDataset: () => "TAXI_STANDS",
   getSource: () => "LTA_DATAMALL",
-  getPath: () => "/TaxiStands",
+  getPaths: () => ["/TaxiStands"],
   getRefreshInterval: () => INTERVAL,
-  prepare: (raw) => {
+  prepare: ([raw]) => {
     if (!Array.isArray(raw)) throw new Error("not an array");
     return raw;
   },
@@ -118,5 +118,74 @@ describe("SyncService", () => {
     sync.stop();
     await vi.advanceTimersByTimeAsync(INTERVAL * 10);
     expect(facade.fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Package 2c (D21) — an adapter that needs several requests, e.g. one per train line.
+describe("SyncService with a several-path adapter", () => {
+  const perLine: DatasetAdapter<string[]> = {
+    getDataset: () => "TAXI_STANDS",
+    getSource: () => "LTA_DATAMALL",
+    getPaths: () => ["/Crowd?Line=A", "/Crowd?Line=B", "/Crowd?Line=C"],
+    getRefreshInterval: () => INTERVAL,
+    prepare: (responses) => responses.map(String),
+  };
+
+  it("makes one request per path and hands prepare() the answers in the paths' order", async () => {
+    const facade = fakeFacade();
+    facade.fetch.mockImplementation(async (_p, path) => {
+      if (path.endsWith("A")) await new Promise((resolve) => setTimeout(resolve, 50)); // A answers last
+      return path.slice(-1);
+    });
+    sync = new SyncService(facade, cache, [perLine], RETRY);
+
+    const started = sync.start();
+    await vi.advanceTimersByTimeAsync(50);
+    await started;
+
+    expect(facade.fetch.mock.calls.map(([, path]) => path)).toEqual([
+      "/Crowd?Line=A",
+      "/Crowd?Line=B",
+      "/Crowd?Line=C",
+    ]);
+    expect(cache.get("TAXI_STANDS")?.data).toEqual(["A", "B", "C"]);
+  });
+
+  it("asks for every path at once rather than one after another", async () => {
+    const facade = fakeFacade();
+    let inFlight = 0;
+    let most = 0;
+    facade.fetch.mockImplementation(async () => {
+      most = Math.max(most, ++inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      inFlight--;
+      return "x";
+    });
+    sync = new SyncService(facade, cache, [perLine], RETRY);
+
+    const started = sync.start();
+    await vi.advanceTimersByTimeAsync(10);
+    await started;
+
+    expect(most).toBe(3);
+  });
+
+  it("stores nothing when one of the requests fails, keeps the last good copy, and retries", async () => {
+    const facade = fakeFacade();
+    facade.fetch.mockResolvedValue("ok");
+    sync = new SyncService(facade, cache, [perLine], RETRY);
+    await sync.start();
+    const good = cache.get("TAXI_STANDS");
+
+    facade.fetch.mockImplementation(async (_p, path) => {
+      if (path.endsWith("B")) throw new Error("line B is down");
+      return "new";
+    });
+    await vi.advanceTimersByTimeAsync(INTERVAL);
+
+    expect(cache.get("TAXI_STANDS")).toEqual(good);
+    facade.fetch.mockResolvedValue("back");
+    await vi.advanceTimersByTimeAsync(RETRY);
+    expect(cache.get("TAXI_STANDS")?.data).toEqual(["back", "back", "back"]);
   });
 });

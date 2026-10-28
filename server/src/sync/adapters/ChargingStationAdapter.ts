@@ -22,11 +22,15 @@ type LtaEvLocation = z.infer<typeof LtaEvLocation>;
 /** Each value once, sorted: LTA's charger order varies, and a different order would change the ETag for nothing. */
 const distinct = (values: string[]) => [...new Set(values)].sort();
 
+/** LTA gives locations no id: postal code and longitude make one (also used by ChargerAvailabilityAdapter). */
+export const chargingStationId = (postalCode: string, longitude: number) =>
+  `${postalCode.trim()}:${longitude.toFixed(6)}`;
+
 function toDto(l: LtaEvLocation): ChargingStationDto {
   const plugs = l.chargingPoints.flatMap((c) => c.plugTypes);
   const powers = plugs.map((p) => Number(p.powerRating)).filter((kw) => Number.isFinite(kw) && kw > 0);
   return {
-    id: `${l.postalCode}:${l.longtitude.toFixed(6)}`,
+    id: chargingStationId(l.postalCode, l.longtitude),
     name: l.name || l.address,
     address: l.address,
     latitude: l.latitude,
@@ -47,14 +51,14 @@ export class ChargingStationAdapter implements DatasetAdapter<ChargingStationDto
   getSource(): Provider {
     return "LTA_DATAMALL";
   }
-  getPath(): string {
-    return "/EVCBatch";
+  getPaths(): readonly string[] {
+    return ["/EVCBatch"];
   }
   getRefreshInterval(): number {
     return 24 * 60 * 60 * 1000; // daily: the locations are static; free chargers are live data (package 2c)
   }
 
-  prepare(raw: unknown): ChargingStationDto[] {
+  prepare([raw]: readonly unknown[]): ChargingStationDto[] {
     const { evLocationsData } = z.object({ evLocationsData: z.unknown() }).parse(raw);
     const locations = parseRows(evLocationsData, LtaEvLocation, { minRows: 1000 });
     return uniqueBy(locations.map(toDto), (s) => s.id);

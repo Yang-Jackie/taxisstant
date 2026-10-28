@@ -108,6 +108,10 @@ const SERVES: Record<keyof typeof ENDPOINTS, Dataset> = {
   hawkerCentres: "HAWKER_CENTRES",
   fuelStations: "FUEL_STATIONS",
   chargingStations: "CHARGING_STATIONS",
+  taxis: "TAXIS",
+  carparkAvailability: "CARPARK_AVAILABILITY",
+  chargerAvailability: "CHARGER_AVAILABILITY",
+  hotspots: "HOTSPOTS",
 };
 
 describe("every endpoint in ENDPOINTS (package 2a)", () => {

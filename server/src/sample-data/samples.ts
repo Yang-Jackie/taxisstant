@@ -8,6 +8,9 @@ export const SAMPLE_FILES = {
   chargingStations: "lta-ev-batch.json.gz",
   fuelStations: "osm-fuel-stations.json",
   hawkerCentres: "nea-hawker-centres.json",
+  taxis: "datagovsg-taxis.json",
+  /** One answer per train line, in TRAIN_LINES order (D21). */
+  hotspots: "lta-crowd-realtime.json",
 } as const;
 export type SampleName = keyof typeof SAMPLE_FILES;
 

@@ -5,6 +5,10 @@ import { ChargingStationDto } from "./ChargingStationDto.js";
 import { FuelStationDto } from "./FuelStationDto.js";
 import { HawkerCentreDto } from "./HawkerCentreDto.js";
 import { TaxiStandDto } from "./TaxiStandDto.js";
+import { CarparkAvailabilityDto } from "./CarparkAvailabilityDto.js";
+import { ChargerAvailabilityDto } from "./ChargerAvailabilityDto.js";
+import { HotspotDto } from "./HotspotDto.js";
+import { TaxiDto } from "./TaxiDto.js";
 
 /** One GET endpoint of our API: where it is, what it's for, and the exact shape of its JSON body. */
 export interface Endpoint<T> {
@@ -54,5 +58,29 @@ export const ENDPOINTS = {
     summary: "Every place with EV chargers",
     description: "Static data from LTA DataMall, refreshed daily. Free chargers are live data, served separately.",
     data: z.array(ChargingStationDto),
+  }),
+  taxis: endpoint("Taxis", {
+    path: "/taxis",
+    summary: "Where the available taxis are right now",
+    description: "Live data from data.gov.sg, refreshed every 30 seconds. Clients poll it only while it is toggled on.",
+    data: z.array(TaxiDto),
+  }),
+  carparkAvailability: endpoint("CarparkAvailability", {
+    path: "/carparks/availability",
+    summary: "Free car lots in every carpark",
+    description: "Live data from LTA DataMall, refreshed every minute. Joins /carparks by id.",
+    data: z.array(CarparkAvailabilityDto),
+  }),
+  chargerAvailability: endpoint("ChargerAvailability", {
+    path: "/charging-stations/availability",
+    summary: "Free chargers at every place with EV chargers",
+    description: "Live data from LTA DataMall, refreshed every 5 minutes. Joins /charging-stations by id.",
+    data: z.array(ChargerAvailabilityDto),
+  }),
+  hotspots: endpoint("Hotspots", {
+    path: "/hotspots",
+    summary: "How crowded each MRT and LRT station is right now",
+    description: "Live data from LTA DataMall's platform crowd density, refreshed every 10 minutes.",
+    data: z.array(HotspotDto),
   }),
 };

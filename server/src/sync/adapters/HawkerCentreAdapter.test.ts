@@ -12,12 +12,12 @@ describe("HawkerCentreAdapter", () => {
   describe("declares its own data source", () => {
     it("feeds the HAWKER_CENTRES dataset", () => expect(adapter.getDataset()).toBe("HAWKER_CENTRES"));
     it("comes from data.gov.sg", () => expect(adapter.getSource()).toBe("DATA_GOV_SG"));
-    it("is NEA's closure dataset", () => expect(adapter.getPath()).toBe("d_bda4baa634dd1cc7a6c7cad5f19e2d68"));
+    it("is NEA's closure dataset", () => expect(adapter.getPaths()).toEqual(["d_bda4baa634dd1cc7a6c7cad5f19e2d68"]));
     it("refreshes once a day (static data, D1)", () => expect(adapter.getRefreshInterval()).toBe(24 * 60 * 60 * 1000));
   });
 
   describe("prepare()", () => {
-    const centres = adapter.prepare(rows);
+    const centres = adapter.prepare([rows]);
     const byName = (name: string) => centres.find((c) => c.name === name);
 
     it("keeps every centre, each with an id made from its name", () => {
@@ -66,7 +66,7 @@ describe("HawkerCentreAdapter", () => {
     });
 
     it("rejects a download that was cut short", () => {
-      expect(() => adapter.prepare(rows.slice(0, 10))).toThrow(/expected at least 80/);
+      expect(() => adapter.prepare([rows.slice(0, 10)])).toThrow(/expected at least 80/);
     });
   });
 });

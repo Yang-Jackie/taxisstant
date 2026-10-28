@@ -16,6 +16,10 @@ const ROUTES: readonly Route[] = [
   { endpoint: ENDPOINTS.hawkerCentres, dataset: "HAWKER_CENTRES", label: "Hawker centre" },
   { endpoint: ENDPOINTS.fuelStations, dataset: "FUEL_STATIONS", label: "Fuel station" },
   { endpoint: ENDPOINTS.chargingStations, dataset: "CHARGING_STATIONS", label: "Charging station" },
+  { endpoint: ENDPOINTS.taxis, dataset: "TAXIS", label: "Nearby taxi" },
+  { endpoint: ENDPOINTS.carparkAvailability, dataset: "CARPARK_AVAILABILITY", label: "Carpark availability" },
+  { endpoint: ENDPOINTS.chargerAvailability, dataset: "CHARGER_AVAILABILITY", label: "Charger availability" },
+  { endpoint: ENDPOINTS.hotspots, dataset: "HOTSPOTS", label: "Hotspot" },
 ];
 
 export class DataApiController {

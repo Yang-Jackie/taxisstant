@@ -48,8 +48,8 @@ export class SyncService {
   /** One attempt: fetch → prepare → store. Returns false (and logs) instead of throwing. */
   private async sync(a: DatasetAdapter<unknown>): Promise<boolean> {
     try {
-      const raw = await this.facade.fetch(a.getSource(), a.getPath());
-      this.cache.put(a.getDataset(), a.prepare(raw));
+      const responses = await Promise.all(a.getPaths().map((path) => this.facade.fetch(a.getSource(), path)));
+      this.cache.put(a.getDataset(), a.prepare(responses));
       return true;
     } catch (err) {
       console.error(`Sync of ${a.getDataset()} failed: ${err instanceof Error ? err.message : String(err)}`);

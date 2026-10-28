@@ -13,10 +13,34 @@ const LtaCarparkLot = z.object({
   Location: z.string().regex(/^\s*-?\d+(\.\d+)?\s+-?\d+(\.\d+)?\s*$/, "expected 'latitude longitude'"),
   LotType: z.literal("C"),
   Agency: z.string().min(1),
+  AvailableLots: z.number().int().min(0),
 });
+type LtaCarparkLot = z.infer<typeof LtaCarparkLot>;
 
 /** More rows than this came twice: too many carparks were probably lost from the snapshot. */
 const MAX_REPEATED_SHARE = 0.01;
+
+/**
+ * The car-lot rows of one read of LTA's carpark availability feed, one per carpark. Shared by the static carpark list
+ * and the live availability (CarparkAvailabilityAdapter), which read the same feed.
+ */
+export function ltaCarLots(raw: unknown): LtaCarparkLot[] {
+  const rows = z.array(z.looseObject({ CarParkID: z.unknown(), LotType: z.unknown() })).parse(raw);
+
+  // LTA updates this feed while the facade reads its pages, so rows can shift between pages: some come twice and as
+  // many are lost. A few lost carparks is fine (duplicates are dropped below); many means a bad snapshot, so reject
+  // it and let the sync retry, keeping the last good copy (D7).
+  const keys = rows.map((row) => `${String(row.CarParkID)}|${String(row.LotType)}`);
+  const repeats = keys.length - new Set(keys).size;
+  if (repeats > rows.length * MAX_REPEATED_SHARE) {
+    throw new Error(`${repeats} rows came twice: the feed changed while it was being read`);
+  }
+  if (repeats > 0) console.warn(`Carparks: ${repeats} rows came twice (the feed changed mid-read); kept one of each`);
+
+  // Each carpark has one row per lot type; taxis only need car lots ("C"). Motorcycle and heavy-vehicle rows go.
+  const carRows = rows.filter((row) => row.LotType === "C");
+  return uniqueBy(parseRows(carRows, LtaCarparkLot, { minRows: 1000 }), (lot) => lot.CarParkID);
+}
 
 /** Carparks come from LTA's availability feed, the only source that covers HDB, URA and LTA with coordinates. */
 export class CarparkAdapter implements DatasetAdapter<CarparkDto[]> {
@@ -26,30 +50,15 @@ export class CarparkAdapter implements DatasetAdapter<CarparkDto[]> {
   getSource(): Provider {
     return "LTA_DATAMALL";
   }
-  getPath(): string {
-    return "/CarParkAvailabilityv2";
+  getPaths(): readonly string[] {
+    return ["/CarParkAvailabilityv2"];
   }
   getRefreshInterval(): number {
     return 24 * 60 * 60 * 1000; // daily: static data (D1)
   }
 
-  prepare(raw: unknown): CarparkDto[] {
-    const rows = z.array(z.looseObject({ CarParkID: z.unknown(), LotType: z.unknown() })).parse(raw);
-
-    // LTA updates this feed while the facade reads its pages, so rows can shift between pages: some come twice and as
-    // many are lost. A few lost carparks for a day is fine (duplicates are dropped below); many means a bad snapshot,
-    // so reject it and let the sync retry, keeping the last good copy (D7).
-    const keys = rows.map((row) => `${String(row.CarParkID)}|${String(row.LotType)}`);
-    const repeats = keys.length - new Set(keys).size;
-    if (repeats > rows.length * MAX_REPEATED_SHARE) {
-      throw new Error(`${repeats} rows came twice: the feed changed while it was being read`);
-    }
-    if (repeats > 0) console.warn(`Carparks: ${repeats} rows came twice (the feed changed mid-read); kept one of each`);
-
-    // Each carpark has one row per lot type; taxis only need car lots ("C"). Motorcycle and heavy-vehicle rows go.
-    const carRows = rows.filter((row) => row.LotType === "C");
-    const lots = parseRows(carRows, LtaCarparkLot, { minRows: 1000 });
-    return uniqueBy(lots, (lot) => lot.CarParkID).map((lot) => {
+  prepare([raw]: readonly unknown[]): CarparkDto[] {
+    return ltaCarLots(raw).map((lot) => {
       const [latitude, longitude] = lot.Location.trim().split(/\s+/).map(Number) as [number, number];
       return {
         id: lot.CarParkID,

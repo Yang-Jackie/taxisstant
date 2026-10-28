@@ -167,6 +167,20 @@ describe("ExternalApiFacade.fetch — data.gov.sg (package 2a)", () => {
     expect(result).toEqual(geojson);
   });
 
+  it("calls a real-time API (a path starting with /) directly, with no download step (package 2c)", async () => {
+    const taxis = {
+      type: "FeatureCollection",
+      features: [{ geometry: { type: "MultiPoint", coordinates: [[103.8, 1.3]] } }],
+    };
+    const fetchFn = answering(json(taxis));
+
+    const result = await new ExternalApiFacade(noKeys, fetchFn).fetch("DATA_GOV_SG", "/v1/transport/taxi-availability");
+
+    expect(result).toEqual(taxis);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(String(fetchFn.mock.calls[0]![0])).toBe("https://api.data.gov.sg/v1/transport/taxi-availability");
+  });
+
   it("rejects when data.gov.sg gives no download link", async () => {
     const fetchFn = answering(json({ code: 1, errorMsg: "Dataset not found" }));
     await expect(new ExternalApiFacade(noKeys, fetchFn).fetch("DATA_GOV_SG", "d_missing")).rejects.toThrow();

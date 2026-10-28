@@ -80,14 +80,14 @@ export class HawkerCentreAdapter implements DatasetAdapter<HawkerCentreDto[]> {
   getSource(): Provider {
     return "DATA_GOV_SG";
   }
-  getPath(): string {
-    return "d_bda4baa634dd1cc7a6c7cad5f19e2d68"; // Dates of Hawker Centres Closure (NEA)
+  getPaths(): readonly string[] {
+    return ["d_bda4baa634dd1cc7a6c7cad5f19e2d68"]; // Dates of Hawker Centres Closure (NEA)
   }
   getRefreshInterval(): number {
     return 24 * 60 * 60 * 1000; // daily: static data (D1)
   }
 
-  prepare(raw: unknown): HawkerCentreDto[] {
+  prepare([raw]: readonly unknown[]): HawkerCentreDto[] {
     const centres = parseRows(raw, NeaHawkerCentre, { minRows: 80 });
     return uniqueBy(centres, (c) => slug(c.name)).map((c) => ({
       id: slug(c.name),

@@ -210,6 +210,166 @@
           }
         }
       }
+    },
+    "/taxis": {
+      "get": {
+        "operationId": "getTaxis",
+        "summary": "Where the available taxis are right now",
+        "description": "Live data from data.gov.sg, refreshed every 30 seconds. Clients poll it only while it is toggled on.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxisResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/NotLoadedYet"
+          }
+        }
+      }
+    },
+    "/carparks/availability": {
+      "get": {
+        "operationId": "getCarparkAvailability",
+        "summary": "Free car lots in every carpark",
+        "description": "Live data from LTA DataMall, refreshed every minute. Joins /carparks by id.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarparkAvailabilityResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/NotLoadedYet"
+          }
+        }
+      }
+    },
+    "/charging-stations/availability": {
+      "get": {
+        "operationId": "getChargerAvailability",
+        "summary": "Free chargers at every place with EV chargers",
+        "description": "Live data from LTA DataMall, refreshed every 5 minutes. Joins /charging-stations by id.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargerAvailabilityResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/NotLoadedYet"
+          }
+        }
+      }
+    },
+    "/hotspots": {
+      "get": {
+        "operationId": "getHotspots",
+        "summary": "How crowded each MRT and LRT station is right now",
+        "description": "Live data from LTA DataMall's platform crowd density, refreshed every 10 minutes.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotsResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/NotLoadedYet"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -516,6 +676,134 @@
         ],
         "additionalProperties": false
       },
+      "CarparkAvailabilityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The carpark's id, as in /carparks."
+          },
+          "availableLots": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Free car lots, as LTA reports them."
+          }
+        },
+        "required": [
+          "id",
+          "availableLots"
+        ],
+        "additionalProperties": false
+      },
+      "ChargerAvailabilityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The place's id, as in /charging-stations."
+          },
+          "availablePoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Chargers LTA reports as available; occupied and out-of-service ones don't count."
+          }
+        },
+        "required": [
+          "id",
+          "availablePoints"
+        ],
+        "additionalProperties": false
+      },
+      "DensityLevel": {
+        "type": "string",
+        "enum": [
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ]
+      },
+      "HotspotDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The station, e.g. city-hall."
+          },
+          "stationName": {
+            "type": "string",
+            "description": "e.g. City Hall."
+          },
+          "codes": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every line's code for the station, e.g. EW13 and NS25."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "WGS 84 degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "WGS 84 degrees."
+          },
+          "density": {
+            "description": "The busiest platform's level, for interchange stations.",
+            "$ref": "#/components/schemas/DensityLevel"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of the 10-minute slot the level is for (UTC)."
+          },
+          "validTo": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End of that slot (UTC). LTA publishes a slot only after it ends, so this is usually 10–25 minutes ago."
+          }
+        },
+        "required": [
+          "id",
+          "stationName",
+          "codes",
+          "latitude",
+          "longitude",
+          "density",
+          "validFrom",
+          "validTo"
+        ],
+        "additionalProperties": false
+      },
+      "TaxiDto": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "WGS 84 degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "WGS 84 degrees."
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
       "TaxiStandsResponse": {
         "type": "object",
         "properties": {
@@ -636,6 +924,110 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ChargingStationDto"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "etag",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "TaxisResponse": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server got this data from its source (ISO 8601, UTC)."
+          },
+          "etag": {
+            "type": "string",
+            "description": "A fingerprint of the data. Send it back as If-None-Match to get 304 if nothing changed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaxiDto"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "etag",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CarparkAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server got this data from its source (ISO 8601, UTC)."
+          },
+          "etag": {
+            "type": "string",
+            "description": "A fingerprint of the data. Send it back as If-None-Match to get 304 if nothing changed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarparkAvailabilityDto"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "etag",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ChargerAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server got this data from its source (ISO 8601, UTC)."
+          },
+          "etag": {
+            "type": "string",
+            "description": "A fingerprint of the data. Send it back as If-None-Match to get 304 if nothing changed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChargerAvailabilityDto"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "etag",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "HotspotsResponse": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server got this data from its source (ISO 8601, UTC)."
+          },
+          "etag": {
+            "type": "string",
+            "description": "A fingerprint of the data. Send it back as If-None-Match to get 304 if nothing changed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotDto"
             }
           }
         },

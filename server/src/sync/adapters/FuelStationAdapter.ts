@@ -46,14 +46,16 @@ export class FuelStationAdapter implements DatasetAdapter<FuelStationDto[]> {
   getSource(): Provider {
     return "OSM_OVERPASS";
   }
-  getPath(): string {
-    return '[out:json][timeout:90];area["ISO3166-1"="SG"][admin_level=2]->.sg;nwr["amenity"="fuel"](area.sg);out center tags;';
+  getPaths(): readonly string[] {
+    return [
+      '[out:json][timeout:90];area["ISO3166-1"="SG"][admin_level=2]->.sg;nwr["amenity"="fuel"](area.sg);out center tags;',
+    ];
   }
   getRefreshInterval(): number {
     return 24 * 60 * 60 * 1000; // daily: static data (D1)
   }
 
-  prepare(raw: unknown): FuelStationDto[] {
+  prepare([raw]: readonly unknown[]): FuelStationDto[] {
     const { elements } = z.object({ elements: z.unknown() }).parse(raw);
     const all = parseRows(elements, OsmFuel, { minRows: 100 }).filter(isPublic);
 

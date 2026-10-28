@@ -23,17 +23,17 @@ describe("TaxiStandAdapter", () => {
   describe("declares its own data source", () => {
     it("feeds the TAXI_STANDS dataset", () => expect(adapter.getDataset()).toBe("TAXI_STANDS"));
     it("comes from LTA DataMall", () => expect(adapter.getSource()).toBe("LTA_DATAMALL"));
-    it("lives at /TaxiStands", () => expect(adapter.getPath()).toBe("/TaxiStands"));
+    it("lives at /TaxiStands", () => expect(adapter.getPaths()).toEqual(["/TaxiStands"]));
     it("refreshes once a day (static data, D1)", () => expect(adapter.getRefreshInterval()).toBe(24 * 60 * 60 * 1000));
   });
 
   describe("prepare()", () => {
     it("turns every real LTA row into a TaxiStandDto", () => {
-      expect(adapter.prepare(rows)).toHaveLength(316);
+      expect(adapter.prepare([rows])).toHaveLength(316);
     });
 
     it("renames and converts the fields", () => {
-      expect(adapter.prepare(rows)[0]).toEqual({
+      expect(adapter.prepare([rows])[0]).toEqual({
         id: "A01",
         name: "Orchard Rd along driveway of Lucky Plaza",
         latitude: 1.304294727,
@@ -45,23 +45,23 @@ describe("TaxiStandAdapter", () => {
 
     it('turns Bfa "No" into isBarrierFree: false', () => {
       const noBfa = rows.findIndex((r) => r["Bfa"] === "No");
-      expect(adapter.prepare(rows)[noBfa]?.isBarrierFree).toBe(false);
+      expect(adapter.prepare([rows])[noBfa]?.isBarrierFree).toBe(false);
     });
 
     it("keeps only the six fields the app uses (drops Ownership)", () => {
-      for (const dto of adapter.prepare(rows)) {
+      for (const dto of adapter.prepare([rows])) {
         expect(Object.keys(dto).sort()).toEqual(["id", "isBarrierFree", "latitude", "longitude", "name", "standType"]);
       }
     });
 
     it("rejects the whole { value: [...] } envelope — it expects the rows", () => {
-      expect(() => adapter.prepare(recorded)).toThrow();
+      expect(() => adapter.prepare([recorded])).toThrow();
     });
 
     // Package 2a (D16): one bad row is skipped instead of freezing the whole layer.
     describe("a row that doesn't fit is skipped, and the other 315 kept", () => {
       const withBad = (bad: Record<string, unknown>) => [bad, ...rows.slice(1)];
-      const keptIds = (input: unknown[]) => adapter.prepare(input).map((s) => s.id);
+      const keptIds = (input: unknown[]) => adapter.prepare([input]).map((s) => s.id);
 
       beforeEach(() => {
         vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -86,11 +86,11 @@ describe("TaxiStandAdapter", () => {
 
     it("rejects the whole dataset when many rows don't fit: LTA changed its format", () => {
       const renamed = rows.map((r) => ({ ...r, Latitude: undefined, Lat: r["Latitude"] }));
-      expect(() => adapter.prepare(renamed)).toThrow(/don't fit/);
+      expect(() => adapter.prepare([renamed])).toThrow(/don't fit/);
     });
 
     it("rejects a download that was cut short", () => {
-      expect(() => adapter.prepare(rows.slice(0, 50))).toThrow(/expected at least 200/);
+      expect(() => adapter.prepare([rows.slice(0, 50)])).toThrow(/expected at least 200/);
     });
   });
 });

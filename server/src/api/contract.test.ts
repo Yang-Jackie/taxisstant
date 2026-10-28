@@ -4,13 +4,17 @@ import { readFileSync } from "node:fs";
 import { ApiError, ENDPOINTS } from "@taxisstant/shared";
 import express from "express";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ServerDataCache } from "../cache/ServerDataCache.js";
 import { loadSample } from "../sample-data/samples.js";
 import { CarparkAdapter } from "../sync/adapters/CarparkAdapter.js";
+import { CarparkAvailabilityAdapter } from "../sync/adapters/CarparkAvailabilityAdapter.js";
+import { ChargerAvailabilityAdapter } from "../sync/adapters/ChargerAvailabilityAdapter.js";
 import { ChargingStationAdapter } from "../sync/adapters/ChargingStationAdapter.js";
 import { FuelStationAdapter } from "../sync/adapters/FuelStationAdapter.js";
 import { HawkerCentreAdapter } from "../sync/adapters/HawkerCentreAdapter.js";
+import { HotspotAdapter } from "../sync/adapters/HotspotAdapter.js";
+import { TaxiAdapter } from "../sync/adapters/TaxiAdapter.js";
 import { TaxiStandAdapter } from "../sync/adapters/TaxiStandAdapter.js";
 import type { DatasetAdapter } from "../sync/DatasetAdapter.js";
 import { DataApiController } from "./DataApiController.js";
@@ -19,13 +23,17 @@ const taxiStands = JSON.parse(
   readFileSync(new URL("../sample-data/lta-taxi-stands.raw.json", import.meta.url), "utf8"),
 ) as { value: unknown };
 
-/** Each endpoint, the adapter that feeds it, and a real recorded response for that adapter. */
-const CASES: [keyof typeof ENDPOINTS, DatasetAdapter<unknown>, unknown][] = [
-  ["taxiStands", new TaxiStandAdapter(), taxiStands.value],
-  ["carparks", new CarparkAdapter(), loadSample("carparks")],
-  ["hawkerCentres", new HawkerCentreAdapter(), loadSample("hawkerCentres")],
-  ["fuelStations", new FuelStationAdapter(), loadSample("fuelStations")],
-  ["chargingStations", new ChargingStationAdapter(), loadSample("chargingStations")],
+/** Each endpoint, the adapter that feeds it, and real recorded answers for that adapter (one per path, D21). */
+const CASES: [keyof typeof ENDPOINTS, DatasetAdapter<unknown>, readonly unknown[]][] = [
+  ["taxiStands", new TaxiStandAdapter(), [taxiStands.value]],
+  ["carparks", new CarparkAdapter(), [loadSample("carparks")]],
+  ["hawkerCentres", new HawkerCentreAdapter(), [loadSample("hawkerCentres")]],
+  ["fuelStations", new FuelStationAdapter(), [loadSample("fuelStations")]],
+  ["chargingStations", new ChargingStationAdapter(), [loadSample("chargingStations")]],
+  ["taxis", new TaxiAdapter(), [loadSample("taxis")]],
+  ["carparkAvailability", new CarparkAvailabilityAdapter(), [loadSample("carparks")]],
+  ["chargerAvailability", new ChargerAvailabilityAdapter(), [loadSample("chargingStations")]],
+  ["hotspots", new HotspotAdapter(), loadSample("hotspots") as unknown[]],
 ];
 
 function appWith(cache: ServerDataCache) {
@@ -35,14 +43,18 @@ function appWith(cache: ServerDataCache) {
 }
 
 describe("the server keeps to the shared contract", () => {
+  beforeAll(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {}); // unopened stations in the crowd data
+  });
+
   it("covers every endpoint in ENDPOINTS", () => {
     expect(CASES.map(([name]) => name).sort()).toEqual(Object.keys(ENDPOINTS).sort());
   });
 
-  for (const [name, adapter, raw] of CASES) {
+  for (const [name, adapter, responses] of CASES) {
     it(`GET /api${ENDPOINTS[name].path} sends exactly what ENDPOINTS.${name}.response describes`, async () => {
       const cache = new ServerDataCache();
-      cache.put(adapter.getDataset(), adapter.prepare(raw));
+      cache.put(adapter.getDataset(), adapter.prepare(responses));
 
       const res = await request(appWith(cache)).get(`/api${ENDPOINTS[name].path}`);
 

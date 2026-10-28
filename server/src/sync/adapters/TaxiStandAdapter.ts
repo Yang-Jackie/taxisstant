@@ -22,14 +22,14 @@ export class TaxiStandAdapter implements DatasetAdapter<TaxiStandDto[]> {
   getSource(): Provider {
     return "LTA_DATAMALL";
   }
-  getPath(): string {
-    return "/TaxiStands";
+  getPaths(): readonly string[] {
+    return ["/TaxiStands"];
   }
   getRefreshInterval(): number {
     return 24 * 60 * 60 * 1000;
   } // daily: static data (D1)
 
-  prepare(raw: unknown): TaxiStandDto[] {
+  prepare([raw]: readonly unknown[]): TaxiStandDto[] {
     const stands = uniqueBy(parseRows(raw, LtaTaxiStand, { minRows: 200 }), (row) => row.TaxiCode);
     return stands.map((row) => ({
       id: row.TaxiCode,

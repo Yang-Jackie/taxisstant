@@ -17,14 +17,14 @@ describe("ChargingStationAdapter", () => {
   describe("declares its own data source", () => {
     it("feeds the CHARGING_STATIONS dataset", () => expect(adapter.getDataset()).toBe("CHARGING_STATIONS"));
     it("comes from LTA DataMall", () => expect(adapter.getSource()).toBe("LTA_DATAMALL"));
-    it("lives at /EVCBatch", () => expect(adapter.getPath()).toBe("/EVCBatch"));
+    it("lives at /EVCBatch", () => expect(adapter.getPaths()).toEqual(["/EVCBatch"]));
     it("refreshes once a day (the locations are static data, D1)", () => {
       expect(adapter.getRefreshInterval()).toBe(24 * 60 * 60 * 1000);
     });
   });
 
   describe("prepare()", () => {
-    const stations = adapter.prepare(sample);
+    const stations = adapter.prepare([sample]);
 
     it("keeps every location, each with an id from its postal code and longitude", () => {
       expect(stations).toHaveLength(sample.evLocationsData.length);
@@ -54,7 +54,7 @@ describe("ChargingStationAdapter", () => {
 
     it("gives the same result whatever order LTA lists the chargers in, so the ETag only changes with the data", () => {
       const reversed = withFirst((l) => ({ ...l, chargingPoints: [...l.chargingPoints].reverse() }));
-      expect(adapter.prepare(reversed)[0]).toEqual(stations[0]);
+      expect(adapter.prepare([reversed])[0]).toEqual(stations[0]);
     });
 
     it("names an unnamed location by its address (about 4% have no name)", () => {
@@ -64,7 +64,7 @@ describe("ChargingStationAdapter", () => {
     });
 
     it("ignores power ratings that aren't numbers, and has no maxPowerKw when none is", () => {
-      const result = adapter.prepare(
+      const result = adapter.prepare([
         withFirst((l) => ({
           ...l,
           chargingPoints: l.chargingPoints.map((c) => ({
@@ -72,16 +72,16 @@ describe("ChargingStationAdapter", () => {
             plugTypes: (c.plugTypes as Record<string, unknown>[]).map((p) => ({ ...p, powerRating: "" })),
           })),
         })),
-      );
+      ]);
       expect(result[0]).not.toHaveProperty("maxPowerKw");
     });
 
     it("rejects a batch file without its list of locations", () => {
-      expect(() => adapter.prepare({ LastUpdatedTime: "2026-10-28 17:15:00" })).toThrow();
+      expect(() => adapter.prepare([{ LastUpdatedTime: "2026-10-28 17:15:00" }])).toThrow();
     });
 
     it("rejects a file that was cut short", () => {
-      expect(() => adapter.prepare({ evLocationsData: sample.evLocationsData.slice(0, 100) })).toThrow(
+      expect(() => adapter.prepare([{ evLocationsData: sample.evLocationsData.slice(0, 100) }])).toThrow(
         /expected at least 1000/,
       );
     });

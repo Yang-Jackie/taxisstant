@@ -90,9 +90,10 @@ server/src/
 ├── api/                     DataApiController
 ├── cache/                   ServerDataCache, Dataset
 ├── sync/                    SyncService, DatasetAdapter, parseRows (D16), geo
-│   ├── adapters/            TaxiStand, Carpark, HawkerCentre, FuelStation, ChargingStation adapters (+ live ones in 2c)
+│   ├── adapters/            static: TaxiStand, Carpark, HawkerCentre, FuelStation, ChargingStation; live: Taxi, CarparkAvailability, ChargerAvailability, Hotspot
 │   └── strategies/          Phase 2: SuggestionStrategy and its two strategies
 ├── external/                ExternalApiFacade (one client per provider), ApiKeyStore, Provider
+├── reference-data/          train-stations.json (D14) and build-stations.ts, which rebuilds it
 └── sample-data/             real recorded provider responses for tests; record.ts refreshes them
 ```
 
@@ -320,10 +321,11 @@ I review and approve before the next package starts. Claude asks me whenever a d
      - [x] `refreshVisible(viewport)`: only what's in view, clustered while zoomed out (D17)
      - [x] the mockup's markers per layer (Tabler icons, amber and green groups), a details popup per layer, and "© OpenStreetMap contributors" while Fuel is shown (D12)
      - [x] gzip on the server (moved forward from 2e): charging stations go out as 115 kB instead of 785 kB
-   - **2c. Live layers, server**
-     - [ ] the station coordinates file and its generator script (D14)
-     - [ ] taxis, carpark availability (LTA, plus HDB total lots from data.gov.sg), charger availability (EV batch) and hotspots (crowd density)
-     - [ ] intervals from the deployment diagram: taxis every 30 s, availability every 1–5 min, hotspots every 30 min
+   - **2c. Live layers, server** ✅
+     - [x] the station file (`reference-data/train-stations.json`, 185 open stations) and its generator, `npm run build-stations -w server` (D14)
+     - [x] `DatasetAdapter.getPaths()` (D21)
+     - [x] taxis (data.gov.sg, one snapshot), carpark availability (LTA only, D19), charger availability (EV batch) and hotspots (real-time crowd density, D20)
+     - [x] intervals: taxis every 30 s, carpark availability every minute and chargers every 5 minutes (LTA's own pace, within the diagram's 1–5), hotspots every 10 minutes (D20)
    - **2d. Live layers, client**
      - [ ] `refreshLive(layers, kinds)`, polling only what's toggled on, pausing when the app is in the background
      - [ ] `MapDataRepository.updateAvailability`; taxis with clustering or density; hotspots as circles
@@ -409,6 +411,9 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D16 — How adapters treat imperfect data (28 Oct, extends D7).** Real feeds have odd rows: 116 EV locations have no name, one carpark has no location. Adapters therefore skip rows that don't fit and log a warning, but reject the whole download when more than 5% of rows don't fit (the format changed) or when it is implausibly small (cut short or emptied). LTA's paged feeds also don't always come from one snapshot: on 28 Oct, for several minutes, rows shifted between pages, so 40 carparks came twice and 40 others went missing. `CarparkAdapter` accepts up to 1% repeated rows (keeping one of each) and rejects anything worse. A rejected download keeps the last good copy and retries a minute later (D7). The live LTA feeds in 2c need the same check. `TaxiStandAdapter` follows the same rule since 2a (it used to reject the whole dataset over one bad row).
 - **D17 — Dense layers are clustered (my decision, 28 Oct).** With every layer on, the island has about 5,000 landmarks: slow on a phone, and unreadable. `MapDisplayController.refreshVisible` keeps what's in view and merges nearby markers into a bubble with the layer's icon and a count while zoomed out (Supercluster, radius 60 px); from zoom 17 every marker shows on its own, and tapping a bubble zooms to where it splits. This changes the design model's `refreshVisible(bounds)` and `MapView.onPan(bounds)` to take a viewport: the bounds plus the zoom (FR-1.5.3 says "moves or zooms"). Measured: 2,996 chargers and fuel stations drawn as 233 markers, repainted in 36 ms.
 - **D18 — Every static layer is downloaded at startup (my decision, 28 Oct).** After `loadCached()`, `startControllers()` calls `DataSyncController.refreshStatic()`, which brings every static layer up to date in the background, re-checking daily. That way every layer works offline, even one never turned on while online (the "markers available offline" requirement of UC 0004–0007), and toggles are instant. It never shows a toast. A toggle calls the new `refreshLayer(t)` for its one layer, which shares a download already under way and rejects (the toast) only when there is nothing to show. Cost: about 190 kB once, gzipped.
+- **D19 — Carpark availability from LTA only (my decision, 28 Oct).** LTA's feed gives free lots for every HDB, URA and LTA carpark; data.gov.sg would add total lots for HDB carparks only. `Carpark.totalLots` is optional ([0..1]) in the design, so it stays empty, and the diagram's data.gov.sg "HDB carpark availability" feed is not used.
+- **D20 — Hotspots are real-time crowd levels (my decision, 28 Oct).** The documents say "crowd forecast" (FR-1.2.3, the data dictionary, the deployment diagram); we serve LTA's real-time platform crowd density instead (`PCDRealTime`, 10-minute slots, one request per train line), refreshed every 10 minutes rather than the diagram's 30. `Hotspot.validFrom`/`validTo` hold the slot. LTA publishes a slot only after it ends, so "real time" is the last completed slot, about 10–25 minutes old (seen on 28 Oct: at 21:08 the newest slot was 20:40–20:50); 2d decides how old a slot may be and still show. Package 3's pickup scoring uses the same real-time levels.
+- **D21 — Adapters declare a list of paths (my decision, 28 Oct).** LTA's crowd API takes one train line per request, so `DatasetAdapter.getPath()` becomes `getPaths()`: SyncService makes one request per path and `prepare()` receives the answers in order. Most adapters have one path. If any request fails, the sync retries and the last good copy stays (D7).
 
 ---
 
@@ -416,7 +421,6 @@ I review and approve before the next package starts. Claude asks me whenever a d
 
 | When | Decision |
 |---|---|
-| Package 2c | `DatasetAdapter` declares one `getSource()`, but carpark availability joins LTA (available lots) with data.gov.sg (HDB total lots), and the diagram's note says adapters "convert · join · clean". How should one adapter read two sources? |
 | Package 3 | How to score pickup spots and rest stops (`calculateProbability`, `calculateAmenities`). |
 | Package 8 | `Bookmark` has no `id` and holds the whole `Landmark`, yet `BookmarkList.remove(id)` needs an id. Should bookmarks get an `id` and store a `landmarkId`? |
 | Package 10 | How to get access to the school lab server, and whether it can serve HTTPS. |
@@ -441,5 +445,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **`Location.address` is a required `String`** in the diagram, but taxis, hotspots and suggested sites have no address.
 - **The design model has no fuel-station source** (D12), and `HawkerCentre.operatingHours` has no data behind it (D13).
 - **`ChargingStation.operator` is a single string**, but some locations have several operators (D15).
-- **`DatasetAdapter` declares one source and one path,** while the diagram's own note says adapters "convert · join · clean" (to decide in package 2c).
+- **`DatasetAdapter` declares one source and one path,** while the diagram's own note says adapters "convert · join · clean". Settled by D19 (no join for carparks) and D21 (several paths).
+- **Hotspots are described as a forecast** (FR-1.2.3, data dictionary, deployment diagram: "station crowd forecast", every 30 min); the app shows real-time levels every 10 min (D20).
+- **The deployment diagram's data.gov.sg "HDB carpark availability"** isn't used: LTA covers every agency (D19).
 - **The AI report and the Lab 3 report number the use cases differently.** This plan uses the Lab 3 report's numbering.
