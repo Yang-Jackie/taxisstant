@@ -113,7 +113,7 @@ server/src/
 
 ---
 
-## Phase 1 — Learning: UC 0001 "Toggle Taxi Stands", end to end
+## Phase 1 — Learning: UC 0001 "Toggle Taxi Stands", end to end ✅
 
 UC 0001 runs through every part of the architecture once:
 
@@ -260,17 +260,31 @@ UC 0001 runs through every part of the architecture once:
   - no component calls `fetch` or touches storage directly
 - [x] Done: checked in Chrome on 27 Oct (on and off both survive a reload; junk in storage starts with everything off)
 
-### M7 — Offline cache
+### M7 — Offline cache ✅
 - **Learn:** caching strategies, staleness, ETag re-checks from the client, designing for offline use, async storage, testing with a fake IndexedDB.
-- **Claude sets up:** acceptance tests, plus instructions for simulating offline in Chrome DevTools.
+- **Claude sets up:**
+  - [x] acceptance tests (21 new: `services/CacheManager.test.ts`, and M7 tests added to the `DataSyncController`, `MapDisplayController` and `App` tests), checked against a reference solution and 17 likely mistakes
+  - [x] how to simulate offline in Chrome (below)
 - **I write:**
-  - `CacheManager` on top of `LocalStore`, with async `get`, `put` and `isStale`
-  - `DataSyncController.loadCached()`, called by `App` at startup, which fills `MapDataRepository` from the cache
-  - `refreshStatic()` re-checks with `If-None-Match` once a day
+  - [x] `services/CacheManager.ts` on top of `LocalStore`: `get`, `put`, `isStale(key, ttlMs)`; saved as `cache:<key>` → `{ savedAt, response }`; damaged entries count as nothing saved; the clock is passed in, like `fetchFn`
+  - [x] `DataSyncController` takes the `CacheManager` (D10); `loadCached()` fills `MapDataRepository` from the cache, without the network
+  - [x] `refreshStatic()`: no network if checked within a day; otherwise re-check with `If-None-Match`. 200 → save and show; 304 → save again (checked today); failure → keep the saved copy, or reject if there is none
+  - [x] `startup.ts`: create the `CacheManager`; `startControllers()` calls `loadCached()` between `settings.load()` and `mapDisplay.start()`
+- **Simulating offline in Chrome** (both servers running):
+  - *Server down:* stop the API server. Vite's proxy then answers 502, which the app treats like any failure.
+  - *No data connection, app still opens:* DevTools → Network → right-click any `/api/` request → **Block request URL**. Reloads still load the app from Vite, but every API call fails.
+  - *Device offline:* the Network tab's throttling menu → **Offline**, *after* the page has loaded. Reloading while offline can't fetch the app's own files; that needs a service worker (see "Decisions I'll be asked about").
+  - *See the cache:* Application → IndexedDB → `taxisstant` → `keyval` → `cache:/taxi-stands`. The viewer can delete entries but not edit them.
+  - *Force the daily re-check:* paste this into the Console, then reload. The Network tab shows `If-None-Match` and a 304.
+    ```js
+    const db = await new Promise((ok) => (indexedDB.open("taxisstant").onsuccess = (e) => ok(e.target.result)));
+    const keyval = db.transaction("keyval", "readwrite").objectStore("keyval");
+    keyval.get("cache:/taxi-stands").onsuccess = (e) => keyval.put({ ...e.target.result, savedAt: 0 }, "cache:/taxi-stands");
+    ```
 - **Done when** UC 0001 works as revised in D1:
   - after one online load, the taxi stands still toggle on with the server down or the device offline
   - with no cached copy and no connection, toggling shows the toast and switches back
-- [ ] Done
+- [x] Done: checked in Chrome on 27 Oct. **Phase 1 complete.**
 
 ---
 
@@ -389,6 +403,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 | Package 3 | How to score pickup spots and rest stops (`calculateProbability`, `calculateAmenities`). |
 | Package 8 | `Bookmark` has no `id` and holds the whole `Landmark`, yet `BookmarkList.remove(id)` needs an id. Should bookmarks get an `id` and store a `landmarkId`? |
 | Package 10 | How to get access to the school lab server, and whether it can serve HTTPS. |
+| Package 10 | Should the app itself open with no connection (a service worker)? M7 caches the *data*; the page's own files still come from the server. |
 
 ## Things I need to do
 - [x] Register for an LTA DataMall AccountKey before M3. It's sent by email, which can take a while.

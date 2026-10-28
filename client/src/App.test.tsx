@@ -1,5 +1,6 @@
 // M6 acceptance tests — the whole app, wired the real way: initControllers() → startControllers() → <App>.
 // A fake server stands in for fetch; IndexedDB is the in-memory one from test-setup.ts (empty per test).
+// M7: after one online session, the stands work with the server down (D1).
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +20,7 @@ function fakeServer(answer: () => Promise<Response>) {
   return fetchFn;
 }
 const serving = () => fakeServer(async () => new Response(JSON.stringify(okBody), { status: 200 }));
+const offline = () => fakeServer(() => Promise.reject(new TypeError("Failed to fetch")));
 
 /** Opens the app the way main.tsx does. Calling it again in the same test is "reloading the page". */
 async function openApp() {
@@ -118,5 +120,37 @@ describe("App (with controllers)", () => {
 
     expect(screen.getByRole("button", { name: "Fuel" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Hotspots" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("after one online session, Taxi stands still toggle on with no connection (M7)", async () => {
+    serving();
+    const first = await openApp();
+    await userEvent.click(taxiStandsButton());
+    await waitFor(() => expect(markerCount(first.container)).toBe(3));
+    await userEvent.click(taxiStandsButton());
+    first.unmount();
+
+    offline();
+    const reopened = await openApp();
+    await userEvent.click(taxiStandsButton());
+
+    expect(taxiStandsButton()).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(markerCount(reopened.container)).toBe(3));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("opens with the saved stands already on the map when there's no connection (M7)", async () => {
+    serving();
+    const first = await openApp();
+    await userEvent.click(taxiStandsButton());
+    await waitFor(() => expect(markerCount(first.container)).toBe(3));
+    first.unmount();
+
+    offline();
+    const reopened = await openApp();
+
+    expect(taxiStandsButton()).toHaveAttribute("aria-pressed", "true");
+    expect(markerCount(reopened.container)).toBe(3);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

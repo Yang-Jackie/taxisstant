@@ -1,7 +1,9 @@
 // M6 acceptance tests — MapDisplayController «control»: decides what the map shows. It runs UC 0001:
 // toggle → settings (saved) → load data if needed → show; on failure, switch back and set a notice (D3).
+// M7: with a copy saved by an earlier session, a failure no longer matters (D1).
 import { describe, expect, it, vi } from "vitest";
 import { MapDataRepository } from "../entity/MapDataRepository";
+import { CacheManager } from "../services/CacheManager";
 import { DataApiClient } from "../services/DataApiClient";
 import { DataSyncController } from "./DataSyncController";
 import { MapDisplayController } from "./MapDisplayController";
@@ -13,21 +15,22 @@ const stands = [
 ];
 const ok = () => Promise.resolve(new Response(JSON.stringify({ asOf: "x", etag: '"v1"', data: stands }), { status: 200 }));
 const unavailable = () => Promise.resolve(new Response("{}", { status: 503 }));
+const offline = () => Promise.reject(new TypeError("Failed to fetch"));
 
 function memoryStore(initial: Record<string, unknown> = {}) {
   const data = new Map<string, unknown>(Object.entries(initial));
   return { data, read: async (k: string) => data.get(k), write: async (k: string, v: unknown) => void data.set(k, v) };
 }
 
-/** Wires the real controllers together the way App will, with a fake server and in-memory storage. */
-function setUp(answer: () => Promise<Response> = ok, saved: Record<string, unknown> = {}) {
+/** Wires the real controllers together the way startup.ts does, with a fake server and in-memory storage. */
+function setUp(answer: () => Promise<Response> = ok, store = memoryStore()) {
   const fetchFn = vi.fn<(input: string | URL | Request, init?: RequestInit) => Promise<Response>>(answer);
   const repo = new MapDataRepository();
-  const settings = new SettingsController(memoryStore(saved));
-  const dataSync = new DataSyncController(new DataApiClient({ fetchFn }), repo);
+  const settings = new SettingsController(store);
+  const dataSync = new DataSyncController(new DataApiClient({ fetchFn }), repo, new CacheManager(store));
   const mapDisplay = new MapDisplayController(settings, dataSync, repo);
   dataSync.attach(mapDisplay);
-  return { fetchFn, settings, mapDisplay };
+  return { fetchFn, settings, dataSync, mapDisplay };
 }
 
 describe("MapDisplayController", () => {
@@ -84,7 +87,7 @@ describe("MapDisplayController", () => {
   });
 
   it("start() loads and shows Taxi stands if a previous session left them on", async () => {
-    const { settings, mapDisplay } = setUp(ok, { preferences: { visibleLayers: ["TAXI_STAND"] } });
+    const { settings, mapDisplay } = setUp(ok, memoryStore({ preferences: { visibleLayers: ["TAXI_STAND"] } }));
 
     await settings.load();
     await mapDisplay.start();
@@ -107,5 +110,22 @@ describe("MapDisplayController", () => {
     await mapDisplay.toggleLayer("TAXI_STAND");
 
     expect(listener).toHaveBeenCalled();
+  });
+
+  it("toggling on with no connection still shows the stands if an earlier session saved them — no notice (D1)", async () => {
+    const store = memoryStore();
+    const first = setUp(ok, store);
+    await first.mapDisplay.toggleLayer("TAXI_STAND"); // on: downloads and saves them
+    await first.mapDisplay.toggleLayer("TAXI_STAND"); // off again
+
+    const { settings, dataSync, mapDisplay } = setUp(offline, store);
+    await settings.load();
+    await dataSync.loadCached();
+    await mapDisplay.start();
+    await mapDisplay.toggleLayer("TAXI_STAND");
+
+    expect(settings.isLayerVisible("TAXI_STAND")).toBe(true);
+    expect(mapDisplay.getSnapshot().visible.TAXI_STAND.map((s) => s.id)).toEqual(["A01", "A05"]);
+    expect(mapDisplay.getSnapshot().notice).toBeNull();
   });
 });
