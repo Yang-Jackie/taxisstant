@@ -1,7 +1,17 @@
 import { Popup as LeafletPopup, point, type LatLngTuple, type Marker as LeafletMarker } from "leaflet";
-import { useCallback, useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents, type MarkerProps } from "react-leaflet";
+import {
+  Circle,
+  MapContainer,
+  Marker,
+  Pane,
+  Popup,
+  TileLayer,
+  useMap,
+  useMapEvents,
+  type MarkerProps,
+} from "react-leaflet";
 import type { Viewport } from "../entity/Bounds";
 import type { Hotspot } from "../entity/Hotspot";
 import type { Landmark } from "../entity/Landmark";
@@ -33,6 +43,16 @@ import "./MapView.css";
 /** OpenStreetMap's licence (ODbL) requires this credit wherever its data is shown: here, the Fuel layer (D12). */
 export const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors';
+
+/**
+ * Leaflet stacks shapes (400) under markers (600) under popups (700). Two panes go between markers and popups (D51):
+ * the suggestions, so that no layer's markers cover a suggested area or its pin, and over them what the driver keeps an
+ * eye on, their own dot and a chosen bookmark. The panes take no taps themselves, so the markers under them still do.
+ * Their markers' popups go in Leaflet's popup pane: react-leaflet would put them in the markers' own pane, under the
+ * markers above.
+ */
+const SUGGESTION_PANE = { zIndex: 610, pointerEvents: "none" } as const;
+const TOP_PANE = { zIndex: 620, pointerEvents: "none" } as const;
 
 /**
  * One position array per location. react-leaflet moves a marker whenever it gets a new array, and moving a marker
@@ -141,6 +161,7 @@ function DriverDot({ driver }: { driver: DriverPosition }) {
   return (
     <>
       <Circle
+        pane="overlayPane" // with the other shapes, under the markers: only the dot goes on top
         center={positionOf(driver.location)}
         radius={driver.accuracyM}
         pathOptions={{ weight: 1, color: colour, fillColor: colour, fillOpacity: 0.1 }}
@@ -182,8 +203,8 @@ interface PointMarkersProps<T extends Locatable> {
  * panned on every pan and poll, and near the map's edge (which it can't pan past) for ever.
  */
 function StablePopup({ content }: { content: ReactNode }) {
-  // No props but the content: Leaflet takes an option given as undefined (autoPan={undefined}) as switched off
-  return <Popup>{content}</Popup>;
+  // No other props: Leaflet takes an option given as undefined (autoPan={undefined}) as switched off
+  return <Popup pane="popupPane">{content}</Popup>;
 }
 
 /** One landmark's marker, with its details made only when the landmark or what its popup can do changes. */
@@ -259,7 +280,7 @@ function HighlightedLandmark({
       eventHandlers={{ popupclose: () => onClosed?.(landmark) }}
     >
       {/* No auto-pan: the map is already moving to centre the landmark, and Leaflet's auto-pan would stop that */}
-      <Popup autoPan={false}>
+      <Popup pane="popupPane" autoPan={false}>
         <LandmarkDetails item={landmark} actions={actions} />
       </Popup>
     </Marker>
@@ -330,14 +351,16 @@ function SuggestionPin({
       position={positionOf(recommendation.site.centre)}
       icon={suggestionIcon(kind, place)}
       title={t(`map.suggestionPin.${kind}`, { place, name: recommendation.site.name })}
-      zIndexOffset={500}
     >
       <StablePopup content={content} />
     </TitledMarker>
   );
 }
 
-/** Each suggested site's area, outlined in its suggestion's colour, with a numbered pin to tap (D33). */
+/**
+ * Each suggested site's area, outlined in its suggestion's colour, with a numbered pin to tap (D33). The outline goes
+ * over the layers' markers and the light fill under them, so that it doesn't dim them (D51).
+ */
 function SuggestionAreas({
   suggestions,
   onNavigate,
@@ -348,20 +371,26 @@ function SuggestionAreas({
   return (
     <>
       {RECOMMENDATION_KINDS.flatMap((k) =>
-        suggestions[k].map(({ site }) => (
-          <Circle
-            key={`area-${k}-${site.id}`}
-            center={positionOf(site.centre)}
-            radius={site.radius}
-            pathOptions={{
-              weight: 2,
-              color: SUGGESTION_COLOUR[SUGGESTION_GROUP[k]],
-              dashArray: "6 6",
-              fillOpacity: 0.08,
-            }}
-            interactive={false}
-          />
-        )),
+        suggestions[k].map(({ site }) => {
+          const colour = SUGGESTION_COLOUR[SUGGESTION_GROUP[k]];
+          return (
+            <Fragment key={`area-${k}-${site.id}`}>
+              <Circle
+                pane="overlayPane"
+                center={positionOf(site.centre)}
+                radius={site.radius}
+                pathOptions={{ stroke: false, fillColor: colour, fillOpacity: 0.08 }}
+                interactive={false}
+              />
+              <Circle
+                center={positionOf(site.centre)}
+                radius={site.radius}
+                pathOptions={{ weight: 2, color: colour, dashArray: "6 6", fill: false }}
+                interactive={false}
+              />
+            </Fragment>
+          );
+        }),
       )}
       {RECOMMENDATION_KINDS.flatMap((k) =>
         suggestions[k].map((r, i) => (
@@ -422,16 +451,20 @@ export function MapView({
         />
       ))}
       <PointMarkers layer="TAXIS" view={visible.TAXIS} keyOf={(_, i) => String(i)} titleOf={() => t("map.taxi")} />
-      <SuggestionAreas suggestions={suggestions} onNavigate={actions?.onNavigate} />
-      {highlighted && (
-        <HighlightedLandmark
-          key={bookmarkIdOf(highlighted)}
-          landmark={highlighted}
-          actions={actions}
-          onClosed={onHighlightClosed}
-        />
-      )}
-      {driver && <DriverDot driver={driver} />}
+      <Pane name="suggestions" style={SUGGESTION_PANE}>
+        <SuggestionAreas suggestions={suggestions} onNavigate={actions?.onNavigate} />
+      </Pane>
+      <Pane name="top" style={TOP_PANE}>
+        {highlighted && (
+          <HighlightedLandmark
+            key={bookmarkIdOf(highlighted)}
+            landmark={highlighted}
+            actions={actions}
+            onClosed={onHighlightClosed}
+          />
+        )}
+        {driver && <DriverDot driver={driver} />}
+      </Pane>
     </MapContainer>
   );
 }

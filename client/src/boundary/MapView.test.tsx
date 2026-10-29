@@ -343,6 +343,55 @@ describe("MapView — suggestions (package 7)", () => {
     expect(container.querySelectorAll('path[stroke="#0e7a57"]')).toHaveLength(1);
   });
 
+  /** Where an element's pane is in the stack: Leaflet's own panes as leaflet.css (which jsdom doesn't load) has them. */
+  function stackOf(el: Element | null): number {
+    const pane = el?.closest<HTMLElement>(".leaflet-pane");
+    const leaflet = { "leaflet-overlay-pane": 400, "leaflet-marker-pane": 600, "leaflet-popup-pane": 700 };
+    const own = Object.entries(leaflet).find(([name]) => pane?.classList.contains(name));
+    return own ? own[1] : Number(pane?.style.zIndex);
+  }
+
+  it("lays each area's outline and pin over every layer's markers, and its fill under them (D51)", () => {
+    const { container } = render(
+      <MapView visible={visibleWith({ TAXI_STAND: { items: stands, clusters: [] } })} suggestions={suggestions} />,
+    );
+    const marker = stackOf(screen.getByTitle("Orchard Rd along driveway of Lucky Plaza"));
+    expect(stackOf(container.querySelector('path[stroke="#e8930c"]'))).toBeGreaterThan(marker);
+    expect(stackOf(screen.getByTitle("Suggested pickup 1: Lucky Plaza"))).toBeGreaterThan(marker);
+    expect(stackOf(container.querySelector('path[fill="#e8930c"]'))).toBeLessThan(marker);
+  });
+
+  it("lays the driver's dot and a chosen bookmark over the pins, and the popups over everything (D51)", async () => {
+    const driver = { location: new Location(1.3, 103.8), accuracyM: 40, at: new Date(), live: true };
+    const { container } = render(
+      <MapView
+        visible={visibleWith({ TAXI_STAND: { items: stands, clusters: [] } })}
+        suggestions={suggestions}
+        driver={driver}
+        highlighted={suntec}
+      />,
+    );
+    const pin = stackOf(screen.getByTitle("Suggested pickup 1: Lucky Plaza"));
+    const dot = stackOf(screen.getByTitle("You are here"));
+    expect(dot).toBeGreaterThan(pin);
+    expect(stackOf(screen.getByTitle("Suntec City, from your bookmarks"))).toBeGreaterThan(pin);
+    expect(stackOf(container.querySelector('path[stroke="#1e6fe0"]'))).toBeLessThan(
+      stackOf(screen.getByTitle("Orchard Rd along driveway of Lucky Plaza")),
+    ); // the dot's accuracy circle stays under the markers
+    expect(stackOf(await screen.findByRole("heading", { name: "Suntec City" }))).toBeGreaterThan(dot);
+    fireEvent.click(screen.getByTitle("Suggested rest stop 1: Maxwell Food Centre"));
+    expect(stackOf(await screen.findByText("Food (100 stalls) · parking"))).toBeGreaterThan(dot);
+  });
+
+  it("leaves the markers under the suggestions tappable, and the pins too (D51)", () => {
+    const driver = { location: new Location(1.3, 103.8), accuracyM: 40, at: new Date(), live: true };
+    render(<MapView visible={visibleWith()} suggestions={suggestions} driver={driver} />);
+    const pin = screen.getByTitle("Suggested pickup 1: Lucky Plaza");
+    expect(pin.closest(".leaflet-pane")).toHaveStyle({ pointerEvents: "none" });
+    expect(screen.getByTitle("You are here").closest(".leaflet-pane")).toHaveStyle({ pointerEvents: "none" });
+    expect(pin).toHaveClass("leaflet-interactive"); // Leaflet turns taps back on for the markers themselves
+  });
+
   it("says why a site was suggested, how far it is and when it was scored, when its pin is tapped", async () => {
     render(<MapView visible={visibleWith()} suggestions={suggestions} />);
     fireEvent.click(screen.getByTitle("Suggested rest stop 1: Maxwell Food Centre"));
@@ -362,7 +411,7 @@ describe("MapView — suggestions (package 7)", () => {
   it("draws nothing for suggestions that are off", () => {
     const { container } = render(<MapView visible={visibleWith()} />);
     expect(container.querySelectorAll(".suggestion-pin")).toHaveLength(0);
-    expect(container.querySelectorAll(".leaflet-overlay-pane path")).toHaveLength(0);
+    expect(container.querySelectorAll(".leaflet-pane path")).toHaveLength(0);
   });
 });
 
