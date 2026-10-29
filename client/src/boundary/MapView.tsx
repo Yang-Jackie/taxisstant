@@ -20,6 +20,7 @@ import {
   MAX_ZOOM,
   MIN_ZOOM,
   ONEMAP_ATTRIBUTION,
+  ONEMAP_NIGHT_TILE_URL,
   ONEMAP_TILE_URL,
   SINGAPORE_BOUNDS,
   SINGAPORE_CENTRE,
@@ -87,6 +88,8 @@ export interface MapViewProps {
   highlighted?: Landmark | null;
   /** The highlighted landmark's details were closed. */
   onHighlightClosed?: (l: Landmark) => void;
+  /** OneMap's Night map, for dark mode (D44). */
+  dark?: boolean;
 }
 
 /** Reports the view after every move or zoom, padded so markers just off screen are ready before they scroll in. */
@@ -315,6 +318,7 @@ export function MapView({
   actions,
   highlighted = null,
   onHighlightClosed,
+  dark = false,
 }: MapViewProps) {
   const fuelShown = visible.FUEL.items.length > 0 || visible.FUEL.clusters.length > 0;
   return (
@@ -326,7 +330,7 @@ export function MapView({
       maxZoom={MAX_ZOOM}
       maxBounds={SINGAPORE_BOUNDS}
     >
-      <TileLayer url={ONEMAP_TILE_URL} attribution={ONEMAP_ATTRIBUTION} />
+      <TileLayer url={dark ? ONEMAP_NIGHT_TILE_URL : ONEMAP_TILE_URL} attribution={ONEMAP_ATTRIBUTION} />
       {onPan && <ViewportReporter onPan={onPan} />}
       <FocusFollower focus={focus} />
       {fuelShown && <OsmCredit />}

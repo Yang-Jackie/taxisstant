@@ -14,12 +14,12 @@
   transform: translate(-50%, -50%);
   padding: 20px;
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 .nav-prompt__box h2 {
   margin: 0 0 6px;
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .nav-prompt__box p {
   margin: 0 0 14px;
@@ -29,7 +29,7 @@
   align-items: center;
   gap: 10px;
   min-height: 44px;
-  color: #3c3f44;
+  color: var(--ink);
 }
 .nav-prompt__skip input {
   width: 22px;
@@ -43,10 +43,10 @@
 .nav-prompt__buttons button {
   flex: 1;
   min-height: 48px;
-  border: 1.5px solid #e4e6ea;
+  border: 1.5px solid var(--line);
   border-radius: 12px;
-  background: #fff;
-  color: #17181a;
+  background: var(--surface);
+  color: var(--ink);
   font-weight: 700;
   cursor: pointer;
 }

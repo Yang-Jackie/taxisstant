@@ -3,7 +3,7 @@
 // M7: after one online session, the stands work with the server down (D1).
 // Package 2b: every static layer is downloaded at startup (D18) and clustered while zoomed out (D17).
 // Package 6: the driver's position (UC 0013). Package 7: smart suggestions from the side menu (UC 0008/0009).
-// Package 8: bookmarks (UC 0011) and navigation to Google Maps (UC 0012).
+// Package 8: bookmarks (UC 0011) and navigation to Google Maps (UC 0012). Package 9a: the Settings page (FR-2).
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -46,6 +46,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  document.documentElement.removeAttribute("style"); // the text size and theme a test set (package 9a)
+  document.documentElement.removeAttribute("data-theme");
 });
 
 describe("App (with controllers)", () => {
@@ -540,5 +542,76 @@ describe("App — bookmarks and navigation (package 8)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Navigate" }));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(open).toHaveBeenCalledTimes(3);
+  });
+});
+
+// Package 9a — the Settings page in the whole app (FR-2, D43, D44).
+describe("App — settings (package 9a)", () => {
+  async function openSettings() {
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(button("Settings"));
+    return screen.getByRole("dialog", { name: "Settings" });
+  }
+
+  it("opens Settings from the side menu, and goes back to the menu (the dialog map)", async () => {
+    serve();
+    await openApp();
+    await openSettings();
+    await userEvent.click(button("Back to the menu"));
+    expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument();
+  });
+
+  it("hides the Charge layer for a petrol or diesel car, and Fuel for an electric one (FR-2.1.1)", async () => {
+    serve();
+    await openApp();
+    await userEvent.click(button("Charge"));
+    await openSettings();
+
+    await userEvent.click(screen.getByRole("radio", { name: "Petrol or diesel" }));
+    expect(screen.queryByRole("button", { name: "Charge" })).not.toBeInTheDocument();
+    expect(button("Fuel")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("radio", { name: "Electric" }));
+    expect(button("Charge")).toHaveAttribute("aria-pressed", "false"); // it was turned off, not just hidden
+    expect(screen.queryByRole("button", { name: "Fuel" })).not.toBeInTheDocument();
+  });
+
+  it("makes all the text bigger, and the whole app dark with the Night map, and keeps both after a reload", async () => {
+    serve();
+    const first = await openApp();
+    await openSettings();
+
+    await userEvent.click(screen.getByRole("radio", { name: /Largest$/ }));
+    await userEvent.click(screen.getByRole("switch", { name: "Dark mode" }));
+
+    expect(document.documentElement.style.fontSize).toBe("150%");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(first.container.querySelector(".leaflet-container")).not.toBeNull();
+    first.unmount();
+    document.documentElement.removeAttribute("style");
+    document.documentElement.removeAttribute("data-theme");
+
+    await openApp();
+    expect(document.documentElement.style.fontSize).toBe("150%");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  it("brings the navigation prompt back after 'Do not show this again' (D39)", async () => {
+    serve();
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await openApp();
+    await userEvent.click(button("Carpark"));
+    fireEvent.click(await screen.findByTitle("Suntec City"));
+    await userEvent.click(await screen.findByRole("button", { name: "Navigate" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Do not show this again" }));
+    await userEvent.click(button("Yes"));
+
+    await openSettings();
+    await userEvent.click(screen.getByRole("switch", { name: "Ask before opening Google Maps" }));
+    await userEvent.click(button("Close the menu"));
+    await userEvent.click(button("Navigate")); // Suntec City's details are still open
+
+    expect(screen.getByRole("alertdialog", { name: "Open Google Maps?" })).toBeInTheDocument();
+    expect(open).toHaveBeenCalledOnce();
   });
 });

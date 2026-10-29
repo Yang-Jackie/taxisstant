@@ -359,14 +359,18 @@ I review and approve before the next package starts. Claude asks me whenever a d
    - [x] `BookmarkController` (`toggleBookmark`, `openBookmark`, saved in IndexedDB), `BookmarkList` and `BookmarkPanel` in the side menu (D40); `Bookmark` with an id and a snapshot (D42); the popup's star; UC 0011's messages and exception 3a
    - [x] a chosen bookmark shows its landmark highlighted (a ringed marker, details open) whatever layers are on; `Landmark.getType()` is a `StaticLayer`
    - [x] found in Chrome: the popup closed when its star was tapped (React swapped the icon before Leaflet saw the tap, so it counted as a tap on the map; both icons now stay, and the star no longer overlaps the close button), and the highlight's popup cancelled the map's move to it (no auto-pan)
-9. **Settings (FR-2)**
-   - [ ] EN/ZH language switch
-   - [ ] vehicle type
-   - [ ] font size
-   - [ ] dark mode
-   - [ ] every setting persisted
-   - [ ] a way to show the navigation prompt again (`skipNavPrompt`, D39): until then, "Do not show this again" can't be undone
-   - [ ] Help & Support page (from the dialog map)
+9. **Settings (FR-2)** (decided 29 Oct: D43–D46; in three checkpoints: 9a the Settings page, 9b English and Chinese, 9c Help & Support)
+   - **9a. The Settings page** ✅
+     - [x] `SettingsView` (the dialog map's Settings UI, from the side menu's Settings entry and back), in the side menu's drawer (`Drawer`, shared with `Sidemenu`)
+     - [x] vehicle type: `setVehicleType`; Fuel hides the Charge layer and Electric hides Fuel (FR-2.1.1, D43), including the rest stop's related layers; the ranking bonus (D34)
+     - [x] text size: `setDisplay(fontSize, …)` with four sizes (100–150 % of the phone's); every UI text in `rem`, map symbols at fixed sizes
+     - [x] dark mode: `setDisplay(…, darkMode)`, following the phone until chosen (D44); colours as theme tokens; OneMap's Night map; Leaflet's popups and controls themed
+     - [x] "Ask before opening Google Maps", which undoes "Do not show this again" (D39)
+     - [x] every setting saved and restored (FR-2.2.1); found in Chrome: the Settings drawer overflowed at the largest text (a fieldset's minimum width) and a long hint squeezed a radio
+   - **9b. English and Chinese**
+     - [ ] EN/ZH language switch (FR-2.1.2): every screen, toast and popup; the mockup's language button and the side menu's Language entry
+   - **9c. Help & Support**
+     - [ ] Help & Support page (from the dialog map): how-to and data sources (D46)
 10. **Hardening and deployment**
     - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
     - [ ] the mockup's layer tools: a bottom sheet with icon buttons that collapses to icons only (replaces M4's text row in `FilterTool`)
@@ -448,6 +452,10 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D40 — Bookmarks live in the side menu (my decision, 29 Oct).** No document places UC 0011's "bookmark menu" (the data dictionary's side menu lists suggestions, language, settings and help). It is a section of the side menu under Smart suggestions (`BookmarkPanel`), newest first, with each one's distance. Choosing one closes the menu and shows the landmark highlighted on the map with its popup open (steps 3–4); a landmark that is no longer in the data gives exception 3a's toast.
 - **D41 — The Google Maps link has the destination only (my decision, 29 Oct).** UC 0012 step 4 sends both positions, its postcondition says the current one is optional, and its exception says "Try again later" without one. `NavigationGateway.openDeepLink(dest)` opens `google.com/maps/dir/?api=1&destination=…&travelmode=driving`: Google Maps starts from the phone's own location (it reads the GPS itself), so the driver's position never goes into a URL (D32) and navigation works before our GPS has a fix. It shows the route rather than starting turn-by-turn (step 5: "sees route"), so the driver can pick one. On a phone with the Google Maps app, the link opens the app.
 - **D42 — A bookmark records its landmark and a snapshot (my decision, 29 Oct).** The design's `Bookmark` (label, dateSaved) points at a whole `Landmark`, but `BookmarkList.remove(id)` needs an id (the AI report's fix). A bookmark is `id` (the landmark's layer and id, so one per landmark), `layer`, `landmarkId`, and the `label` (name) and `location` when saved, plus `dateSaved`. The list reads well offline; opening one looks the landmark up in today's data.
+- **D43 — The vehicle type hides the other energy layer (my decision, 29 Oct).** FR-2.1.1: choosing a vehicle type filters energy stops ("hide charging points for diesel cabs"). Fuel (petrol or diesel) hides the Charge layer, Electric hides Fuel: their buttons and markers go, a layer that was on is turned off, and the rest-stop suggestion turns on only the relevant one; the ranking bonus applies (D34). Until a type is chosen, both show.
+- **D44 — Dark mode is on or off, starting as the phone (my decision, 29 Oct).** The design's `darkMode` Boolean. Until the driver flips it, it follows the phone's light or dark setting; their choice then sticks. Dark uses OneMap's Night map and dark menus.
+- **D45 — No narrator (my decision, 29 Oct).** Only the dialog map has "narrator on/off" (no FR, use case or design-model field). The phone's own screen reader (VoiceOver, TalkBack) covers it: every control has a label.
+- **D46 — Help & Support has how-to and data sources, no contact (my decision, 29 Oct).** The dialog map's "contact information for application support" isn't given anywhere. The page explains each feature, credits the data sources, and names the course and team; a contact can be added later.
 
 ## Decisions I'll be asked about
 
@@ -482,7 +490,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **UC 0013's exception sends the driver to OS app settings,** which a web app can't open (D30). Its step 3 keeps the map on the driver; the app centres once (D31).
 - **`TaxiDriver.driverId`** has no meaning without user accounts, which the design rules out (D32).
 - **UC 0008/0009 contradict themselves** like UC 0001: the "not older than 5 minutes" precondition, against "markers available offline" (D36). UC 0009's 2a toast says "rest stop markers"; the app says "pickup markers".
-- **The dialog map shows suggestions as a list screen; UC 0008/0009 as map toggles** (D33). Its Settings UI has a "narrator on/off" option that no other document mentions (package 9).
+- **The dialog map shows suggestions as a list screen; UC 0008/0009 as map toggles** (D33). Its Settings UI has a "narrator on/off" option that no other document mentions (left out, D45), and its Help & Support "contact information" isn't given anywhere (D46).
 - **The app's name:** the mockup calls it "TaxiMate", the project's first page title "Taxi Assistant". It is TaxiMate (my decision, 29 Oct); the code's internal name `taxisstant` stays (the package scope, and the phone's IndexedDB database, whose renaming would lose every saved copy and setting).
 - **The dialog map has no bookmarks screen, and its icon tap goes straight to the navigation prompt,** while UC 0011 has the same tap open the landmark with a star (D39, D40). UC 0012 needs the current position in step 4, calls it optional in its postcondition, and fails without it in its exception (D41).
 - **The AI report and the Lab 3 report number the use cases differently.** This plan uses the Lab 3 report's numbering.

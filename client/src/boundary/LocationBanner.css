@@ -6,9 +6,9 @@
   z-index: 1001;
   padding: 12px 14px;
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .location-banner p {
   margin: 0 0 8px;
@@ -24,9 +24,9 @@
 }
 .location-banner button {
   padding: 8px 12px;
-  border: 1.5px solid #1e6fe0;
+  border: 1.5px solid var(--link);
   border-radius: 10px;
-  background: #fff;
-  color: #1e6fe0;
+  background: var(--surface);
+  color: var(--link);
   font-weight: 700;
 }

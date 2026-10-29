@@ -1,0 +1,38 @@
+/* The mockup's drawer: slides in from the left over a dimmed map */
+.drawer__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1040; /* above the map, its buttons and the layer tools; below the toast */
+  background: rgba(0, 0, 0, 0.42);
+  animation: drawer-fade 0.25s ease-out;
+}
+.drawer__panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1050;
+  width: min(300px, 86%);
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface);
+  border-radius: 0 22px 22px 0;
+  box-shadow: 6px 0 26px rgba(0, 0, 0, 0.22);
+  animation: drawer-slide 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes drawer-slide {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes drawer-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer__overlay,
+  .drawer__panel {
+    animation: none;
+  }
+}

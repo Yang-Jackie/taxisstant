@@ -116,7 +116,7 @@ describe("Sidemenu", () => {
   it("closes with its close button, a tap outside it, or Escape", async () => {
     const { onClose } = renderMenu();
     await userEvent.click(screen.getByRole("button", { name: "Close the menu" }));
-    fireEvent.click(document.querySelector(".sidemenu__overlay")!);
+    fireEvent.click(document.querySelector(".drawer__overlay")!);
     await userEvent.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalledTimes(3);
   });
@@ -147,5 +147,12 @@ describe("Sidemenu", () => {
     renderMenu({ active: new Set<RecommendationKind>(["PICKUP"]), recommendations: pickupsOn, onNavigate });
     await userEvent.click(screen.getByRole("button", { name: "Navigate to Lucky Plaza" }));
     expect(onNavigate).toHaveBeenCalledExactlyOnceWith({ location: luckyPlaza.centre, name: "Lucky Plaza" });
+  });
+
+  it("opens Settings from its entry under a divider (the dialog map's 'Settings button pressed')", async () => {
+    const onOpenSettings = vi.fn();
+    renderMenu({ onOpenSettings });
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(onOpenSettings).toHaveBeenCalledOnce();
   });
 });

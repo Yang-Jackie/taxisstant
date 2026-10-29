@@ -43,4 +43,9 @@ describe("FilterTool", () => {
 
     expect(button).toHaveAttribute("aria-pressed", "false"); // the parent didn't turn it on, so it stays off
   });
+
+  it("shows only the layers it is given: a vehicle type hides the other energy layer (D43)", () => {
+    render(<FilterTool active={new Set()} onToggle={() => {}} layers={["TAXI_STAND", "FUEL"]} />);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Taxi stands", "Fuel"]);
+  });
 });

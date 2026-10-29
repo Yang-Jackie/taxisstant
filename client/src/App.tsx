@@ -6,12 +6,15 @@ import { LocationButton } from "./boundary/LocationButton";
 import { MapView } from "./boundary/MapView";
 import { MenuButton } from "./boundary/MenuButton";
 import { NavigationPrompt } from "./boundary/NavigationPrompt";
+import { SettingsView } from "./boundary/SettingsView";
 import { Sidemenu } from "./boundary/Sidemenu";
 import { Toast } from "./boundary/Toast";
 import { useStore } from "./boundary/useStore";
 import type { Bookmark } from "./entity/Bookmark";
 import type { Viewport } from "./entity/Bounds";
 import type { Landmark } from "./entity/Landmark";
+import { LAYER_TYPES } from "./entity/LayerType";
+import { hiddenEnergyLayer } from "./entity/UserPreferences";
 import type { SuggestedSite } from "./entity/SuggestedSite";
 import { ControllersContext, type Controllers } from "./startup";
 import "./App.css";
@@ -30,14 +33,15 @@ export function App() {
   const suggestions = useStore(recommendations);
   const saved = useStore(bookmarks);
   const route = useStore(navigation);
-  const [menuOpen, setMenuOpen] = useState(false);
+  // The drawer's screens, as in the dialog map: the side menu, and Settings reached from it
+  const [panel, setPanel] = useState<"menu" | "settings" | null>(null);
   const dismissNotice = useCallback(() => mapDisplay.dismissNotice(), [mapDisplay]);
   const onPan = useCallback((viewport: Viewport) => mapDisplay.refreshVisible(viewport), [mapDisplay]);
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const closeMenu = useCallback(() => setPanel(null), []);
   // A chosen suggestion is shown on the map (the dialog map), so the menu gets out of the way
   const showSite = useCallback(
     (site: SuggestedSite) => {
-      setMenuOpen(false);
+      setPanel(null);
       mapDisplay.focusOn(site.centre);
     },
     [mapDisplay],
@@ -54,7 +58,7 @@ export function App() {
   // A chosen bookmark is shown highlighted on the map (UC 0011), so the menu gets out of the way too
   const showBookmark = useCallback(
     (b: Bookmark) => {
-      setMenuOpen(false);
+      setPanel(null);
       void bookmarks.openBookmark(b.id);
     },
     [bookmarks],
@@ -64,6 +68,13 @@ export function App() {
     (ok: boolean, doNotShow: boolean) => navigation.confirm(ok, doNotShow),
     [navigation],
   );
+
+  // Text size and dark mode apply to the whole page: rem-based text scales with the root (FR-2, D44)
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = preferences.darkMode ? "dark" : "light";
+    root.style.fontSize = `${preferences.fontSize}%`;
+  }, [preferences.darkMode, preferences.fontSize]);
 
   // Live layers poll only while the app is on screen (D25)
   useEffect(() => {
@@ -92,16 +103,21 @@ export function App() {
         actions={actions}
         highlighted={display.highlighted}
         onHighlightClosed={endHighlight}
+        dark={preferences.darkMode}
       />
-      <MenuButton onClick={() => setMenuOpen(true)} />
+      <MenuButton onClick={() => setPanel("menu")} />
       <LocationButton
         enabled={display.driver !== null}
         highlighted={display.driverOffCentre}
         onClick={() => mapDisplay.centreOnDriver()}
       />
       {whereabouts.status === "denied" && <LocationBanner onRetry={() => location.retry()} />}
-      <FilterTool active={preferences.visibleLayers} onToggle={(t) => void mapDisplay.toggleLayer(t)} />
-      {menuOpen && (
+      <FilterTool
+        active={preferences.visibleLayers}
+        onToggle={(t) => void mapDisplay.toggleLayer(t)}
+        layers={LAYER_TYPES.filter((t) => t !== hiddenEnergyLayer(preferences.vehicleType))}
+      />
+      {panel === "menu" && (
         <Sidemenu
           active={preferences.activeSuggestions}
           recommendations={suggestions}
@@ -111,6 +127,17 @@ export function App() {
           bookmarks={saved.bookmarks}
           driverAt={whereabouts.position?.location}
           onSelectBookmark={showBookmark}
+          onOpenSettings={() => setPanel("settings")}
+          onClose={closeMenu}
+        />
+      )}
+      {panel === "settings" && (
+        <SettingsView
+          preferences={preferences}
+          onSetVehicleType={(v) => void settings.setVehicleType(v)}
+          onSetDisplay={(fontSize, darkMode) => void settings.setDisplay(fontSize, darkMode)}
+          onSetSkipNavPrompt={(skip) => void settings.setSkipNavPrompt(skip)}
+          onBack={() => setPanel("menu")}
           onClose={closeMenu}
         />
       )}

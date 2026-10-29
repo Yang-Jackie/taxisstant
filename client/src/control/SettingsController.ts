@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { isLayerType, type LayerType } from "../entity/LayerType";
 import { isRecommendationKind, type RecommendationKind } from "../entity/RecommendationKind";
-import type { UserPreferences } from "../entity/UserPreferences";
+import {
+  hiddenEnergyLayer,
+  TEXT_SIZES,
+  type TextSize,
+  type UserPreferences,
+  type VehicleType,
+} from "../entity/UserPreferences";
 import type { LocalStore } from "../services/LocalStore";
 import { Store } from "./Store";
 
@@ -14,26 +20,53 @@ const namesOf = <T>(isName: (v: unknown) => v is T) =>
     .catch([])
     .transform((values) => values.filter(isName));
 
-/** What is saved: plain arrays and objects, as IndexedDB keeps them. Anything missing or unexpected reads as empty. */
+/** What is saved: plain arrays and objects, as IndexedDB keeps them. Anything missing or unexpected reads as unset. */
 const SavedPreferences = z.object({
   visibleLayers: namesOf(isLayerType),
   activeSuggestions: namesOf(isRecommendationKind),
   suggestionLayers: z.record(z.string(), z.unknown()).catch({}),
   skipNavPrompt: z.boolean().catch(false),
+  vehicleType: z.enum(["FUEL", "EV"]).optional().catch(undefined),
+  fontSize: z
+    .number()
+    .refine((n): n is TextSize => (TEXT_SIZES as readonly number[]).includes(n))
+    .catch(100),
+  /** Saved only once the driver has chosen; until then the phone decides (D44). */
+  darkMode: z.boolean().optional().catch(undefined),
 });
+
+/** The phone's light or dark setting, as `window.matchMedia("(prefers-color-scheme: dark)")` gives it. */
+export interface ColourSchemeQuery {
+  readonly matches: boolean;
+  addEventListener(type: "change", listener: () => void): void;
+}
+
+function phoneColourScheme(): ColourSchemeQuery {
+  const query = typeof window === "undefined" ? undefined : window.matchMedia?.("(prefers-color-scheme: dark)");
+  return query ?? { matches: false, addEventListener: () => {} };
+}
 
 /** The only owner of the driver's preferences (D3). Saves every change through LocalStore. */
 export class SettingsController extends Store<UserPreferences> {
   private readonly localStore: Pick<LocalStore, "read" | "write">;
+  private readonly phoneDark: ColourSchemeQuery;
+  /** Dark mode as the driver chose it; undefined while the phone decides (D44). */
+  private darkModeChosen: boolean | undefined;
 
-  constructor(localStore: Pick<LocalStore, "read" | "write">) {
+  constructor(localStore: Pick<LocalStore, "read" | "write">, phoneDark: ColourSchemeQuery = phoneColourScheme()) {
     super({
       visibleLayers: new Set(),
       activeSuggestions: new Set(),
       suggestionLayers: new Map(),
       skipNavPrompt: false,
+      fontSize: 100,
+      darkMode: phoneDark.matches,
     });
     this.localStore = localStore;
+    this.phoneDark = phoneDark;
+    phoneDark.addEventListener("change", () => {
+      if (this.darkModeChosen === undefined) this.setState({ ...this.getSnapshot(), darkMode: phoneDark.matches });
+    });
   }
 
   getPreferences(): UserPreferences {
@@ -52,8 +85,10 @@ export class SettingsController extends Store<UserPreferences> {
   async load(): Promise<void> {
     const saved = SavedPreferences.safeParse(await this.localStore.read(KEY));
     if (!saved.success) return; // not an object at all: keep the defaults
-    const { visibleLayers, activeSuggestions, suggestionLayers, skipNavPrompt } = saved.data;
-    const visible = new Set(visibleLayers);
+    const { visibleLayers, activeSuggestions, suggestionLayers, skipNavPrompt, vehicleType, fontSize, darkMode } =
+      saved.data;
+    const hidden = hiddenEnergyLayer(vehicleType);
+    const visible = new Set(visibleLayers.filter((t) => t !== hidden));
     const active = new Set(activeSuggestions);
     // A suggestion owns only layers that are still on, and only while it is on itself
     const owned = new Map<RecommendationKind, ReadonlySet<LayerType>>();
@@ -61,12 +96,15 @@ export class SettingsController extends Store<UserPreferences> {
       const layers = namesOf(isLayerType).parse(suggestionLayers[k]);
       owned.set(k, new Set(layers.filter((t) => visible.has(t))));
     }
+    this.darkModeChosen = darkMode;
     this.setState({
-      ...this.getSnapshot(),
       visibleLayers: visible,
       activeSuggestions: active,
       suggestionLayers: owned,
       skipNavPrompt,
+      ...(vehicleType && { vehicleType }),
+      fontSize,
+      darkMode: darkMode ?? this.phoneDark.matches,
     });
   }
 
@@ -79,10 +117,7 @@ export class SettingsController extends Store<UserPreferences> {
     const visibleLayers = new Set(this.getSnapshot().visibleLayers);
     if (on) visibleLayers.add(t);
     else visibleLayers.delete(t);
-    const suggestionLayers = new Map(
-      [...this.getSnapshot().suggestionLayers].map(([k, layers]) => [k, new Set([...layers].filter((l) => l !== t))]),
-    );
-    await this.save({ ...this.getSnapshot(), visibleLayers, suggestionLayers });
+    await this.save({ ...this.getSnapshot(), visibleLayers, suggestionLayers: this.without(t) });
   }
 
   /**
@@ -121,6 +156,39 @@ export class SettingsController extends Store<UserPreferences> {
     await this.save({ ...this.getSnapshot(), skipNavPrompt: on });
   }
 
+  /**
+   * The design model's setVehicleType, or undefined to show both energy layers again. The layer the vehicle has no
+   * use for is turned off and hidden (FR-2.1.1, D43).
+   */
+  async setVehicleType(v: VehicleType | undefined): Promise<void> {
+    const prefs = this.getSnapshot();
+    if (prefs.vehicleType === v) return;
+    const hidden = hiddenEnergyLayer(v);
+    const visibleLayers = new Set([...prefs.visibleLayers].filter((t) => t !== hidden));
+    const { vehicleType: _old, ...rest } = prefs;
+    await this.save({
+      ...rest,
+      ...(v && { vehicleType: v }),
+      visibleLayers,
+      suggestionLayers: hidden ? this.without(hidden) : prefs.suggestionLayers,
+    });
+  }
+
+  /** The design model's setDisplay. Changing dark mode makes it the driver's choice, which then sticks (D44). */
+  async setDisplay(fontSize: TextSize, darkMode: boolean): Promise<void> {
+    const prefs = this.getSnapshot();
+    if (prefs.fontSize === fontSize && prefs.darkMode === darkMode) return;
+    if (prefs.darkMode !== darkMode) this.darkModeChosen = darkMode;
+    await this.save({ ...prefs, fontSize, darkMode });
+  }
+
+  /** Every suggestion's own layers, less `t`. */
+  private without(t: LayerType): Map<RecommendationKind, ReadonlySet<LayerType>> {
+    return new Map(
+      [...this.getSnapshot().suggestionLayers].map(([k, layers]) => [k, new Set([...layers].filter((l) => l !== t))]),
+    );
+  }
+
   private async save(next: UserPreferences): Promise<void> {
     this.setState(next);
     await this.localStore.write(KEY, {
@@ -128,6 +196,9 @@ export class SettingsController extends Store<UserPreferences> {
       activeSuggestions: [...next.activeSuggestions],
       suggestionLayers: Object.fromEntries([...next.suggestionLayers].map(([k, layers]) => [k, [...layers]])),
       skipNavPrompt: next.skipNavPrompt,
+      ...(next.vehicleType && { vehicleType: next.vehicleType }),
+      fontSize: next.fontSize,
+      ...(this.darkModeChosen !== undefined && { darkMode: this.darkModeChosen }),
     });
   }
 }

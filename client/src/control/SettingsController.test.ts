@@ -45,6 +45,7 @@ describe("SettingsController", () => {
       activeSuggestions: [],
       suggestionLayers: {},
       skipNavPrompt: false,
+      fontSize: 100,
     });
   });
 
@@ -167,6 +168,7 @@ describe("SettingsController — suggestions (package 7, D35)", () => {
       activeSuggestions: ["REST_STOP"],
       suggestionLayers: { REST_STOP: ["CARPARK", "HAWKER"] },
       skipNavPrompt: false,
+      fontSize: 100,
     });
     const afterReload = new SettingsController(store);
     await afterReload.load();
@@ -219,5 +221,130 @@ describe("SettingsController — the navigation prompt (package 8)", () => {
     const settings = new SettingsController(memoryStore({ preferences: { skipNavPrompt: "yes" } }));
     await settings.load();
     expect(settings.getPreferences().skipNavPrompt).toBe(false);
+  });
+});
+
+describe("SettingsController — vehicle type, text size and dark mode (package 9a)", () => {
+  /** A stand-in for the phone's light or dark setting, which a test can flip. */
+  function phone(dark: boolean) {
+    const listeners: (() => void)[] = [];
+    return {
+      matches: dark,
+      addEventListener: (_type: "change", listener: () => void) => void listeners.push(listener),
+      flip(to: boolean) {
+        this.matches = to;
+        for (const l of listeners) l();
+      },
+    };
+  }
+
+  it("hides charging points for a petrol or diesel car, turning them off if they were on (FR-2.1.1, D43)", async () => {
+    const store = memoryStore();
+    const settings = new SettingsController(store);
+    await settings.setLayerVisible("CHARGING", true);
+    await settings.setLayerVisible("FUEL", true);
+
+    await settings.setVehicleType("FUEL");
+
+    expect(settings.getPreferences().vehicleType).toBe("FUEL");
+    expect([...settings.getPreferences().visibleLayers]).toEqual(["FUEL"]);
+    expect(store.data.get("preferences")).toMatchObject({ vehicleType: "FUEL", visibleLayers: ["FUEL"] });
+  });
+
+  it("hides fuel stations for an electric car, and takes them from a suggestion's own layers too", async () => {
+    const settings = new SettingsController(memoryStore());
+    await settings.setSuggestionActive("REST_STOP", true, ["CHARGING", "FUEL", "CARPARK", "HAWKER"]);
+
+    await settings.setVehicleType("EV");
+
+    expect(settings.isLayerVisible("FUEL")).toBe(false);
+    expect([...settings.getPreferences().suggestionLayers.get("REST_STOP")!]).toEqual([
+      "CHARGING",
+      "CARPARK",
+      "HAWKER",
+    ]);
+  });
+
+  it("shows both again once the type is unset, and saves no type", async () => {
+    const store = memoryStore();
+    const settings = new SettingsController(store);
+    await settings.setVehicleType("EV");
+
+    await settings.setVehicleType(undefined);
+
+    expect(settings.getPreferences().vehicleType).toBeUndefined();
+    expect(store.data.get("preferences")).not.toHaveProperty("vehicleType");
+  });
+
+  it("load() brings the type back, and drops a layer it hides that was saved as on", async () => {
+    const settings = new SettingsController(
+      memoryStore({ preferences: { vehicleType: "FUEL", visibleLayers: ["CHARGING", "FUEL"] } }),
+    );
+    await settings.load();
+    expect(settings.getPreferences().vehicleType).toBe("FUEL");
+    expect([...settings.getPreferences().visibleLayers]).toEqual(["FUEL"]);
+  });
+
+  it("load() ignores a type it doesn't know", async () => {
+    const settings = new SettingsController(memoryStore({ preferences: { vehicleType: "DIESEL" } }));
+    await settings.load();
+    expect(settings.getPreferences().vehicleType).toBeUndefined();
+  });
+
+  it("starts at normal text size, saves a new one, and load() brings it back", async () => {
+    const store = memoryStore();
+    const settings = new SettingsController(store, phone(false));
+    expect(settings.getPreferences().fontSize).toBe(100);
+
+    await settings.setDisplay(130, false);
+
+    expect(store.data.get("preferences")).toMatchObject({ fontSize: 130 });
+    const afterReload = new SettingsController(store, phone(false));
+    await afterReload.load();
+    expect(afterReload.getPreferences().fontSize).toBe(130);
+  });
+
+  it("load() reads a text size it doesn't offer as normal", async () => {
+    const settings = new SettingsController(memoryStore({ preferences: { fontSize: 400 } }));
+    await settings.load();
+    expect(settings.getPreferences().fontSize).toBe(100);
+  });
+
+  it("starts dark or light as the phone is, and follows the phone until the driver chooses (D44)", async () => {
+    const store = memoryStore();
+    const dark = phone(true);
+    const settings = new SettingsController(store, dark);
+    expect(settings.getPreferences().darkMode).toBe(true);
+
+    dark.flip(false);
+    expect(settings.getPreferences().darkMode).toBe(false);
+
+    await settings.setDisplay(115, false); // the text size changes, dark mode doesn't: still the phone's
+    dark.flip(true);
+    expect(settings.getPreferences().darkMode).toBe(true);
+    expect(store.data.get("preferences")).not.toHaveProperty("darkMode");
+  });
+
+  it("keeps the driver's dark mode once chosen, whatever the phone does, and saves it", async () => {
+    const store = memoryStore();
+    const dark = phone(true);
+    const settings = new SettingsController(store, dark);
+
+    await settings.setDisplay(100, false);
+    dark.flip(false);
+    dark.flip(true);
+
+    expect(settings.getPreferences().darkMode).toBe(false);
+    expect(store.data.get("preferences")).toMatchObject({ darkMode: false });
+  });
+
+  it("load() brings back the driver's dark mode, or else asks the phone", async () => {
+    const chosen = new SettingsController(memoryStore({ preferences: { darkMode: true } }), phone(false));
+    await chosen.load();
+    expect(chosen.getPreferences().darkMode).toBe(true);
+
+    const notChosen = new SettingsController(memoryStore({ preferences: { visibleLayers: [] } }), phone(true));
+    await notChosen.load();
+    expect(notChosen.getPreferences().darkMode).toBe(true);
   });
 });

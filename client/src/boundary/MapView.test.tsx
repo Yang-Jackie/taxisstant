@@ -395,3 +395,21 @@ describe("MapView — bookmarks and navigation (package 8)", () => {
     expect(onHighlightClosed).toHaveBeenCalledWith(suntec);
   });
 });
+
+// Package 9a — dark mode's Night map (D44).
+describe("MapView — dark mode (package 9a)", () => {
+  const tileUrls = (container: HTMLElement) =>
+    [...container.querySelectorAll("img.leaflet-tile")].map((img) => img.getAttribute("src") ?? "");
+
+  it("draws OneMap's Default map, or its Night map in dark mode, and switches without a reload", () => {
+    withScreenSize();
+    const { container, rerender } = render(<MapView visible={visibleWith()} />);
+    expect(tileUrls(container).length).toBeGreaterThan(0);
+    expect(tileUrls(container).every((u) => u.includes("/maps/tiles/Default/"))).toBe(true);
+
+    rerender(<MapView visible={visibleWith()} dark />);
+
+    expect(tileUrls(container).length).toBeGreaterThan(0);
+    expect(tileUrls(container).every((u) => u.includes("/maps/tiles/Night/"))).toBe(true);
+  });
+});

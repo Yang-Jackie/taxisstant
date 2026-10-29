@@ -3,6 +3,8 @@
 import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
 
 export const ONEMAP_TILE_URL = "https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png";
+/** OneMap's Night style, for dark mode (D44). */
+export const ONEMAP_NIGHT_TILE_URL = "https://www.onemap.gov.sg/maps/tiles/Night/{z}/{x}/{y}.png";
 
 /** OneMap's terms ask for this logo + credit on every map that uses their tiles. */
 export const ONEMAP_ATTRIBUTION =

@@ -6,6 +6,7 @@ import { Site } from "./Site";
 import { SuggestedPickup } from "./SuggestedPickup";
 import { SuggestedRestStop } from "./SuggestedRestStop";
 import { SuggestedSite } from "./SuggestedSite";
+import { hiddenEnergyLayer } from "./UserPreferences";
 
 const asOf = new Date("2026-10-29T13:00:00Z");
 const at = (minutes: number) => new Date(asOf.getTime() + minutes * 60 * 1000);
@@ -79,5 +80,15 @@ describe("SuggestedPickup and SuggestedRestStop", () => {
     expect(restStop.isFresh(at(15))).toBe(true);
     expect(restStop.isFresh(at(15.01))).toBe(false);
     expect(restStop.freshUntil()).toEqual(at(15));
+  });
+});
+
+describe("hiddenEnergyLayer (FR-2.1.1, D43)", () => {
+  it("hides charging points from a fuel car, fuel stations from an electric one, and nothing until chosen", () => {
+    expect([hiddenEnergyLayer("FUEL"), hiddenEnergyLayer("EV"), hiddenEnergyLayer(undefined)]).toEqual([
+      "CHARGING",
+      "FUEL",
+      undefined,
+    ]);
   });
 });

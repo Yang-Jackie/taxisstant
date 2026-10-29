@@ -66,20 +66,20 @@
 
 .landmark-details h2 {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .landmark-details p {
   margin: 2px 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .landmark-details__muted {
-  color: #6a6d73;
+  color: var(--muted);
 }
 .landmark-details__live {
   font-weight: 700;
 }
 .landmark-details__alert {
-  color: #b42318;
+  color: var(--alert);
   font-weight: 700;
 }
 

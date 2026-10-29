@@ -9,9 +9,65 @@
     Arial,
     sans-serif;
   line-height: 1.4;
-  color: #17181a;
-  background: #ffffff;
+  color: var(--ink);
+  background: var(--surface);
   -webkit-font-smoothing: antialiased;
+
+  /* The mockup's colours. Map symbols keep theirs in both themes; panels and text use these */
+  color-scheme: light;
+  --surface: #ffffff;
+  --ink: #17181a;
+  --muted: #6a6d73;
+  --line: #e4e6ea;
+  --disabled: #b5b8bd;
+  --alert: #b42318;
+  --link: #1e6fe0;
+  --amber-bg: #fdf1d6;
+  --amber-line: #f3d48a;
+  --amber-ink: #6b4600;
+  --green-bg: #ddf3eb;
+  --green-line: #b2e0d0;
+  --green-ink: #0a4e38;
+  --green-text: #0e7a57;
+  --toast-bg: #17181a;
+  --toast-ink: #ffffff;
+}
+
+/* Dark mode (D44): the same roles in night colours, with OneMap's Night map underneath */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #1f2328;
+  --ink: #eef0f3;
+  --muted: #a6abb3;
+  --line: #3a4048;
+  --disabled: #5c626b;
+  --alert: #ff8b7e;
+  --link: #79adff;
+  --amber-bg: #3f2c08;
+  --amber-line: #8a6116;
+  --amber-ink: #ffcf73;
+  --green-bg: #0e3527;
+  --green-line: #1f6d52;
+  --green-ink: #8ce6c3;
+  --green-text: #4fd3a0;
+  --toast-bg: #eef0f3;
+  --toast-ink: #17181a;
+}
+
+/* Leaflet's popups and controls follow the theme too */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip,
+.leaflet-bar a,
+.leaflet-container .leaflet-control-attribution {
+  background: var(--surface);
+  color: var(--ink);
+}
+.leaflet-container .leaflet-control-attribution a,
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--muted);
+}
+.leaflet-bar a {
+  border-bottom-color: var(--line);
 }
 
 *,

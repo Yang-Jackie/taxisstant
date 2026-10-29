@@ -15,12 +15,14 @@ const LABELS: Record<LayerType, string> = {
 export interface FilterToolProps {
   active: ReadonlySet<LayerType>;
   onToggle: (t: LayerType) => void;
+  /** The buttons to show: all layers but one the vehicle type hides (D43). */
+  layers?: readonly LayerType[];
 }
 
-export function FilterTool({ active, onToggle }: FilterToolProps) {
+export function FilterTool({ active, onToggle, layers = LAYER_TYPES }: FilterToolProps) {
   return (
     <nav className="filter-tool" aria-label="Map layers">
-      {LAYER_TYPES.map((t) => (
+      {layers.map((t) => (
         <button key={t} type="button" aria-pressed={active.has(t)} onClick={() => onToggle(t)}>
           {LABELS[t]}
         </button>

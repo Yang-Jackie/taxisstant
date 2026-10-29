@@ -48,6 +48,8 @@ const prefs = (vehicleType?: VehicleType): UserPreferences => ({
   activeSuggestions: new Set(),
   suggestionLayers: new Map(),
   skipNavPrompt: false,
+  fontSize: 100,
+  darkMode: false,
   ...(vehicleType && { vehicleType }),
 });
 const ranked = (sites: Parameters<typeof rank>[0], p = prefs()) => rank(sites, FROM, p).map((r) => r.site.id);
@@ -173,6 +175,13 @@ describe("RecommendationController.toggle — on (UC 0008/0009)", () => {
     const { settings, recommendations } = setUp();
     await recommendations.toggle("REST_STOP", true);
     expect(visibleLayers(settings)).toEqual(["CARPARK", "CHARGING", "FUEL", "HAWKER"]);
+  });
+
+  it("turns on only the driver's own energy stop with a rest stop, once the vehicle type is set (D43)", async () => {
+    const { settings, recommendations } = setUp();
+    await settings.setVehicleType("FUEL");
+    await recommendations.toggle("REST_STOP", true);
+    expect(visibleLayers(settings)).toEqual(["CARPARK", "FUEL", "HAWKER"]);
   });
 
   it("saves the toggle (step 7)", async () => {

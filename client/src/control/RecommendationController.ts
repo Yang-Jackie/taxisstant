@@ -4,7 +4,7 @@ import type { MapDataRepository, SuggestionItems } from "../entity/MapDataReposi
 import { RECOMMENDATION_KINDS, type RecommendationKind } from "../entity/RecommendationKind";
 import { SuggestedRestStop } from "../entity/SuggestedRestStop";
 import type { SuggestedSite } from "../entity/SuggestedSite";
-import type { UserPreferences } from "../entity/UserPreferences";
+import { hiddenEnergyLayer, type UserPreferences } from "../entity/UserPreferences";
 import type { DataSyncController } from "./DataSyncController";
 import type { DataSyncObserver } from "./DataSyncObserver";
 import type { LocationController } from "./LocationController";
@@ -175,7 +175,9 @@ export class RecommendationController extends Store<RecommendationState> impleme
       this.mapDisplay.showNotice(notice);
       return;
     }
-    const turnedOn = await this.settings.setSuggestionActive(k, true, RELATED_LAYERS[k]);
+    const hidden = hiddenEnergyLayer(this.settings.getPreferences().vehicleType); // not the other energy (D43)
+    const related = RELATED_LAYERS[k].filter((t) => t !== hidden);
+    const turnedOn = await this.settings.setSuggestionActive(k, true, related);
     await this.mapDisplay.showLayers(turnedOn);
   }
 

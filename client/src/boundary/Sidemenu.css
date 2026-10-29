@@ -1,48 +1,9 @@
-/* The mockup's drawer: slides in from the left over a dimmed map */
-.sidemenu__overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 1040; /* above the map, its buttons and the layer tools; below the toast */
-  background: rgba(0, 0, 0, 0.42);
-  animation: sidemenu-fade 0.25s ease-out;
-}
-.sidemenu__drawer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  z-index: 1050;
-  width: min(300px, 86%);
-  overflow-y: auto;
-  padding-bottom: env(safe-area-inset-bottom);
-  background: #fff;
-  border-radius: 0 22px 22px 0;
-  box-shadow: 6px 0 26px rgba(0, 0, 0, 0.22);
-  animation: sidemenu-slide 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-}
-@keyframes sidemenu-slide {
-  from {
-    transform: translateX(-100%);
-  }
-}
-@keyframes sidemenu-fade {
-  from {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sidemenu__overlay,
-  .sidemenu__drawer {
-    animation: none;
-  }
-}
-
 .sidemenu__brand {
   display: flex;
   align-items: center;
   gap: 13px;
   padding: calc(20px + env(safe-area-inset-top)) 16px 18px 22px;
-  border-bottom: 1px solid #e4e6ea;
+  border-bottom: 1px solid var(--line);
 }
 .sidemenu__logo {
   flex: 0 0 auto;
@@ -65,12 +26,12 @@
   flex-direction: column;
 }
 .sidemenu__name {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 800;
 }
 .sidemenu__tagline {
-  font-size: 12.5px;
-  color: #6a6d73;
+  font-size: 0.78125rem;
+  color: var(--muted);
   margin-top: 2px;
 }
 .sidemenu__close {
@@ -80,7 +41,7 @@
   border: none;
   border-radius: 50%;
   background: none;
-  color: #6a6d73;
+  color: var(--muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -93,11 +54,11 @@
   gap: 7px;
   margin: 0;
   padding: 16px 22px 9px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #6a6d73;
+  color: var(--muted);
 }
 .sidemenu__label svg {
   width: 16px;
@@ -117,30 +78,30 @@
   padding: 13px 14px;
   border: 1.5px solid;
   border-radius: 15px;
-  background: #fff;
-  color: #17181a;
+  background: var(--surface);
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
 .sidemenu__suggestion--find .sidemenu__toggle {
-  border-color: #f3d48a;
+  border-color: var(--amber-line);
 }
 .sidemenu__suggestion--find .sidemenu__toggle[aria-pressed="true"] {
-  background: #fdf1d6;
+  background: var(--amber-bg);
   border-color: #e8930c;
 }
 .sidemenu__suggestion--find .sidemenu__icon {
-  color: #6b4600;
+  color: var(--amber-ink);
 }
 .sidemenu__suggestion--rest .sidemenu__toggle {
-  border-color: #b2e0d0;
+  border-color: var(--green-line);
 }
 .sidemenu__suggestion--rest .sidemenu__toggle[aria-pressed="true"] {
-  background: #ddf3eb;
+  background: var(--green-bg);
   border-color: #0e7a57;
 }
 .sidemenu__suggestion--rest .sidemenu__icon {
-  color: #0a4e38;
+  color: var(--green-ink);
 }
 .sidemenu__toggle[aria-busy="true"] {
   cursor: progress;
@@ -155,12 +116,12 @@
   flex-direction: column;
 }
 .sidemenu__title {
-  font-size: 15.5px;
+  font-size: 0.96875rem;
   font-weight: 800;
 }
 .sidemenu__subtitle {
-  font-size: 12.5px;
-  color: #6a6d73;
+  font-size: 0.78125rem;
+  color: var(--muted);
   margin-top: 2px;
 }
 
@@ -171,7 +132,7 @@
   padding: 0;
 }
 .recommendation-card li + li {
-  border-top: 1px solid #e4e6ea;
+  border-top: 1px solid var(--line);
 }
 .recommendation-card button {
   width: 100%;
@@ -181,7 +142,7 @@
   padding: 10px 4px;
   border: none;
   background: none;
-  color: #17181a;
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
@@ -192,7 +153,7 @@
   border-radius: 50%;
   color: #fff;
   font-weight: 800;
-  font-size: 14px;
+  font-size: 0.875rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -211,22 +172,22 @@
 }
 .recommendation-card__name {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .recommendation-card__summary {
-  font-size: 12.5px;
-  color: #6a6d73;
+  font-size: 0.78125rem;
+  color: var(--muted);
 }
 .recommendation-card__distance {
   flex: 0 0 auto;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .recommendation-card__as-of,
 .recommendation-card__empty {
   margin: 6px 4px 0;
-  font-size: 12.5px;
-  color: #6a6d73;
+  font-size: 0.78125rem;
+  color: var(--muted);
 }
 
 /* A suggestion's Navigate, at the end of its row (D39) */
@@ -245,7 +206,7 @@
   padding: 0;
   justify-content: center;
   border-radius: 50%;
-  color: #1e6fe0;
+  color: var(--link);
 }
 .recommendation-card__navigate svg {
   width: 22px;
@@ -262,7 +223,7 @@
   padding: 0;
 }
 .bookmark-panel li + li {
-  border-top: 1px solid #e4e6ea;
+  border-top: 1px solid var(--line);
 }
 .bookmark-panel button {
   width: 100%;
@@ -272,7 +233,7 @@
   padding: 10px 4px;
   border: none;
   background: none;
-  color: #17181a;
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
@@ -281,7 +242,7 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 1.5px solid #e4e6ea;
+  border: 1.5px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -294,7 +255,7 @@
   color: #e8930c;
 }
 .bookmark-panel__icon--rest {
-  color: #0e7a57;
+  color: var(--green-text);
 }
 .bookmark-panel__text {
   flex: 1;
@@ -304,19 +265,45 @@
 }
 .bookmark-panel__name {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .bookmark-panel__kind {
-  font-size: 12.5px;
-  color: #6a6d73;
+  font-size: 0.78125rem;
+  color: var(--muted);
 }
 .bookmark-panel__distance {
   flex: 0 0 auto;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .bookmark-panel__empty {
   margin: 0 4px;
-  font-size: 13px;
-  color: #6a6d73;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+/* The mockup's plain menu entries, under a divider (package 9) */
+.sidemenu__divider {
+  height: 1px;
+  margin: 9px 22px 4px;
+  background: var(--line);
+}
+.sidemenu__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 22px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.sidemenu__item svg {
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
 }

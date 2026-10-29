@@ -1,0 +1,137 @@
+/* The dialog map's Settings UI, in the side menu's drawer */
+.settings__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(16px + env(safe-area-inset-top)) 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.settings__header h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.125rem;
+}
+.settings__icon-button {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.settings__group {
+  min-width: 0; /* a fieldset is otherwise as wide as its content, wider than the drawer at large text sizes */
+  margin: 0;
+  padding: 14px 22px 16px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+}
+.settings__group legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.settings__choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  cursor: pointer;
+}
+.settings__choice input,
+.settings__size input {
+  flex: 0 0 auto; /* a long hint mustn't squeeze the radio */
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: #e8930c;
+}
+.settings__text {
+  display: flex;
+  flex-direction: column;
+}
+.settings__label {
+  font-weight: 700;
+}
+.settings__hint {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.settings__sizes {
+  display: flex;
+  flex-direction: column;
+}
+/* A row per size, like the vehicle types: radio, name, and a sample at that size */
+.settings__size {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  cursor: pointer;
+}
+.settings__size-name {
+  font-weight: 700;
+}
+.settings__sample {
+  margin-left: auto;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.settings__switch {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.settings__knob {
+  flex: 0 0 auto;
+  position: relative;
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--disabled);
+  transition: background 0.15s;
+}
+.settings__knob::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.settings__switch[aria-checked="true"] .settings__knob {
+  background: #0e7a57;
+}
+.settings__switch[aria-checked="true"] .settings__knob::after {
+  transform: translateX(18px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings__knob,
+  .settings__knob::after {
+    transition: none;
+  }
+}
