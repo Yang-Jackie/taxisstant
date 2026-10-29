@@ -34,10 +34,10 @@ interface LayerSync {
 /** The live layers' own toggles; carparks and charging stations also have live availability (D25). */
 export type LiveLayer = "TAXIS" | "HOTSPOT";
 export const LIVE_LAYERS: readonly LiveLayer[] = ["TAXIS", "HOTSPOT"];
-type AvailabilityLayer = "CARPARK" | "CHARGING";
+export type AvailabilityLayer = "CARPARK" | "CHARGING";
 const AVAILABILITY_LAYERS: readonly AvailabilityLayer[] = ["CARPARK", "CHARGING"];
 /** Everything asked for again on every poll: live layers, availability, and suggestions, which change with them. */
-type LiveData = LiveLayer | AvailabilityLayer | RecommendationKind;
+export type LiveData = LiveLayer | AvailabilityLayer | RecommendationKind;
 
 const isLive = (t: LayerType): t is LiveLayer => (LIVE_LAYERS as readonly LayerType[]).includes(t);
 const hasAvailability = (t: LayerType): t is AvailabilityLayer =>
@@ -55,6 +55,8 @@ export class DataSyncController {
   private readonly refreshes = new Map<StaticLayer, Promise<void>>();
   private readonly live: Readonly<Record<LiveData, LayerSync>>;
   private readonly liveRequests = new Map<LiveData, Promise<void>>();
+  /** When each live endpoint's data was observed, and how long that counts as current (D22). */
+  private readonly liveAge = new Map<LiveData, { at: Date; maxAgeMs: number }>();
   /** The latest availability per layer, put back whenever its static layer is replaced. */
   private readonly availability = new Map<AvailabilityLayer, { values: ReadonlyMap<string, number>; asOf: Date }>();
 
@@ -71,6 +73,7 @@ export class DataSyncController {
     } satisfies Record<StaticLayer, LayerSync>;
     this.live = {
       TAXIS: this.liveLayer(
+        "TAXIS",
         ENDPOINTS.taxis,
         TAXI_MAX_AGE_MS,
         (r) => new Date(r.asOf),
@@ -84,6 +87,7 @@ export class DataSyncController {
         },
       ),
       HOTSPOT: this.liveLayer(
+        "HOTSPOT",
         ENDPOINTS.hotspots,
         HOTSPOT_MAX_LAG_MS,
         (r) => latestSlot(r.data),
@@ -96,6 +100,7 @@ export class DataSyncController {
         },
       ),
       CARPARK: this.liveLayer(
+        "CARPARK",
         ENDPOINTS.carparkAvailability,
         AVAILABILITY_MAX_AGE_MS,
         (r) => new Date(r.asOf),
@@ -104,6 +109,7 @@ export class DataSyncController {
         },
       ),
       CHARGING: this.liveLayer(
+        "CHARGING",
         ENDPOINTS.chargerAvailability,
         AVAILABILITY_MAX_AGE_MS,
         (r) => new Date(r.asOf),
@@ -112,6 +118,7 @@ export class DataSyncController {
         },
       ),
       PICKUP: this.liveLayer(
+        "PICKUP",
         ENDPOINTS.pickupSites,
         SUGGESTION_MAX_AGE_MS.PICKUP,
         (r) => new Date(r.asOf),
@@ -125,6 +132,7 @@ export class DataSyncController {
         },
       ),
       REST_STOP: this.liveLayer(
+        "REST_STOP",
         ENDPOINTS.restStopSites,
         SUGGESTION_MAX_AGE_MS.REST_STOP,
         (r) => new Date(r.asOf),
@@ -166,6 +174,15 @@ export class DataSyncController {
   /** Brings one live layer up to date. Rejects only when there is nothing recent enough to show (D22, exception 4a). */
   refreshLiveLayer(t: LiveLayer): Promise<void> {
     return this.requestLive(t);
+  }
+
+  /**
+   * Whether `k`'s live data is still recent enough to show at `now` (D22): undefined when there has never been any,
+   * this session or saved.
+   */
+  isLiveCurrent(k: LiveData, now: Date): boolean | undefined {
+    const age = this.liveAge.get(k);
+    return age && isRecent(age.at, now, age.maxAgeMs);
   }
 
   /** Brings one suggestion's sites up to date. Rejects only when there is nothing recent enough to rank (D36, 2a). */
@@ -227,11 +244,16 @@ export class DataSyncController {
    * as nothing to show: it is stored, but the refresh rejects.
    */
   private liveLayer<D>(
+    key: LiveData,
     endpoint: Endpoint<D[]>,
     maxAgeMs: number,
     observedAt: (r: ApiResponse<D[]>) => Date,
-    apply: (r: ApiResponse<D[]>) => void,
+    show: (r: ApiResponse<D[]>) => void,
   ): LayerSync {
+    const apply = (r: ApiResponse<D[]>) => {
+      this.liveAge.set(key, { at: observedAt(r), maxAgeMs });
+      show(r);
+    };
     return {
       loadCached: async () => {
         const cached = await this.cache.get(endpoint.path, endpoint.response);

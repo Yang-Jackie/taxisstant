@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { point, Popup as LeafletPopup } from "leaflet";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { MapDisplayController } from "./control/MapDisplayController";
 import { ControllersContext, initControllers, startControllers } from "./startup";
 import { LocalStore } from "./services/LocalStore";
 import { fakeGeolocation } from "./testing/fakeGps";
@@ -302,6 +303,9 @@ describe("App — location (package 6)", () => {
 
     expect(await screen.findByTitle("You are here")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Centre the map on my location" })).toBeEnabled();
+    const centre = vi.spyOn(MapDisplayController.prototype, "centreOnDriver");
+    await userEvent.click(screen.getByRole("button", { name: "Centre the map on my location" }));
+    expect(centre).toHaveBeenCalledOnce();
   });
 
   it("shows the banner when location is denied, and Try again asks the GPS again (D30)", async () => {
@@ -642,6 +646,17 @@ describe("App — languages (package 9b)", () => {
     await userEvent.click(button("德士站"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("无法加载德士站标记。请检查网络连接。");
+  });
+
+  it("chooses the language in Settings too (the dialog map's Settings UI)", async () => {
+    serve();
+    await openApp();
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(button("Settings"));
+
+    await userEvent.click(screen.getByRole("radio", { name: "中文" }));
+
+    expect(screen.getByRole("dialog", { name: "设置" })).toBeInTheDocument();
   });
 
   it("chooses the language from the side menu's Language screen, and keeps it after a reload", async () => {

@@ -1,6 +1,6 @@
 import type { StaticLayer } from "../entity/LayerType";
 import type { RecommendationKind } from "../entity/RecommendationKind";
-import type { LiveLayer } from "./DataSyncController";
+import type { LiveData, LiveLayer } from "./DataSyncController";
 
 /**
  * A toast (D3), as which message rather than its words: the screen words it in the driver's language (FR-2.1.2). Each
@@ -14,4 +14,6 @@ export type NoticeKey =
   | `noneNearby.${RecommendationKind}`
   | "bookmarkAdded"
   | "bookmarkRemoved"
-  | "bookmarkNotFound";
+  | "bookmarkNotFound"
+  | `outOfDate.${LiveData}`
+  | "outOfDate.several";

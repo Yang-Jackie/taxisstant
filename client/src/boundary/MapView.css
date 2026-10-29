@@ -32,7 +32,7 @@
   height: 20px;
 }
 .marker-chip--find {
-  color: #e8930c; /* the mockup's amber */
+  color: #b86e00; /* the mockup's amber, darker on the white chip in both themes (D50) */
 }
 .marker-chip--rest {
   color: #0e7a57; /* the mockup's green */
@@ -140,16 +140,16 @@
 .landmark-details__head h2 {
   flex: 1;
 }
-/* Clear of Leaflet's close button, which sits in the popup's top-right corner */
+/* Clear of Leaflet's close button (40 px, 16 px of it over the content), which sits in the popup's top-right corner */
 .landmark-details__star {
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  margin: -10px 8px 0 0;
+  width: 44px;
+  height: 44px;
+  margin: -12px 24px 0 0;
   padding: 0;
   border: none;
   background: none;
-  color: #e8930c;
+  color: var(--amber-strong);
   cursor: pointer;
 }
 .landmark-details__star span {

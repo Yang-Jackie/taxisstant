@@ -25,6 +25,8 @@
   --amber-bg: #fdf1d6;
   --amber-line: #f3d48a;
   --amber-ink: #6b4600;
+  /* Amber for icons and the outline of what is on (D50): the mockup's #e8930c is 2.44:1 on white, this about 4:1 */
+  --amber-strong: #b86e00;
   --green-bg: #ddf3eb;
   --green-line: #b2e0d0;
   --green-ink: #0a4e38;
@@ -46,6 +48,7 @@
   --amber-bg: #3f2c08;
   --amber-line: #8a6116;
   --amber-ink: #ffcf73;
+  --amber-strong: #e8930c; /* 6.48:1 on the dark surface */
   --green-bg: #0e3527;
   --green-line: #1f6d52;
   --green-ink: #8ce6c3;
@@ -68,6 +71,22 @@
 }
 .leaflet-bar a {
   border-bottom-color: var(--line);
+}
+
+/* NF-1: map controls big enough for any finger (Leaflet's are 30 px, its popups' close button 24 px) */
+.leaflet-container .leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: 22px;
+}
+.leaflet-container a.leaflet-popup-close-button {
+  width: 40px;
+  height: 40px;
+  font:
+    26px/40px Tahoma,
+    Verdana,
+    sans-serif;
 }
 
 *,

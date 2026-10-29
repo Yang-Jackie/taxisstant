@@ -2,7 +2,7 @@
 import { get } from "node:http";
 import type { AddressInfo } from "node:net";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ServerDataCache } from "../cache/ServerDataCache.js";
 import { loadSample } from "../sample-data/samples.js";
 import { ChargingStationAdapter } from "../sync/adapters/ChargingStationAdapter.js";
@@ -141,5 +141,14 @@ describe("createHttpApp — hardening (package 2e)", () => {
     const over = await request(app).get("/api/taxi-stands").set("Origin", "https://taxi.example");
     expect(over.status).toBe(429);
     expect(over.headers["access-control-allow-origin"]).toBe("https://taxi.example");
+  });
+});
+
+describe("createHttpApp — the request log", () => {
+  it("logs each request with its answer and how long it took", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await request(createHttpApp(new ServerDataCache())).get("/api/taxi-stands");
+    expect(log).toHaveBeenCalledWith(expect.stringMatching(/^GET \/api\/taxi-stands -> 503 \(\d+ ms\)$/));
+    log.mockRestore();
   });
 });

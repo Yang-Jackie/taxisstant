@@ -12,6 +12,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "openapi": "tsx scripts/write-openapi.ts"

@@ -534,3 +534,38 @@ describe("DataSyncController — suggested sites (package 7)", () => {
     expect(listener.onRecommendationUpdated).toHaveBeenCalledWith("PICKUP");
   });
 });
+
+describe("DataSyncController.isLiveCurrent (D49)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("doesn't know before there has been any live data, saved or fetched", () => {
+    expect(setUp().dataSync.isLiveCurrent("TAXIS", new Date())).toBeUndefined();
+  });
+
+  it("is current while within the data's age limit, and not after (D22)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T13:00:00Z"));
+    const { dataSync } = setUp();
+    await dataSync.refreshLive(new Set(["TAXIS", "CARPARK"]));
+
+    const at = (minutes: number) => new Date(Date.parse("2026-10-29T13:00:00Z") + minutes * 60_000);
+    expect([dataSync.isLiveCurrent("TAXIS", at(5)), dataSync.isLiveCurrent("TAXIS", at(6))]).toEqual([true, false]);
+    expect([dataSync.isLiveCurrent("CARPARK", at(15)), dataSync.isLiveCurrent("CARPARK", at(16))]).toEqual([
+      true,
+      false,
+    ]);
+  });
+
+  it("judges hotspots by their newest slot, and a saved copy by when it was observed", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T13:00:00Z"));
+    const p = phone();
+    await p.open().dataSync.refreshLive(new Set(["HOTSPOT"]));
+    const next = p.open({ "*": offline });
+    await next.dataSync.loadCached();
+
+    // The slot ended 15 minutes before 13:00; hotspots count for 30 minutes after their slot
+    expect(next.dataSync.isLiveCurrent("HOTSPOT", new Date("2026-10-29T13:14:00Z"))).toBe(true);
+    expect(next.dataSync.isLiveCurrent("HOTSPOT", new Date("2026-10-29T13:16:00Z"))).toBe(false);
+  });
+});

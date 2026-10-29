@@ -4,13 +4,13 @@ import type { Dataset } from "../cache/Dataset.js";
 import type { ServerDataCache } from "../cache/ServerDataCache.js";
 
 /** Which dataset each endpoint serves, and what to call it while it isn't loaded yet. */
-interface Route {
+export interface Route {
   readonly endpoint: Endpoint<unknown>;
   readonly dataset: Dataset;
   readonly label: string;
 }
 
-const ROUTES: readonly Route[] = [
+export const ROUTES: readonly Route[] = [
   { endpoint: ENDPOINTS.taxiStands, dataset: "TAXI_STANDS", label: "Taxi stand" },
   { endpoint: ENDPOINTS.carparks, dataset: "CARPARKS", label: "Carpark" },
   { endpoint: ENDPOINTS.hawkerCentres, dataset: "HAWKER_CENTRES", label: "Hawker centre" },

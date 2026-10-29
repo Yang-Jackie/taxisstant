@@ -52,6 +52,7 @@ This type-checks, lints (Oxlint), checks formatting (Prettier) and runs every te
 | ------------------------------- | -------------------------------------------------------------------------------- |
 | `npm run format`                | Formats every file with Prettier                                                 |
 | `npm test -w client`            | Runs one folder's tests (`-w server`, `-w shared` for the others)                |
+| `npm run coverage`              | Shows how much of the code the tests run (reports in each folder's `coverage/`); it fails below the floors set in the folders' Vitest configs |
 | `npm run openapi -w shared`     | Writes `shared/openapi.json` again, after a change to the contract               |
 | `npm run record-samples -w server` | Records new samples of the real data, which the server's contract tests use   |
 | `npm run build-stations -w server` | Rebuilds the train station file (`server/src/reference-data`) when a station opens |

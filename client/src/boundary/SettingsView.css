@@ -54,7 +54,7 @@
   width: 20px;
   height: 20px;
   margin: 0;
-  accent-color: #e8930c;
+  accent-color: var(--amber-strong);
 }
 .settings__text {
   display: flex;

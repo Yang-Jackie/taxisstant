@@ -63,7 +63,7 @@
 .sidemenu__label svg {
   width: 16px;
   height: 16px;
-  color: #e8930c;
+  color: var(--amber-strong);
 }
 
 .sidemenu__suggestion {
@@ -88,7 +88,7 @@
 }
 .sidemenu__suggestion--find .sidemenu__toggle[aria-pressed="true"] {
   background: var(--amber-bg);
-  border-color: #e8930c;
+  border-color: var(--amber-strong);
 }
 .sidemenu__suggestion--find .sidemenu__icon {
   color: var(--amber-ink);
@@ -252,7 +252,7 @@
   height: 18px;
 }
 .bookmark-panel__icon--find {
-  color: #e8930c;
+  color: var(--amber-strong);
 }
 .bookmark-panel__icon--rest {
   color: var(--green-text);

@@ -9,7 +9,18 @@ import { Location } from "../entity/Location";
 import { MapDataRepository } from "../entity/MapDataRepository";
 import { CacheManager } from "../services/CacheManager";
 import { DataApiClient } from "../services/DataApiClient";
-import { callsTo, fakeServer, hotspotsAt, offline, ok, status, TAXIS, type Answer } from "../testing/fakeServer";
+import {
+  callsTo,
+  CARPARK_LOTS,
+  fakeServer,
+  hotspotsAt,
+  offline,
+  ok,
+  PICKUPS,
+  status,
+  TAXIS,
+  type Answer,
+} from "../testing/fakeServer";
 import { DataSyncController, type LiveLayer } from "./DataSyncController";
 import { LIVE_POLL_MS, MapDisplayController, SINGAPORE_VIEW } from "./MapDisplayController";
 import { SettingsController } from "./SettingsController";
@@ -536,5 +547,133 @@ describe("MapDisplayController — the driver (package 6)", () => {
     const { mapDisplay } = setUp();
     mapDisplay.refreshVisible(screenAround(1.3, 103.8));
     expect(mapDisplay.getSnapshot().driverOffCentre).toBe(false);
+  });
+});
+
+// Package 10a-2 (D49) — live data that goes out of date is announced, once.
+describe("MapDisplayController — out-of-date live data (D49)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-29T13:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  /** A server whose live endpoints can be cut off and brought back. */
+  function flakyServer() {
+    const state = { online: true };
+    const answer =
+      (data: Parameters<typeof ok>[0]): Answer =>
+      (init) =>
+        state.online ? ok(data)(init) : offline(init);
+    return {
+      state,
+      answers: {
+        "/taxis": answer(TAXIS),
+        "/hotspots": answer(() => hotspotsAt(new Date())),
+        "/carparks/availability": answer(CARPARK_LOTS),
+        "/pickup-sites": answer(PICKUPS),
+      },
+    };
+  }
+  const notice = (mapDisplay: MapDisplayController) => toastText(mapDisplay.getSnapshot().notice);
+
+  it("says so once when taxis go out of date and leave the map, not on every poll after", async () => {
+    const server = flakyServer();
+    const { mapDisplay } = setUp(server.answers);
+    await mapDisplay.toggleLayer("TAXIS");
+    mapDisplay.setForeground(true);
+    server.state.online = false;
+
+    await vi.advanceTimersByTimeAsync(4.5 * 60 * 1000);
+    expect(notice(mapDisplay)).toBeNull();
+    await vi.advanceTimersByTimeAsync(60 * 1000); // over 5 minutes old (D22)
+    expect(notice(mapDisplay)).toBe("Nearby taxis are out of date, so they're hidden. Please check your connection.");
+
+    mapDisplay.dismissNotice();
+    await vi.advanceTimersByTimeAsync(3 * LIVE_POLL_MS);
+    expect(notice(mapDisplay)).toBeNull();
+    mapDisplay.setForeground(false);
+  });
+
+  it("says so again only after they have come back and gone out of date again", async () => {
+    const server = flakyServer();
+    const { mapDisplay } = setUp(server.answers);
+    await mapDisplay.toggleLayer("TAXIS");
+    mapDisplay.setForeground(true);
+    server.state.online = false;
+    await vi.advanceTimersByTimeAsync(5.5 * 60 * 1000);
+    mapDisplay.dismissNotice();
+
+    server.state.online = true;
+    await vi.advanceTimersByTimeAsync(LIVE_POLL_MS); // back
+    server.state.online = false;
+    await vi.advanceTimersByTimeAsync(5.5 * 60 * 1000); // and gone again
+
+    expect(notice(mapDisplay)).toMatch(/^Nearby taxis are out of date/);
+    mapDisplay.setForeground(false);
+  });
+
+  it("names a carpark layer's free lots, which go out of date after 15 minutes", async () => {
+    const server = flakyServer();
+    const { mapDisplay } = setUp(server.answers);
+    await mapDisplay.toggleLayer("CARPARK");
+    mapDisplay.setForeground(true);
+    server.state.online = false;
+
+    await vi.advanceTimersByTimeAsync(15.5 * 60 * 1000);
+
+    expect(notice(mapDisplay)).toBe("Carparks' free lots are out of date. Please check your connection.");
+    mapDisplay.setForeground(false);
+  });
+
+  it("says it once for several things going out of date together", async () => {
+    const server = flakyServer();
+    const { settings, mapDisplay } = setUp(server.answers);
+    await mapDisplay.toggleLayer("TAXIS");
+    await settings.setSuggestionActive("PICKUP", true);
+    await vi.advanceTimersByTimeAsync(0);
+    mapDisplay.setForeground(true);
+    await vi.advanceTimersByTimeAsync(0);
+    server.state.online = false;
+
+    await vi.advanceTimersByTimeAsync(5.5 * 60 * 1000); // taxis and pickups both last 5 minutes (D22, D36)
+
+    expect(notice(mapDisplay)).toBe("Live data is out of date. Please check your connection.");
+    mapDisplay.setForeground(false);
+  });
+
+  it("says nothing about live data the driver has turned off", async () => {
+    const server = flakyServer();
+    const { mapDisplay } = setUp(server.answers);
+    await mapDisplay.toggleLayer("TAXIS");
+    mapDisplay.setForeground(true);
+    await mapDisplay.toggleLayer("CARPARK"); // keeps the timer going once taxis are off
+    await mapDisplay.toggleLayer("TAXIS");
+    server.state.online = false;
+
+    await vi.advanceTimersByTimeAsync(5.5 * 60 * 1000); // taxis would be out of date; carpark lots not yet
+
+    expect(notice(mapDisplay)).toBeNull();
+    mapDisplay.setForeground(false);
+  });
+});
+
+// Package 10a-2 (NF-3) — a layer just turned on shows that its data is on its way.
+describe("MapDisplayController — loading (NF-3)", () => {
+  it("marks a layer as loading until its data is in, after success or failure", async () => {
+    let release = () => {};
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const { mapDisplay } = setUp({ "/taxi-stands": async (init) => (await slow, status(503)(init)) });
+
+    const toggling = mapDisplay.toggleLayer("TAXI_STAND");
+    await vi.waitFor(() => expect(mapDisplay.getSnapshot().loading.has("TAXI_STAND")).toBe(true));
+    release();
+    await toggling;
+
+    expect(mapDisplay.getSnapshot().loading.size).toBe(0);
+  });
+
+  it("isn't loading anything at the start", () => {
+    expect(setUp().mapDisplay.getSnapshot().loading.size).toBe(0);
   });
 });

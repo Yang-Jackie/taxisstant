@@ -51,6 +51,16 @@ export const en = {
     bookmarkAdded: "Location has been favourited",
     bookmarkRemoved: "Location has been unfavourited",
     bookmarkNotFound: "Unable to find bookmarked location. Please try again later",
+    /** D49: live data the driver has on went out of date. */
+    outOfDate: {
+      TAXIS: "Nearby taxis are out of date, so they're hidden. Please check your connection.",
+      HOTSPOT: "Hotspots are out of date, so they're hidden. Please check your connection.",
+      CARPARK: "Carparks' free lots are out of date. Please check your connection.",
+      CHARGING: "Free chargers are out of date. Please check your connection.",
+      PICKUP: "Suggested pickups are out of date, so they're hidden. Please check your connection.",
+      REST_STOP: "Suggested rest stops are out of date, so they're hidden. Please check your connection.",
+      several: "Live data is out of date. Please check your connection.",
+    },
   },
   map: {
     taxi: "Available taxi",

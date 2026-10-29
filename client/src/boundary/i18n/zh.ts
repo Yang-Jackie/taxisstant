@@ -53,6 +53,15 @@ export const zh: Messages = {
     bookmarkAdded: "已收藏该地点",
     bookmarkRemoved: "已取消收藏该地点",
     bookmarkNotFound: "找不到收藏的地点。请稍后再试",
+    outOfDate: {
+      TAXIS: "附近德士的数据已过时，暂不显示。请检查网络连接。",
+      HOTSPOT: "热点数据已过时，暂不显示。请检查网络连接。",
+      CARPARK: "停车场空位数据已过时。请检查网络连接。",
+      CHARGING: "充电桩空闲数据已过时。请检查网络连接。",
+      PICKUP: "推荐载客点已过时，暂不显示。请检查网络连接。",
+      REST_STOP: "推荐休息站已过时，暂不显示。请检查网络连接。",
+      several: "实时数据已过时。请检查网络连接。",
+    },
   },
   map: {
     taxi: "空德士",

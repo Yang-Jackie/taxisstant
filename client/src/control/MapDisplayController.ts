@@ -7,7 +7,13 @@ import type { Locatable } from "../entity/Locatable";
 import type { Location } from "../entity/Location";
 import type { LayerItems, MapDataRepository } from "../entity/MapDataRepository";
 import type { Taxi } from "../entity/Taxi";
-import { LIVE_LAYERS, type DataSyncController, type LiveLayer } from "./DataSyncController";
+import {
+  LIVE_LAYERS,
+  type AvailabilityLayer,
+  type DataSyncController,
+  type LiveData,
+  type LiveLayer,
+} from "./DataSyncController";
 import type { DataSyncObserver } from "./DataSyncObserver";
 import type { LocationObserver } from "./LocationObserver";
 import type { NoticeKey } from "./Notice";
@@ -34,6 +40,8 @@ export interface MapDisplayState {
   readonly focus: MapFocus | null;
   /** The driver's dot is away from the middle of the screen: the re-centre button lights up (UC 0013 3a, D31). */
   readonly driverOffCentre: boolean;
+  /** Layers just turned on whose data is still on its way (NF-3: the driver sees it's coming). */
+  readonly loading: ReadonlySet<LayerType>;
   /** A landmark shown highlighted, its details open: a chosen bookmark (UC 0011 step 3). */
   readonly highlighted: Landmark | null;
 }
@@ -48,7 +56,7 @@ const NO_HOTSPOTS: NoticeKey = "noHotspots";
 export const LIVE_POLL_MS = 30_000;
 
 /** The layers whose live data the timer asks for: the live layers, and the ones with live availability (D25). */
-const POLLED: readonly LayerType[] = ["TAXIS", "HOTSPOT", "CARPARK", "CHARGING"];
+const POLLED: readonly (LiveLayer | AvailabilityLayer)[] = ["TAXIS", "HOTSPOT", "CARPARK", "CHARGING"];
 
 const isLive = (t: LayerType): t is LiveLayer => (LIVE_LAYERS as readonly LayerType[]).includes(t);
 const inside = (b: Bounds, l: Location) =>
@@ -93,6 +101,8 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
   private timer: ReturnType<typeof setInterval> | undefined;
   private foreground = false;
   private centredOnLiveFix = false;
+  /** Live data the driver has been told is out of date, until it is current again (D49). */
+  private readonly toldOutOfDate = new Set<LiveData>();
 
   constructor(settings: SettingsController, dataSync: DataSyncController, repo: MapDataRepository) {
     super({
@@ -102,6 +112,7 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
       focus: null,
       driverOffCentre: false,
       highlighted: null,
+      loading: new Set(),
     });
     this.settings = settings;
     this.dataSync = dataSync;
@@ -207,9 +218,21 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
 
   /** A layer that was just turned on: its data, and availability now rather than at the next poll. */
   private async show(t: LayerType): Promise<void> {
-    if (POLLED.includes(t) && !isLive(t)) void this.dataSync.refreshLive(new Set([t]));
-    if (isStaticLayer(t)) await this.load(t);
-    if (isLive(t)) await this.loadLive(t);
+    this.setLoading(t, true);
+    try {
+      if ((POLLED as readonly LayerType[]).includes(t) && !isLive(t)) void this.dataSync.refreshLive(new Set([t]));
+      if (isStaticLayer(t)) await this.load(t);
+      if (isLive(t)) await this.loadLive(t);
+    } finally {
+      this.setLoading(t, false);
+    }
+  }
+
+  private setLoading(t: LayerType, on: boolean): void {
+    const loading = new Set(this.getSnapshot().loading);
+    if (on) loading.add(t);
+    else loading.delete(t);
+    this.setState({ ...this.getSnapshot(), loading });
   }
 
   private async load(t: StaticLayer): Promise<void> {
@@ -296,5 +319,21 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
     const screen = this.viewport.screen ?? this.viewport.bounds;
     const driverOffCentre = driver !== null && !inside(middleOf(screen), driver.location);
     this.setState({ ...this.getSnapshot(), visible, driverOffCentre });
+    this.announceOutOfDate(now);
+  }
+
+  /**
+   * Tells the driver, once, when live data they have on goes out of date (D49): one layer, its free lots or a
+   * suggestion by name, or several together. Told again only after it has been current again.
+   */
+  private announceOutOfDate(now: Date): void {
+    const { visibleLayers, activeSuggestions } = this.settings.getPreferences();
+    const watched: LiveData[] = [...POLLED.filter((t) => visibleLayers.has(t)), ...activeSuggestions];
+    const stale = new Set(watched.filter((k) => this.dataSync.isLiveCurrent(k, now) === false));
+    for (const k of this.toldOutOfDate) if (!stale.has(k)) this.toldOutOfDate.delete(k); // current again, or off
+    const untold = [...stale].filter((k) => !this.toldOutOfDate.has(k));
+    if (untold.length === 0) return;
+    for (const k of untold) this.toldOutOfDate.add(k);
+    this.showNotice(stale.size === 1 ? `outOfDate.${untold[0]!}` : "outOfDate.several");
   }
 }

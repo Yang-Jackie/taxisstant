@@ -6,3 +6,6 @@ server/src/sample-data/
 # Prose: Prettier would re-wrap PLAN.md's lists and tables
 *.md
 server/src/reference-data/train-stations.json
+
+# Coverage reports (npm run coverage)
+coverage/

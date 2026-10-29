@@ -134,6 +134,7 @@ export function App() {
           active={preferences.visibleLayers}
           onToggle={(t) => void mapDisplay.toggleLayer(t)}
           layers={LAYER_TYPES.filter((t) => t !== hiddenEnergyLayer(preferences.vehicleType))}
+          loading={display.loading}
         />
       </div>
       {panel === "menu" && (

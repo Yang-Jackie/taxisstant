@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "concurrently --names server,client --prefix-colors blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
     "test": "npm test --workspaces --if-present",
+    "coverage": "npm run coverage --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write .",
@@ -16,6 +17,7 @@
   "license": "ISC",
   "private": true,
   "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.5",
     "concurrently": "^10.0.6",
     "oxlint": "^1.89.0",
     "prettier": "^3.9.10",

@@ -135,3 +135,17 @@ describe("FilterTool — the mockup's bottom sheet (package 10a)", () => {
     expect(screen.getByRole("button", { name: "德士站" })).toBeInTheDocument();
   });
 });
+
+describe("FilterTool — loading (NF-3)", () => {
+  it("marks the chip of a layer whose data is on its way as busy, and its tile once expanded", async () => {
+    render(
+      <FilterTool active={new Set<LayerType>(["FUEL"])} onToggle={() => {}} loading={new Set<LayerType>(["FUEL"])} />,
+    );
+    expect(screen.getByRole("button", { name: "Fuel" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Hotspots" })).toHaveAttribute("aria-busy", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Show the layers' names" }));
+
+    expect(screen.getByRole("button", { name: "Fuel" })).toHaveAttribute("aria-busy", "true");
+  });
+});

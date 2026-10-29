@@ -35,13 +35,13 @@ export interface SidemenuProps {
   bookmarks?: readonly Bookmark[];
   /** Where the driver is, to say how far each bookmark is. */
   driverAt?: Location;
-  onSelectBookmark?: (b: Bookmark) => void;
+  onSelectBookmark: (b: Bookmark) => void;
   /** The dialog map's "Language selection button pressed". */
-  onOpenLanguage?: () => void;
+  onOpenLanguage: () => void;
   /** The dialog map's "Settings button pressed". */
-  onOpenSettings?: () => void;
+  onOpenSettings: () => void;
   /** The dialog map's "Help and support button pressed". */
-  onOpenHelp?: () => void;
+  onOpenHelp: () => void;
   onClose: () => void;
 }
 
@@ -57,10 +57,10 @@ export function Sidemenu({
   onNavigate,
   bookmarks = [],
   driverAt,
-  onSelectBookmark = () => {},
-  onOpenLanguage = () => {},
-  onOpenSettings = () => {},
-  onOpenHelp = () => {},
+  onSelectBookmark,
+  onOpenLanguage,
+  onOpenSettings,
+  onOpenHelp,
   onClose,
 }: SidemenuProps) {
   const { t } = useTranslation();

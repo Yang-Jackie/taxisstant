@@ -118,7 +118,7 @@
 }
 .filter-tool__chip--find,
 .filter-tool__tile--find svg {
-  color: #e8930c;
+  color: var(--amber-strong);
 }
 .filter-tool__chip--rest,
 .filter-tool__tile--rest {
@@ -131,10 +131,49 @@
 .filter-tool__chip--find[aria-pressed="true"],
 .filter-tool__tile--find[aria-pressed="true"] {
   background: var(--amber-bg);
-  border-color: #e8930c;
+  border-color: var(--amber-strong);
 }
 .filter-tool__chip--rest[aria-pressed="true"],
 .filter-tool__tile--rest[aria-pressed="true"] {
   background: var(--green-bg);
   border-color: #0e7a57;
+}
+
+/* A layer whose data is on its way: a small spinner on its chip or tile, shown only if it takes a moment (NF-3) */
+.filter-tool__chip[aria-busy="true"],
+.filter-tool__tile[aria-busy="true"] {
+  position: relative;
+}
+.filter-tool__chip[aria-busy="true"]::after,
+.filter-tool__tile[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--line);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  background: var(--surface);
+  opacity: 0;
+  animation:
+    filter-tool-spin 0.9s linear infinite,
+    filter-tool-appear 0.15s 0.3s forwards;
+}
+@keyframes filter-tool-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes filter-tool-appear {
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .filter-tool__chip[aria-busy="true"]::after,
+  .filter-tool__tile[aria-busy="true"]::after {
+    animation: filter-tool-appear 0.15s 0.3s forwards;
+  }
 }

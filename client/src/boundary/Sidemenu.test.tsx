@@ -40,7 +40,15 @@ const pickupsOn: RecommendationState = {
 };
 
 function renderMenu(props: Partial<SidemenuProps> = {}) {
-  const handlers = { onToggleSuggestion: vi.fn(), onSelect: vi.fn(), onClose: vi.fn() };
+  const handlers = {
+    onToggleSuggestion: vi.fn(),
+    onSelect: vi.fn(),
+    onSelectBookmark: vi.fn(),
+    onOpenLanguage: vi.fn(),
+    onOpenSettings: vi.fn(),
+    onOpenHelp: vi.fn(),
+    onClose: vi.fn(),
+  };
   render(<Sidemenu active={new Set()} recommendations={none} {...handlers} {...props} />);
   return handlers;
 }
