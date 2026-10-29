@@ -359,7 +359,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
    - [x] `BookmarkController` (`toggleBookmark`, `openBookmark`, saved in IndexedDB), `BookmarkList` and `BookmarkPanel` in the side menu (D40); `Bookmark` with an id and a snapshot (D42); the popup's star; UC 0011's messages and exception 3a
    - [x] a chosen bookmark shows its landmark highlighted (a ringed marker, details open) whatever layers are on; `Landmark.getType()` is a `StaticLayer`
    - [x] found in Chrome: the popup closed when its star was tapped (React swapped the icon before Leaflet saw the tap, so it counted as a tap on the map; both icons now stay, and the star no longer overlaps the close button), and the highlight's popup cancelled the map's move to it (no auto-pan)
-9. **Settings (FR-2)** (decided 29 Oct: D43–D46; in three checkpoints: 9a the Settings page, 9b English and Chinese, 9c Help & Support)
+9. **Settings (FR-2)** ✅ (decided 29 Oct: D43–D46; in three checkpoints: 9a the Settings page, 9b English and Chinese, 9c Help & Support)
    - **9a. The Settings page** ✅
      - [x] `SettingsView` (the dialog map's Settings UI, from the side menu's Settings entry and back), in the side menu's drawer (`Drawer`, shared with `Sidemenu`)
      - [x] vehicle type: `setVehicleType`; Fuel hides the Charge layer and Electric hides Fuel (FR-2.1.1, D43), including the rest stop's related layers; the ranking bonus (D34)
@@ -371,8 +371,8 @@ I review and approve before the next package starts. Claude asks me whenever a d
      - [x] EN/ZH language switch (FR-2.1.2, D47): every screen, toast, popup and screen-reader label, with i18next; the mockup's language button, the side menu's Language entry, and Settings
      - [x] toasts as message keys; suggestion summaries built from their facts; dates, distances and counts in each language; the page's `lang` for screen readers
      - [x] checks: every Chinese message exists, differs from the English, and fills in the same blanks
-   - **9c. Help & Support**
-     - [ ] Help & Support page (from the dialog map): how-to and data sources (D46)
+   - **9c. Help & Support** ✅
+     - [x] Help & Support page (from the dialog map's side menu, and back): how to use each feature, the data sources with the Singapore Open Data Licence's own statements, linked, OpenStreetMap's and OneMap's credits, and that the app is a student project no agency endorses (D46); in both languages, the licence statements in English
 10. **Hardening and deployment**
     - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
     - [ ] popups pan clear of the top bar and the location banner (seen in 9b: one near the top opened under the banner)
@@ -460,7 +460,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D43 — The vehicle type hides the other energy layer (my decision, 29 Oct).** FR-2.1.1: choosing a vehicle type filters energy stops ("hide charging points for diesel cabs"). Fuel (petrol or diesel) hides the Charge layer, Electric hides Fuel: their buttons and markers go, a layer that was on is turned off, and the rest-stop suggestion turns on only the relevant one; the ranking bonus applies (D34). Until a type is chosen, both show.
 - **D44 — Dark mode is on or off, starting as the phone (my decision, 29 Oct).** The design's `darkMode` Boolean. Until the driver flips it, it follows the phone's light or dark setting; their choice then sticks. Dark uses OneMap's Night map and dark menus.
 - **D45 — No narrator (my decision, 29 Oct).** Only the dialog map has "narrator on/off" (no FR, use case or design-model field). The phone's own screen reader (VoiceOver, TalkBack) covers it: every control has a label.
-- **D46 — Help & Support has how-to and data sources, no contact (my decision, 29 Oct).** The dialog map's "contact information for application support" isn't given anywhere. The page explains each feature, credits the data sources, and names the course and team; a contact can be added later.
+- **D46 — Help & Support has how-to and data sources, no contact (my decision, 29 Oct).** The dialog map's "contact information for application support" isn't given anywhere. The page explains each feature, credits the data sources, and names the course; a contact can be added later. It names no students (the report's cover has names and matriculation numbers; a public page shouldn't). Each Singapore Open Data Licence source gets the licence's own statement ("Contains information from … accessed on … from … which is made available under the terms of the Singapore Open Data Licence version 1.0", linked), kept in English in both languages like the map credits, and the page says the app is not official or endorsed by any agency, as the licence asks.
 - **D47 — English and Chinese, starting as the phone (my decision, 29 Oct).** FR-2.1.2 with the design's `Language` (EN, ZH): i18next, as the Lab 3 stack decided, with every word in `boundary/i18n` (en.ts, and zh.ts typed to have the same keys). Chinese is Simplified, as written in Singapore (德士 for taxi, 小贩中心 for hawker centre). The language is the phone's until the driver chooses, like dark mode (D44). The mockup's button, top right, switches in one tap (Lab 1's "quick language options"); the side menu's Language entry and Settings also offer the choice (the dialog map). Controllers give toasts as message keys (`NoticeKey`) and the screen words them. Suggestion summaries are built on the phone from the sites' facts, so they translate. Names, addresses and other words from government data stay as the data gives them (English), as do the map credits.
 
 ## Decisions I'll be asked about

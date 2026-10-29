@@ -4,7 +4,7 @@
 // Package 2b: every static layer is downloaded at startup (D18) and clustered while zoomed out (D17).
 // Package 6: the driver's position (UC 0013). Package 7: smart suggestions from the side menu (UC 0008/0009).
 // Package 8: bookmarks (UC 0011) and navigation to Google Maps (UC 0012). Package 9a: the Settings page (FR-2).
-// Package 9b: English and Chinese (FR-2.1.2).
+// Package 9b: English and Chinese (FR-2.1.2). Package 9c: Help & support (D46).
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -670,5 +670,20 @@ describe("App — languages (package 9b)", () => {
     await userEvent.click(screen.getByRole("button", { name: /^推荐载客点/ }));
 
     expect(await screen.findByText("Orchard 拥挤 · 附近有 1 辆空德士")).toBeInTheDocument();
+  });
+});
+
+// Package 9c — Help & support in the whole app (the dialog map, D46).
+describe("App — help (package 9c)", () => {
+  it("opens Help & support from the side menu, and goes back to the menu", async () => {
+    serve();
+    await openApp();
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(button("Help & support"));
+    expect(screen.getByRole("dialog", { name: "Help & support" })).toBeInTheDocument();
+
+    await userEvent.click(button("Back to the menu"));
+
+    expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument();
   });
 });

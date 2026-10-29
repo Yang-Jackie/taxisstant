@@ -120,6 +120,7 @@ export const en = {
     suggestions: "Smart suggestions",
     bookmarks: "Bookmarks",
     settings: "Settings",
+    help: "Help & support",
     finding: "Finding the best nearby…",
     entry: {
       PICKUP: { title: "Suggested pickup", subtitle: "Best place to find a fare now" },
@@ -165,6 +166,45 @@ export const en = {
     darkMode: "Dark mode",
     darkModeHint: "Dark menus and a night map",
     askBeforeMaps: "Ask before opening Google Maps",
+  },
+  help: {
+    title: "Help & support",
+    topics: {
+      layers: {
+        title: "Map layers",
+        text: "Tap a button at the bottom to show or hide that layer. Tap a marker for its details; tap a bubble with a number to zoom in.",
+      },
+      suggestions: {
+        title: "Smart suggestions",
+        text: "In the menu, turn on Suggested pickup or Suggested rest stop. The three best places near you show on the map and in the menu; tap one to see it on the map.",
+      },
+      navigation: {
+        title: "Directions",
+        text: "Tap Navigate in a place's details for directions in Google Maps.",
+      },
+      bookmarks: {
+        title: "Bookmarks",
+        text: "Tap the star in a place's details to save it; your bookmarks are in the menu. Tap the star again to remove it.",
+      },
+      location: {
+        title: "Your location",
+        text: "Allow location to see where you are and get suggestions near you. The round button at the bottom right brings the map back to you. Your location stays on your phone.",
+      },
+      settings: {
+        title: "Settings",
+        text: "Choose the language, what you drive, the text size and dark mode.",
+      },
+      freshness: {
+        title: "How up to date",
+        text: "Taxis, crowds, free lots and chargers are updated every few minutes, and places once a day. Live figures say when they were last updated. Without a connection, the app shows what it saved.",
+      },
+    },
+    sources: "Data sources",
+    /** Shown before the licences' own statements, which stay in English as the licences word them. */
+    sourcesNote: "TaxiMate uses open data from these sources:",
+    about: "About",
+    aboutText:
+      "TaxiMate is a student project for SC2006 Software Engineering. It is not an official app, and no government agency endorses it.",
   },
   location: {
     centre: "Centre the map on my location",

@@ -1,0 +1,25 @@
+/* The dialog map's Help and support page, in the drawer */
+.help__topic {
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.help__topic h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.help__topic p {
+  margin: 0;
+  color: var(--muted);
+}
+.help__sources {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.help__sources li + li {
+  margin-top: 6px;
+}
+.help__sources a {
+  color: var(--link);
+}

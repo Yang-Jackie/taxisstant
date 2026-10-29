@@ -122,6 +122,7 @@ export const zh: Messages = {
     suggestions: "智能推荐",
     bookmarks: "收藏",
     settings: "设置",
+    help: "帮助与支持",
     finding: "正在寻找附近最佳地点…",
     entry: {
       PICKUP: { title: "推荐载客点", subtitle: "现在最容易载到客的地方" },
@@ -167,6 +168,43 @@ export const zh: Messages = {
     darkMode: "深色模式",
     darkModeHint: "深色菜单和夜间地图",
     askBeforeMaps: "打开 Google 地图前先询问",
+  },
+  help: {
+    title: "帮助与支持",
+    topics: {
+      layers: {
+        title: "地图图层",
+        text: "点按底部的按钮，即可显示或隐藏该图层。点按标记查看详情；点按带数字的圆圈即可放大。",
+      },
+      suggestions: {
+        title: "智能推荐",
+        text: "在菜单中打开“推荐载客点”或“推荐休息站”。附近最好的三个地点会显示在地图和菜单中；点按一个即可在地图上查看。",
+      },
+      navigation: {
+        title: "导航",
+        text: "在地点详情中点按“导航”，即可在 Google 地图中查看路线。",
+      },
+      bookmarks: {
+        title: "收藏",
+        text: "在地点详情中点星号即可收藏；收藏会出现在菜单中。再点一次星号即可取消收藏。",
+      },
+      location: {
+        title: "您的位置",
+        text: "允许使用位置信息，即可看到您的位置，并获得附近的推荐。右下角的圆形按钮可以把地图移回您的位置。您的位置只保存在手机上。",
+      },
+      settings: {
+        title: "设置",
+        text: "可以选择语言、车辆类型、文字大小和深色模式。",
+      },
+      freshness: {
+        title: "数据有多新",
+        text: "德士、人流、空车位和充电桩每隔几分钟更新一次，地点每天更新一次。实时数字会显示最后更新的时间。没有网络时，应用会显示上次保存的数据。",
+      },
+    },
+    sources: "数据来源",
+    sourcesNote: "TaxiMate 使用以下来源的开放数据（以下许可声明按许可要求保留英文原文）：",
+    about: "关于",
+    aboutText: "TaxiMate 是 SC2006 软件工程课程的学生项目。它不是官方应用，也没有任何政府机构为其背书。",
   },
   location: {
     centre: "把地图移到我的位置",

@@ -155,4 +155,16 @@ describe("Sidemenu", () => {
     await userEvent.click(screen.getByRole("button", { name: "Language" }));
     expect(onOpenLanguage).toHaveBeenCalledOnce();
   });
+
+  it("opens Help & support from its entry, last as in the mockup", async () => {
+    const onOpenHelp = vi.fn();
+    renderMenu({ onOpenHelp });
+    const entries = screen
+      .getAllByRole("button")
+      .slice(-3)
+      .map((b) => b.textContent?.trim()); // the icons' SVG text is whitespace
+    expect(entries).toEqual(["Language", "Settings", "Help & support"]);
+    await userEvent.click(screen.getByRole("button", { name: "Help & support" }));
+    expect(onOpenHelp).toHaveBeenCalledOnce();
+  });
 });

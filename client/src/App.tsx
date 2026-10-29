@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FilterTool } from "./boundary/FilterTool";
+import { HelpView } from "./boundary/HelpView";
 import { HTML_LANG, i18next, LOCALE } from "./boundary/i18n";
 import type { PlaceActions } from "./boundary/LandmarkDetails";
 import { LanguageButton } from "./boundary/LanguageButton";
@@ -38,7 +39,7 @@ export function App() {
   const saved = useStore(bookmarks);
   const route = useStore(navigation);
   // The drawer's screens, as in the dialog map: the side menu, and Settings reached from it
-  const [panel, setPanel] = useState<"menu" | "settings" | "language" | null>(null);
+  const [panel, setPanel] = useState<"menu" | "settings" | "language" | "help" | null>(null);
   const { t } = useTranslation();
   const dismissNotice = useCallback(() => mapDisplay.dismissNotice(), [mapDisplay]);
   const onPan = useCallback((viewport: Viewport) => mapDisplay.refreshVisible(viewport), [mapDisplay]);
@@ -141,6 +142,7 @@ export function App() {
           onSelectBookmark={showBookmark}
           onOpenLanguage={() => setPanel("language")}
           onOpenSettings={() => setPanel("settings")}
+          onOpenHelp={() => setPanel("help")}
           onClose={closeMenu}
         />
       )}
@@ -164,6 +166,7 @@ export function App() {
           onClose={closeMenu}
         />
       )}
+      {panel === "help" && <HelpView onBack={() => setPanel("menu")} onClose={closeMenu} />}
       {display.notice && <Toast message={t(`toast.${display.notice}`)} onDismiss={dismissNotice} />}
     </div>
   );

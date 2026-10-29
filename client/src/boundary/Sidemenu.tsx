@@ -2,6 +2,7 @@ import car from "@tabler/icons/outline/car.svg?raw";
 import cup from "@tabler/icons/outline/cup.svg?raw";
 import flame from "@tabler/icons/outline/flame.svg?raw";
 import bookmarkIcon from "@tabler/icons/outline/bookmarks.svg?raw";
+import helpIcon from "@tabler/icons/outline/help-circle.svg?raw";
 import settingsIcon from "@tabler/icons/outline/settings.svg?raw";
 import worldIcon from "@tabler/icons/outline/world.svg?raw";
 import star from "@tabler/icons/outline/star.svg?raw";
@@ -39,12 +40,14 @@ export interface SidemenuProps {
   onOpenLanguage?: () => void;
   /** The dialog map's "Settings button pressed". */
   onOpenSettings?: () => void;
+  /** The dialog map's "Help and support button pressed". */
+  onOpenHelp?: () => void;
   onClose: () => void;
 }
 
 /**
  * The mockup's drawer (the data dictionary's Sidemenu): Smart suggestions, each a toggle with its best sites below
- * it while on (D33), the driver's bookmarks (D40), then Language and Settings. Help & support joins it in 9c.
+ * it while on (D33), the driver's bookmarks (D40), then Language, Settings and Help & support, as in the mockup.
  */
 export function Sidemenu({
   active,
@@ -57,6 +60,7 @@ export function Sidemenu({
   onSelectBookmark = () => {},
   onOpenLanguage = () => {},
   onOpenSettings = () => {},
+  onOpenHelp = () => {},
   onClose,
 }: SidemenuProps) {
   const { t } = useTranslation();
@@ -127,6 +131,10 @@ export function Sidemenu({
       <button type="button" className="sidemenu__item" onClick={onOpenSettings}>
         <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: settingsIcon }} />
         {t("menu.settings")}
+      </button>
+      <button type="button" className="sidemenu__item" onClick={onOpenHelp}>
+        <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: helpIcon }} />
+        {t("menu.help")}
       </button>
     </Drawer>
   );
