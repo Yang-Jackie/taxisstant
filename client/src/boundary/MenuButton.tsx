@@ -13,6 +13,7 @@ export function MenuButton({ onClick }: MenuButtonProps) {
     <button
       type="button"
       className="menu-button"
+      data-map-overlay="top"
       aria-label={t("menu.open")}
       aria-haspopup="dialog"
       onClick={onClick}

@@ -4,9 +4,10 @@
 // Package 2b: every static layer is downloaded at startup (D18) and clustered while zoomed out (D17).
 // Package 6: the driver's position (UC 0013). Package 7: smart suggestions from the side menu (UC 0008/0009).
 // Package 8: bookmarks (UC 0011) and navigation to Google Maps (UC 0012). Package 9a: the Settings page (FR-2).
-// Package 9b: English and Chinese (FR-2.1.2). Package 9c: Help & support (D46).
+// Package 9b: English and Chinese (FR-2.1.2). Package 9c: Help & support (D46). Package 10a: the layer sheet.
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { point, Popup as LeafletPopup } from "leaflet";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ControllersContext, initControllers, startControllers } from "./startup";
@@ -685,5 +686,42 @@ describe("App — help (package 9c)", () => {
     await userEvent.click(button("Back to the menu"));
 
     expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument();
+  });
+});
+
+// Package 10a — popups open clear of the controls over the map, measured as they come and go.
+describe("App — popups clear of the controls (package 10a)", () => {
+  /** A stand-in for ResizeObserver: it reports at once when watching starts, as the real one does. */
+  class InstantResizeObserver {
+    private readonly callback: () => void;
+    constructor(callback: () => void) {
+      this.callback = callback;
+    }
+    observe() {
+      queueMicrotask(this.callback);
+    }
+    disconnect() {}
+  }
+
+  it("keeps popups below the top bar and the location banner, and above the layer sheet", async () => {
+    vi.stubGlobal("ResizeObserver", InstantResizeObserver);
+    // A phone's layout: the menu and language buttons end 58 px down, the banner 160 px; the sheet starts at 710
+    const bottoms: Record<string, number> = { "menu-button": 58, "language-button": 58, "location-banner": 160 };
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      const name = [...this.classList].find((c) => c in bottoms || c === "map-tools");
+      const top = name === "map-tools" ? 710 : 0;
+      const bottom = name && name in bottoms ? bottoms[name]! : 800;
+      return { top, bottom, left: 0, right: 400, width: 400, height: bottom - top, x: 0, y: top } as DOMRect;
+    });
+    serve();
+    const gps = fakeGeolocation();
+    vi.stubGlobal("navigator", { ...navigator, geolocation: gps.geolocation });
+    await openApp();
+    await waitFor(() => expect(LeafletPopup.prototype.options.autoPanPaddingTopLeft).toEqual(point(8, 66)));
+    expect(LeafletPopup.prototype.options.autoPanPaddingBottomRight).toEqual(point(8, 98));
+
+    act(() => gps.fail(1)); // location denied: the banner comes
+
+    await waitFor(() => expect(LeafletPopup.prototype.options.autoPanPaddingTopLeft).toEqual(point(8, 168)));
   });
 });

@@ -373,14 +373,23 @@ I review and approve before the next package starts. Claude asks me whenever a d
      - [x] checks: every Chinese message exists, differs from the English, and fills in the same blanks
    - **9c. Help & Support** ✅
      - [x] Help & Support page (from the dialog map's side menu, and back): how to use each feature, the data sources with the Singapore Open Data Licence's own statements, linked, OpenStreetMap's and OneMap's credits, and that the app is a student project no agency endorses (D46); in both languages, the licence statements in English
-10. **Hardening and deployment**
-    - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
-    - [ ] popups pan clear of the top bar and the location banner (seen in 9b: one near the top opened under the banner)
-    - [ ] load the Chinese words only when they're chosen (9b added 21 kB gzipped)
-    - [ ] a native speaker on the team checks the Chinese (9b)
-    - [ ] the mockup's layer tools: a bottom sheet with icon buttons that collapses to icons only (replaces M4's text row in `FilterTool`)
-    - [ ] wider test coverage
-    - [ ] HTTPS deployment. `shared/` has runtime code since package 1, so the server runs with `tsx` or gets bundled. Set `TRUST_PROXY` if a reverse proxy sits in front, and `CORS_ORIGINS` only if the app is hosted elsewhere (D27)
+10. **Hardening and deployment** (decided 29 Oct: the foundations first, which both outcomes need (10a, Claude builds); then deployment (10b, I do it, Claude teaches), once we know whether the school lends a server (HTTPS, a public address) or the app runs locally for demos; the offline app (D48) waits for that answer, since it pays off on a server)
+    - **10a-1. The README, the bottom sheet, popups clear** ✅
+      - [x] a README: what TaxiMate is, how to set it up (Node 24, an LTA DataMall key in `server/.env`) and run it (`npm run dev`), checks, scripts, credits
+      - [x] the mockup's layer tools: a bottom sheet of icon chips (named for screen readers, scrolling sideways with a fade) that its handle expands to labelled tiles (the dialog map's "Filter bar" and "Filter menu"), in the mockup's order and colours, replacing M4's text row in `FilterTool`; the location button rides above it
+      - [x] popups open clear of the top bar, the location banner and the sheet: `useMapInsets` measures them, and Leaflet's auto-pan padding follows; the map may pan a little past Singapore (`PANNING_BOUNDS`), so a popup at the island's edge can clear them too
+      - [x] found in Chrome: an open popup was updated, and so panned to, on every re-render (every pan and poll); near the edge that panned for ever and crashed the app ("Maximum update depth"). Popup content is now made only when what it shows changes. On the way, `autoPan={undefined}` had switched auto-pan off: Leaflet takes an option given as undefined as set
+    - **10a-2. NFRs and polish**
+      - [ ] NFRs: a toast on every failure (NF-3.2.1), timeouts (NF-3.1.1), large tap targets with text labels (NF-1)
+      - [ ] load the Chinese words only when they're chosen (9b added 21 kB gzipped)
+      - [ ] a coverage report, and tests for what it finds
+    - **For the team** (no code)
+      - [ ] a native speaker checks the Chinese (9b)
+      - [ ] push the 23 Oct `.drawio` files; raise the doc errors below
+    - **10b. Deployment** (later; the case decides what's in it)
+      - [ ] a production build served by one server (`npm start`): the built client from Express, and the server's TypeScript run with `tsx` or bundled (`shared/` has runtime code since package 1)
+      - [ ] case 1, a lent server: HTTPS, `TRUST_PROXY` behind a proxy, keeping it running, deploying updates, the offline app (D48)
+      - [ ] case 2, local demos: on the laptop (localhost counts as secure, so location works; Chrome can fake one), or phones through a tunnel or local HTTPS; maybe a sample-data mode for a room without internet
 
 ---
 
@@ -462,13 +471,13 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D45 — No narrator (my decision, 29 Oct).** Only the dialog map has "narrator on/off" (no FR, use case or design-model field). The phone's own screen reader (VoiceOver, TalkBack) covers it: every control has a label.
 - **D46 — Help & Support has how-to and data sources, no contact (my decision, 29 Oct).** The dialog map's "contact information for application support" isn't given anywhere. The page explains each feature, credits the data sources, and names the course; a contact can be added later. It names no students (the report's cover has names and matriculation numbers; a public page shouldn't). Each Singapore Open Data Licence source gets the licence's own statement ("Contains information from … accessed on … from … which is made available under the terms of the Singapore Open Data Licence version 1.0", linked), kept in English in both languages like the map credits, and the page says the app is not official or endorsed by any agency, as the licence asks.
 - **D47 — English and Chinese, starting as the phone (my decision, 29 Oct).** FR-2.1.2 with the design's `Language` (EN, ZH): i18next, as the Lab 3 stack decided, with every word in `boundary/i18n` (en.ts, and zh.ts typed to have the same keys). Chinese is Simplified, as written in Singapore (德士 for taxi, 小贩中心 for hawker centre). The language is the phone's until the driver chooses, like dark mode (D44). The mockup's button, top right, switches in one tap (Lab 1's "quick language options"); the side menu's Language entry and Settings also offer the choice (the dialog map). Controllers give toasts as message keys (`NoticeKey`) and the screen words them. Suggestion summaries are built on the phone from the sites' facts, so they translate. Names, addresses and other words from government data stay as the data gives them (English), as do the map credits.
+- **D48 — TaxiMate installs and opens offline (my decision, 29 Oct).** The plan's open question: M7 keeps the data on the phone, but the page itself still came from the server. A service worker keeps the app's own files on the phone and a web app manifest lets drivers add it to their home screen, so it opens with no signal and shows what it saved; a new version, once deployed, is offered with a prompt. Needs HTTPS, which deployment brings anyway. Built in 10a.
 
 ## Decisions I'll be asked about
 
 | When | Decision |
 |---|---|
-| Package 10 | How to get access to the school lab server, and whether it can serve HTTPS. |
-| Package 10 | Should the app itself open with no connection (a service worker)? M7 caches the *data*; the page's own files still come from the server. |
+| Package 10b | Where TaxiMate runs: the school lab server (I've asked by email, 29 Oct) or, if it can't give a public HTTPS address, a managed host. |
 
 ## Things I need to do
 - [x] Register for an LTA DataMall AccountKey before M3. It's sent by email, which can take a while.

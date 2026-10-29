@@ -17,6 +17,8 @@ export const zh: Messages = {
   },
   layers: {
     label: "地图图层",
+    expand: "显示图层名称",
+    collapse: "只显示图标",
     TAXI_STAND: "德士站",
     TAXIS: "附近德士",
     HOTSPOT: "热点",

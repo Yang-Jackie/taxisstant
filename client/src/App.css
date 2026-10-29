@@ -1,4 +1,13 @@
 .app {
-  position: relative; /* FilterTool's position: absolute is measured from here */
+  position: relative; /* the controls over the map are placed from here */
   height: 100%;
+}
+
+/* Along the bottom: the layer sheet, with the location button riding above it */
+.map-tools {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000; /* above Leaflet's map layers and controls */
 }

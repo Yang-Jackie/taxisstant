@@ -17,6 +17,7 @@ export function LanguageButton({ language, onChange }: LanguageButtonProps) {
     <button
       type="button"
       className="language-button"
+      data-map-overlay="top"
       aria-label={t("language.switchTo", { language: t(`language.${other}`) })}
       onClick={() => onChange(other)}
     >

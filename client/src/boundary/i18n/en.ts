@@ -15,6 +15,8 @@ export const en = {
   },
   layers: {
     label: "Map layers",
+    expand: "Show the layers' names",
+    collapse: "Show icons only",
     TAXI_STAND: "Taxi stands",
     TAXIS: "Nearby taxis",
     HOTSPOT: "Hotspots",

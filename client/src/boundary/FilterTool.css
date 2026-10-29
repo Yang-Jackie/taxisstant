@@ -1,29 +1,140 @@
+/* The mockup's bottom sheet: a white card along the bottom, with a handle on top */
 .filter-tool {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1000; /* above Leaflet's map layers and zoom buttons */
-  display: flex;
-  gap: 8px;
-  overflow-x: auto; /* swipe sideways on a narrow phone */
-  padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); /* clear the iPhone home bar */
+  position: relative;
+  padding-bottom: env(safe-area-inset-bottom); /* clear the iPhone home bar */
   background: var(--surface);
-  border-radius: 20px 20px 0 0;
-  box-shadow: 0 -6px 20px rgb(0 0 0 / 0.15);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -8px 26px rgba(0, 0, 0, 0.16);
 }
 
-.filter-tool button {
-  flex: 0 0 auto; /* keep each button its natural width; don't squash */
-  padding: 10px 14px;
+/* The handle: the whole strip is the button, so it is easy to hit */
+.filter-tool__grip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.filter-tool__bar {
+  width: 42px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--disabled);
+}
+
+/* Collapsed: a row of icon chips that scrolls sideways */
+.filter-tool__peek-area {
+  position: relative;
+}
+.filter-tool__peek {
+  display: flex;
+  gap: 11px;
+  overflow-x: auto;
+  padding: 0 14px 14px;
+  scrollbar-width: none;
+}
+.filter-tool__peek::-webkit-scrollbar {
+  display: none;
+}
+.filter-tool__chip {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   border: 1.5px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface); /* "inactive = white", from your data dictionary */
-  color: var(--ink);
-  font-weight: 600;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.filter-tool__chip svg {
+  width: 25px;
+  height: 25px;
+}
+/* More chips off to the right */
+.filter-tool__fade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 14px;
+  width: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 7px;
+  background: linear-gradient(to right, transparent, var(--surface) 68%);
+  color: var(--muted);
+  pointer-events: none;
+}
+.filter-tool__fade svg {
+  width: 18px;
+  height: 18px;
 }
 
-.filter-tool button[aria-pressed="true"] {
-  background: var(--amber-bg); /* the mockup's amber */
+/* Expanded: labelled tiles, four across, fewer when the text is large */
+.filter-tool__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.75rem, 1fr));
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+.filter-tool__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 80px;
+  padding: 6px 3px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: break-word;
+  cursor: pointer;
+}
+.filter-tool__tile span {
+  display: flex;
+}
+.filter-tool__tile svg {
+  width: 30px;
+  height: 30px;
+}
+
+/* The two colour groups, off and on: amber for finding passengers, green for a break (the mockup) */
+.filter-tool__chip--find,
+.filter-tool__tile--find {
+  border-color: var(--amber-line);
+}
+.filter-tool__chip--find,
+.filter-tool__tile--find svg {
+  color: #e8930c;
+}
+.filter-tool__chip--rest,
+.filter-tool__tile--rest {
+  border-color: var(--green-line);
+}
+.filter-tool__chip--rest,
+.filter-tool__tile--rest svg {
+  color: var(--green-text);
+}
+.filter-tool__chip--find[aria-pressed="true"],
+.filter-tool__tile--find[aria-pressed="true"] {
+  background: var(--amber-bg);
   border-color: #e8930c;
+}
+.filter-tool__chip--rest[aria-pressed="true"],
+.filter-tool__tile--rest[aria-pressed="true"] {
+  background: var(--green-bg);
+  border-color: #0e7a57;
 }

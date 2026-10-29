@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FilterTool } from "./boundary/FilterTool";
 import { HelpView } from "./boundary/HelpView";
@@ -14,6 +14,7 @@ import { NavigationPrompt } from "./boundary/NavigationPrompt";
 import { SettingsView } from "./boundary/SettingsView";
 import { Sidemenu } from "./boundary/Sidemenu";
 import { Toast } from "./boundary/Toast";
+import { useMapInsets } from "./boundary/useMapInsets";
 import { useStore } from "./boundary/useStore";
 import type { Bookmark } from "./entity/Bookmark";
 import type { Viewport } from "./entity/Bounds";
@@ -41,6 +42,8 @@ export function App() {
   // The drawer's screens, as in the dialog map: the side menu, and Settings reached from it
   const [panel, setPanel] = useState<"menu" | "settings" | "language" | "help" | null>(null);
   const { t } = useTranslation();
+  const appRef = useRef<HTMLDivElement>(null);
+  const insets = useMapInsets(appRef); // popups open clear of the controls over the map
   const dismissNotice = useCallback(() => mapDisplay.dismissNotice(), [mapDisplay]);
   const onPan = useCallback((viewport: Viewport) => mapDisplay.refreshVisible(viewport), [mapDisplay]);
   const closeMenu = useCallback(() => setPanel(null), []);
@@ -105,7 +108,7 @@ export function App() {
   }, [mapDisplay, location]);
 
   return (
-    <div className="app">
+    <div className="app" ref={appRef}>
       <MapView
         visible={display.visible}
         onPan={onPan}
@@ -116,20 +119,23 @@ export function App() {
         highlighted={display.highlighted}
         onHighlightClosed={endHighlight}
         dark={preferences.darkMode}
+        insets={insets}
       />
       <MenuButton onClick={() => setPanel("menu")} />
       <LanguageButton language={preferences.language} onChange={(l) => void settings.setLanguage(l)} />
-      <LocationButton
-        enabled={display.driver !== null}
-        highlighted={display.driverOffCentre}
-        onClick={() => mapDisplay.centreOnDriver()}
-      />
       {whereabouts.status === "denied" && <LocationBanner onRetry={() => location.retry()} />}
-      <FilterTool
-        active={preferences.visibleLayers}
-        onToggle={(t) => void mapDisplay.toggleLayer(t)}
-        layers={LAYER_TYPES.filter((t) => t !== hiddenEnergyLayer(preferences.vehicleType))}
-      />
+      <div className="map-tools" data-map-overlay="bottom">
+        <LocationButton
+          enabled={display.driver !== null}
+          highlighted={display.driverOffCentre}
+          onClick={() => mapDisplay.centreOnDriver()}
+        />
+        <FilterTool
+          active={preferences.visibleLayers}
+          onToggle={(t) => void mapDisplay.toggleLayer(t)}
+          layers={LAYER_TYPES.filter((t) => t !== hiddenEnergyLayer(preferences.vehicleType))}
+        />
+      </div>
       {panel === "menu" && (
         <Sidemenu
           active={preferences.activeSuggestions}

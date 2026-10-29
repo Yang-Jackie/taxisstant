@@ -1,5 +1,5 @@
-import type { LatLngTuple, Marker as LeafletMarker } from "leaflet";
-import { useCallback, useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { Popup as LeafletPopup, point, type LatLngTuple, type Marker as LeafletMarker } from "leaflet";
+import { useCallback, useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents, type MarkerProps } from "react-leaflet";
 import type { Viewport } from "../entity/Bounds";
@@ -10,12 +10,13 @@ import type { Locatable } from "../entity/Locatable";
 import type { Location } from "../entity/Location";
 import type { LayerView } from "../control/LayerClusters";
 import type { MapFocus, VisibleLayers } from "../control/MapDisplayController";
-import type { RecommendationResults } from "../control/RecommendationController";
-import { RECOMMENDATION_KINDS } from "../entity/RecommendationKind";
+import type { Recommendation, RecommendationResults } from "../control/RecommendationController";
+import { RECOMMENDATION_KINDS, type RecommendationKind } from "../entity/RecommendationKind";
 import type { DriverPosition } from "../entity/DriverPosition";
 import { bookmarkIdOf } from "../entity/Bookmark";
 import type { NavigationTarget } from "../control/NavigationController";
 import { HotspotDetails, LandmarkDetails, SuggestionDetails, type PlaceActions } from "./LandmarkDetails";
+import type { MapInsets } from "./useMapInsets";
 import { clusterIcon, driverIcon, highlightIcon, markerIcon, SUGGESTION_GROUP, suggestionIcon } from "./markerIcons";
 import {
   MAX_ZOOM,
@@ -23,7 +24,7 @@ import {
   ONEMAP_ATTRIBUTION,
   ONEMAP_NIGHT_TILE_URL,
   ONEMAP_TILE_URL,
-  SINGAPORE_BOUNDS,
+  PANNING_BOUNDS,
   SINGAPORE_CENTRE,
   START_ZOOM,
 } from "./onemap";
@@ -86,6 +87,23 @@ export interface MapViewProps {
   onHighlightClosed?: (l: Landmark) => void;
   /** OneMap's Night map, for dark mode (D44). */
   dark?: boolean;
+  /** How far the controls over the map reach in: popups open clear of them. */
+  insets?: MapInsets;
+}
+
+/** The room a popup keeps from the controls over the map, and from the screen's sides. */
+const POPUP_MARGIN = 8;
+
+/**
+ * Popups open clear of the controls over the map: the top bar, the location banner, the layer sheet. Leaflet works out
+ * a popup's pan while adding it, from its options, which fall back to the class's own; so those are kept up to date.
+ */
+function PopupClearance({ insets }: { insets: MapInsets }) {
+  useEffect(() => {
+    LeafletPopup.prototype.options.autoPanPaddingTopLeft = point(POPUP_MARGIN, insets.top + POPUP_MARGIN);
+    LeafletPopup.prototype.options.autoPanPaddingBottomRight = point(POPUP_MARGIN, insets.bottom + POPUP_MARGIN);
+  }, [insets.top, insets.bottom]);
+  return null;
 }
 
 /** Reports the view after every move or zoom, padded so markers just off screen are ready before they scroll in. */
@@ -158,6 +176,36 @@ interface PointMarkersProps<T extends Locatable> {
   popupOf?: (item: T) => ReactNode;
 }
 
+/**
+ * A popup whose content is the same object until what it shows changes. react-leaflet updates an open popup whenever
+ * its content changes, and Leaflet pans the map to fit a popup on every update: content made afresh on every render
+ * panned on every pan and poll, and near the map's edge (which it can't pan past) for ever.
+ */
+function StablePopup({ content }: { content: ReactNode }) {
+  // No props but the content: Leaflet takes an option given as undefined (autoPan={undefined}) as switched off
+  return <Popup>{content}</Popup>;
+}
+
+/** One landmark's marker, with its details made only when the landmark or what its popup can do changes. */
+function PointMarker<T extends Locatable>({
+  item,
+  layer,
+  title,
+  popupOf,
+}: {
+  item: T;
+  layer: Exclude<LayerType, "HOTSPOT">;
+  title: string;
+  popupOf?: (item: T) => ReactNode;
+}) {
+  const content = useMemo(() => popupOf?.(item), [popupOf, item]);
+  return (
+    <TitledMarker position={positionOf(item.getLocation())} icon={markerIcon(layer)} title={title}>
+      {content && <StablePopup content={content} />}
+    </TitledMarker>
+  );
+}
+
 /** One layer's markers and cluster bubbles; tapping a bubble zooms to where it splits (D17). */
 function PointMarkers<T extends Locatable>({ layer, view, keyOf, titleOf, popupOf }: PointMarkersProps<T>) {
   const { t } = useTranslation();
@@ -166,14 +214,7 @@ function PointMarkers<T extends Locatable>({ layer, view, keyOf, titleOf, popupO
   return (
     <>
       {items.map((item, i) => (
-        <TitledMarker
-          key={keyOf(item, i)}
-          position={positionOf(item.getLocation())}
-          icon={markerIcon(layer)}
-          title={titleOf(item)}
-        >
-          {popupOf && <Popup>{popupOf(item)}</Popup>}
-        </TitledMarker>
+        <PointMarker key={keyOf(item, i)} item={item} layer={layer} title={titleOf(item)} popupOf={popupOf} />
       ))}
       {clusters.map((c) => (
         <TitledMarker
@@ -225,6 +266,21 @@ function HighlightedLandmark({
   );
 }
 
+/** A busy station's flame, with its details made only when the hotspot changes. */
+function HotspotFlame({ hotspot, onNavigate }: { hotspot: Hotspot; onNavigate?: (t: NavigationTarget) => void }) {
+  const { t } = useTranslation();
+  const content = useMemo(() => <HotspotDetails hotspot={hotspot} onNavigate={onNavigate} />, [hotspot, onNavigate]);
+  return (
+    <TitledMarker
+      position={positionOf(hotspot.centre)}
+      icon={markerIcon("HOTSPOT")}
+      title={t(`map.hotspot.${hotspot.density}`, { station: hotspot.stationName })}
+    >
+      <StablePopup content={content} />
+    </TitledMarker>
+  );
+}
+
 /** The mockup's heat circles: amber, larger and stronger for very crowded stations (D23), with a flame to tap. */
 function HotspotCircles({
   hotspots,
@@ -233,7 +289,6 @@ function HotspotCircles({
   hotspots: readonly Hotspot[];
   onNavigate?: (t: NavigationTarget) => void;
 }) {
-  const { t } = useTranslation();
   return (
     <>
       {hotspots.map((h) => (
@@ -245,22 +300,42 @@ function HotspotCircles({
         />
       ))}
       {hotspots.map((h) => (
-        <TitledMarker
-          key={`flame-${h.id}`}
-          position={positionOf(h.centre)}
-          icon={markerIcon("HOTSPOT")}
-          title={t(`map.hotspot.${h.density}`, { station: h.stationName })}
-        >
-          <Popup>
-            <HotspotDetails hotspot={h} onNavigate={onNavigate} />
-          </Popup>
-        </TitledMarker>
+        <HotspotFlame key={`flame-${h.id}`} hotspot={h} onNavigate={onNavigate} />
       ))}
     </>
   );
 }
 
 const SUGGESTION_COLOUR = { find: "#e8930c", rest: "#0e7a57" } as const;
+
+/** A suggested site's numbered pin, with its details made only when the ranking changes. */
+function SuggestionPin({
+  kind,
+  place,
+  recommendation,
+  onNavigate,
+}: {
+  kind: RecommendationKind;
+  place: number;
+  recommendation: Recommendation;
+  onNavigate?: (t: NavigationTarget) => void;
+}) {
+  const { t } = useTranslation();
+  const content = useMemo(
+    () => <SuggestionDetails recommendation={recommendation} onNavigate={onNavigate} />,
+    [recommendation, onNavigate],
+  );
+  return (
+    <TitledMarker
+      position={positionOf(recommendation.site.centre)}
+      icon={suggestionIcon(kind, place)}
+      title={t(`map.suggestionPin.${kind}`, { place, name: recommendation.site.name })}
+      zIndexOffset={500}
+    >
+      <StablePopup content={content} />
+    </TitledMarker>
+  );
+}
 
 /** Each suggested site's area, outlined in its suggestion's colour, with a numbered pin to tap (D33). */
 function SuggestionAreas({
@@ -270,7 +345,6 @@ function SuggestionAreas({
   suggestions: RecommendationResults;
   onNavigate?: (t: NavigationTarget) => void;
 }) {
-  const { t } = useTranslation();
   return (
     <>
       {RECOMMENDATION_KINDS.flatMap((k) =>
@@ -291,17 +365,13 @@ function SuggestionAreas({
       )}
       {RECOMMENDATION_KINDS.flatMap((k) =>
         suggestions[k].map((r, i) => (
-          <TitledMarker
+          <SuggestionPin
             key={`pin-${k}-${r.site.id}`}
-            position={positionOf(r.site.centre)}
-            icon={suggestionIcon(k, i + 1)}
-            title={t(`map.suggestionPin.${k}`, { place: i + 1, name: r.site.name })}
-            zIndexOffset={500}
-          >
-            <Popup>
-              <SuggestionDetails recommendation={r} onNavigate={onNavigate} />
-            </Popup>
-          </TitledMarker>
+            kind={k}
+            place={i + 1}
+            recommendation={r}
+            onNavigate={onNavigate}
+          />
         )),
       )}
     </>
@@ -309,6 +379,7 @@ function SuggestionAreas({
 }
 
 const NO_SUGGESTIONS: RecommendationResults = { PICKUP: [], REST_STOP: [] };
+const NO_INSETS: MapInsets = { top: 0, bottom: 0 };
 
 export function MapView({
   visible,
@@ -320,8 +391,10 @@ export function MapView({
   highlighted = null,
   onHighlightClosed,
   dark = false,
+  insets = NO_INSETS,
 }: MapViewProps) {
   const { t } = useTranslation();
+  const landmarkPopup = useCallback((item: Landmark) => <LandmarkDetails item={item} actions={actions} />, [actions]);
   const fuelShown = visible.FUEL.items.length > 0 || visible.FUEL.clusters.length > 0;
   return (
     <MapContainer
@@ -330,11 +403,12 @@ export function MapView({
       zoom={START_ZOOM}
       minZoom={MIN_ZOOM}
       maxZoom={MAX_ZOOM}
-      maxBounds={SINGAPORE_BOUNDS}
+      maxBounds={PANNING_BOUNDS}
     >
       <TileLayer url={dark ? ONEMAP_NIGHT_TILE_URL : ONEMAP_TILE_URL} attribution={ONEMAP_ATTRIBUTION} />
       {onPan && <ViewportReporter onPan={onPan} />}
       <FocusFollower focus={focus} />
+      <PopupClearance insets={insets} />
       {fuelShown && <OsmCredit />}
       <HotspotCircles hotspots={visible.HOTSPOT.items} onNavigate={actions?.onNavigate} />
       {STATIC_LAYERS.map((t) => (
@@ -344,7 +418,7 @@ export function MapView({
           view={visible[t]}
           keyOf={(item) => item.id}
           titleOf={(item) => item.name}
-          popupOf={(item) => <LandmarkDetails item={item} actions={actions} />}
+          popupOf={landmarkPopup}
         />
       ))}
       <PointMarkers layer="TAXIS" view={visible.TAXIS} keyOf={(_, i) => String(i)} titleOf={() => t("map.taxi")} />

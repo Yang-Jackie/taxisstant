@@ -1,8 +1,8 @@
-/* The mockup's floating action button: a white circle above the layer tools */
+/* The mockup's floating action button: a white circle riding above the layer sheet, collapsed or expanded */
 .location-button {
   position: absolute;
   right: 16px;
-  bottom: 84px;
+  bottom: calc(100% + 18px);
   z-index: 1000;
   width: 52px;
   height: 52px;

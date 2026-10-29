@@ -1,6 +1,6 @@
 // OneMap basemap settings (Singapore Land Authority). Map tiles load straight from OneMap in the
 // browser — no API key, and not through our server (see "map tiles (direct)" in the architecture).
-import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
+import { latLngBounds, type LatLngBounds, type LatLngExpression } from "leaflet";
 
 export const ONEMAP_TILE_URL = "https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png";
 /** OneMap's Night style, for dark mode (D44). */
@@ -16,11 +16,14 @@ export const ONEMAP_ATTRIBUTION =
 /** Roughly the middle of Singapore. */
 export const SINGAPORE_CENTRE: LatLngExpression = [1.3521, 103.8198];
 
-/** OneMap only has tiles for Singapore, so keep the map from being dragged elsewhere. */
-export const SINGAPORE_BOUNDS: LatLngBoundsExpression = [
-  [1.144, 103.535],
-  [1.494, 104.15],
-];
+/** Singapore, from Tuas to Changi and the Straits to the Johor Strait. */
+export const SINGAPORE_BOUNDS: LatLngBounds = latLngBounds([1.144, 103.535], [1.494, 104.15]);
+
+/**
+ * How far the map can be panned: Singapore with a margin (OneMap draws the area around it too), so that a popup at the
+ * island's edge can still be panned clear of the controls over the map, and never off to somewhere else.
+ */
+export const PANNING_BOUNDS: LatLngBounds = SINGAPORE_BOUNDS.pad(0.25);
 
 export const MIN_ZOOM = 11;
 export const MAX_ZOOM = 19;

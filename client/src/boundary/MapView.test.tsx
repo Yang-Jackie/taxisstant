@@ -2,7 +2,7 @@
 // jsdom has no real screen, so map tiles never load in tests — but markers and the credit line do.
 // Package 2b: every static layer in the mockup's marker style, clusters (D17), the OSM credit (D12), onPan (FR-1.5.3).
 import { fireEvent, render, screen } from "@testing-library/react";
-import { Marker } from "leaflet";
+import { Map as LeafletMap, Marker, point, Popup as LeafletPopup } from "leaflet";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Cluster, LayerView } from "../control/LayerClusters";
 import type { VisibleLayers } from "../control/MapDisplayController";
@@ -17,6 +17,7 @@ import { SuggestedRestStop } from "../entity/SuggestedRestStop";
 import { TaxiStand } from "../entity/TaxiStand";
 import type { PlaceActions } from "./LandmarkDetails";
 import { MapView } from "./MapView";
+import { PANNING_BOUNDS, SINGAPORE_BOUNDS } from "./onemap";
 
 function stand(id: string, name: string, latitude: number, longitude: number) {
   return new TaxiStand({
@@ -411,5 +412,82 @@ describe("MapView — dark mode (package 9a)", () => {
 
     expect(tileUrls(container).length).toBeGreaterThan(0);
     expect(tileUrls(container).every((u) => u.includes("/maps/tiles/Night/"))).toBe(true);
+  });
+});
+
+// Package 10a — popups open clear of the controls over the map.
+describe("MapView — popups clear of the controls (package 10a)", () => {
+  it("keeps popups that far from the top bar and banner, and from the layer sheet, plus a margin", () => {
+    const { rerender } = render(<MapView visible={visibleWith()} insets={{ top: 160, bottom: 210 }} />);
+    expect(LeafletPopup.prototype.options.autoPanPaddingTopLeft).toEqual(point(8, 168));
+    expect(LeafletPopup.prototype.options.autoPanPaddingBottomRight).toEqual(point(8, 218));
+
+    rerender(<MapView visible={visibleWith()} insets={{ top: 58, bottom: 90 }} />); // the banner went; the sheet folded
+    expect(LeafletPopup.prototype.options.autoPanPaddingTopLeft).toEqual(point(8, 66));
+  });
+});
+
+// Package 10a — a popup that opens under the controls pans the map until it clears them.
+describe("MapView — popups pan clear (package 10a)", () => {
+  it("pans the map when a popup opens under the controls over the map", async () => {
+    withScreenSize();
+    const panBy = vi.spyOn(LeafletMap.prototype, "panBy");
+    render(
+      <MapView
+        visible={visibleWith({ CARPARK: { items: [suntec], clusters: [] } })}
+        insets={{ top: 790, bottom: 0 }} // controls over all but the bottom 10 px: no popup fits
+      />,
+    );
+    fireEvent.click(screen.getByTitle("Suntec City"));
+    await screen.findByRole("heading", { name: "Suntec City" });
+    expect(panBy).toHaveBeenCalled();
+  });
+});
+
+// Package 10a — an open popup is updated (and so panned to) only when what it shows changes.
+describe("MapView — open popups stay put (package 10a)", () => {
+  it("doesn't update an open popup when the map re-renders with the same places, e.g. after a pan or a poll", async () => {
+    const view = () => visibleWith({ CARPARK: { items: [suntec], clusters: [] } }); // a new object each time
+    const actions: PlaceActions = { bookmarked: new Set(), onToggleBookmark: vi.fn(), onNavigate: vi.fn() };
+    const { rerender } = render(<MapView visible={view()} actions={actions} />);
+    fireEvent.click(screen.getByTitle("Suntec City"));
+    await screen.findByRole("heading", { name: "Suntec City" });
+    const update = vi.spyOn(LeafletPopup.prototype, "update");
+
+    rerender(<MapView visible={view()} actions={actions} />);
+    rerender(<MapView visible={view()} actions={actions} insets={{ top: 160, bottom: 90 }} />);
+
+    // Leaflet pans to fit a popup on every update: near the map's edge, an update on every render panned for ever
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("updates it when what it shows changes", async () => {
+    const actions = (ids: string[]): PlaceActions => ({
+      bookmarked: new Set(ids),
+      onToggleBookmark: vi.fn(),
+      onNavigate: vi.fn(),
+    });
+    const visible = visibleWith({ CARPARK: { items: [suntec], clusters: [] } });
+    const { rerender } = render(<MapView visible={visible} actions={actions([])} />);
+    fireEvent.click(screen.getByTitle("Suntec City"));
+    await screen.findByRole("heading", { name: "Suntec City" });
+
+    rerender(<MapView visible={visible} actions={actions(["CARPARK:1"])} />); // just bookmarked
+
+    expect(await screen.findByRole("button", { name: "Remove the bookmark for Suntec City" })).toBeInTheDocument();
+  });
+});
+
+describe("PANNING_BOUNDS (package 10a)", () => {
+  it("is Singapore with room around it, so a popup at its edge can be panned clear of the controls", () => {
+    expect(PANNING_BOUNDS.contains(SINGAPORE_BOUNDS)).toBe(true);
+    expect(PANNING_BOUNDS.contains([1.55, 103.82])).toBe(true); // north of the Johor Strait's edge
+    expect(PANNING_BOUNDS.contains([3.14, 101.69])).toBe(false); // but not as far as Kuala Lumpur
+  });
+
+  it("is how far the map lets itself be panned", () => {
+    const setMaxBounds = vi.spyOn(LeafletMap.prototype, "setMaxBounds");
+    render(<MapView visible={visibleWith()} />);
+    expect(setMaxBounds).toHaveBeenCalledWith(PANNING_BOUNDS);
   });
 });

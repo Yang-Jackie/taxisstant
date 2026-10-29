@@ -19,7 +19,7 @@ export function LocationBanner({ onRetry, userAgent = globalThis.navigator?.user
   const { t } = useTranslation();
   const [showSteps, setShowSteps] = useState(false);
   return (
-    <section className="location-banner" aria-label={t("location.region")}>
+    <section className="location-banner" aria-label={t("location.region")} data-map-overlay="top">
       <p>{t("location.needed")}</p>
       {showSteps && (
         <ol>
