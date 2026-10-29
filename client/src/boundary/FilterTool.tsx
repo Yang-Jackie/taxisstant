@@ -16,8 +16,8 @@ interface Filter {
   readonly key: string;
   readonly icon: string;
   readonly label: string;
-  /** Its colour: its layer's group, or for Bookmarks the star's amber. */
-  readonly group: "find" | "rest";
+  /** Its colour: its layer's group, or bookmarks' own red (D53). */
+  readonly group: "find" | "rest" | "bookmark";
   readonly on: boolean;
   /** Its data is on its way. */
   readonly busy: boolean;
@@ -95,7 +95,7 @@ export interface FilterToolProps {
   layers?: readonly LayerType[];
   /** Layers whose data is on its way: a spinner shows, if it takes a moment (NF-3). */
   loading?: ReadonlySet<LayerType>;
-  /** The Bookmarks filter, after the layers (D53): offered only with somewhere to send its taps. */
+  /** The Bookmarks filter, first, before the layers (D53): offered only with somewhere to send its taps. */
   bookmarksShown?: boolean;
   onToggleBookmarks?: () => void;
 }
@@ -115,26 +115,31 @@ export function FilterTool({
 }: FilterToolProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const filters: Filter[] = MOCKUP_ORDER.filter((l) => layers.includes(l)).map((layer) => ({
-    key: layer,
-    icon: LAYER_ICON[layer],
-    label: t(`layers.${layer}`),
-    group: GROUP[layer],
-    on: active.has(layer),
-    busy: loading.has(layer),
-    onToggle: () => onToggle(layer),
-  }));
-  if (onToggleBookmarks) {
-    filters.push({
-      key: "bookmarks",
-      icon: star,
-      label: t("layers.bookmarks"),
-      group: "find", // amber, as the star in a place's details
-      on: bookmarksShown,
-      busy: false,
-      onToggle: onToggleBookmarks,
-    });
-  }
+  const bookmarks: Filter[] = onToggleBookmarks
+    ? [
+        {
+          key: "bookmarks",
+          icon: star,
+          label: t("layers.bookmarks"),
+          group: "bookmark",
+          on: bookmarksShown,
+          busy: false,
+          onToggle: onToggleBookmarks,
+        },
+      ]
+    : [];
+  const filters: Filter[] = [
+    ...bookmarks,
+    ...MOCKUP_ORDER.filter((l) => layers.includes(l)).map((layer) => ({
+      key: layer,
+      icon: LAYER_ICON[layer],
+      label: t(`layers.${layer}`),
+      group: GROUP[layer],
+      on: active.has(layer),
+      busy: loading.has(layer),
+      onToggle: () => onToggle(layer),
+    })),
+  ];
   return (
     <nav className="filter-tool" aria-label={t("layers.label")}>
       <button

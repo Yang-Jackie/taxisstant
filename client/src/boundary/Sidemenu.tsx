@@ -111,8 +111,8 @@ export function Sidemenu({
           </section>
         );
       })}
-      <h2 className="sidemenu__label">
-        {/* The star, as in a place's details and on a bookmarked marker (D52) */}
+      <h2 className="sidemenu__label sidemenu__label--bookmarks">
+        {/* The star, as in a place's details and on a bookmarked marker (D52), in bookmarks' red (D53) */}
         <span dangerouslySetInnerHTML={{ __html: star }} />
         {t("menu.bookmarks")}
       </h2>

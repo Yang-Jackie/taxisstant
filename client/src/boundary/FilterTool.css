@@ -128,6 +128,20 @@
 .filter-tool__tile--rest svg {
   color: var(--green-text);
 }
+/* Bookmarks: a colour of their own, first in the sheet (D53) */
+.filter-tool__chip--bookmark,
+.filter-tool__tile--bookmark {
+  border-color: var(--red-line);
+}
+.filter-tool__chip--bookmark,
+.filter-tool__tile--bookmark svg {
+  color: var(--red-strong);
+}
+.filter-tool__chip--bookmark[aria-pressed="true"],
+.filter-tool__tile--bookmark[aria-pressed="true"] {
+  background: var(--red-bg);
+  border-color: var(--red-strong);
+}
 .filter-tool__chip--find[aria-pressed="true"],
 .filter-tool__tile--find[aria-pressed="true"] {
   background: var(--amber-bg);

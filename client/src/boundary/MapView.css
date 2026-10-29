@@ -149,7 +149,7 @@
   padding: 0;
   border: none;
   background: none;
-  color: var(--amber-strong);
+  color: var(--red-strong); /* bookmarks' red (D53) */
   cursor: pointer;
 }
 .landmark-details__star span {
@@ -206,7 +206,8 @@
   }
 }
 
-/* Package 10a-3: a bookmarked landmark's star on its marker's corner (D53), amber as in its details (D50) */
+/* Package 10a-3: a bookmarked landmark's star on its marker's corner, in bookmarks' red (D53). The chip is white in
+   both themes, so the star keeps the light theme's red */
 .marker-chip__star {
   position: absolute;
   top: -5px;
@@ -219,7 +220,7 @@
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  color: #b86e00;
+  color: #dc2626;
 }
 .marker-chip .marker-chip__star svg {
   width: 13px;

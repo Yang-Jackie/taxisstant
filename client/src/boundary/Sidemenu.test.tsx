@@ -119,7 +119,7 @@ describe("Sidemenu", () => {
     const heading = (name: string) => screen.getByRole("heading", { name });
     expect(heading("Smart suggestions").querySelector(".icon-tabler-sparkles")).not.toBeNull();
     expect(heading("Bookmarks").querySelector(".icon-tabler-star")).not.toBeNull();
-    expect(toggle("Suggested pickup").querySelector(".icon-tabler-hand-stop")).not.toBeNull(); // not Hotspot's flame
+    expect(toggle("Suggested pickup").querySelector(".icon-taximate-hailing")).not.toBeNull(); // not Hotspot's flame
     expect(toggle("Suggested rest stop").querySelector(".icon-tabler-cup")).not.toBeNull();
   });
 

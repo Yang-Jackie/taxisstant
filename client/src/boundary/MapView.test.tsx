@@ -345,10 +345,10 @@ describe("MapView — suggestions (package 7)", () => {
     expect(screen.getByTitle("Suggested rest stop 1: Maxwell Food Centre")).toHaveClass("suggestion-pin--rest");
   });
 
-  it("puts each suggestion's own icon on its pins, the hailing hand and the cup, not the bookmarks' star (D52)", () => {
+  it("puts each suggestion's own icon on its pins, the person hailing and the cup, not the bookmarks' star (D52)", () => {
     render(<MapView visible={visibleWith()} suggestions={suggestions} />);
     const pin = (title: string) => screen.getByTitle(title);
-    expect(pin("Suggested pickup 1: Lucky Plaza").querySelector(".icon-tabler-hand-stop")).not.toBeNull();
+    expect(pin("Suggested pickup 1: Lucky Plaza").querySelector(".icon-taximate-hailing")).not.toBeNull();
     expect(pin("Suggested rest stop 1: Maxwell Food Centre").querySelector(".icon-tabler-cup")).not.toBeNull();
     expect(document.querySelectorAll(".suggestion-pin .icon-tabler-star")).toHaveLength(0);
   });

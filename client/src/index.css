@@ -31,6 +31,10 @@
   --green-line: #b2e0d0;
   --green-ink: #0a4e38;
   --green-text: #0e7a57;
+  /* Bookmarks' own colour (D53): 4.83:1 on white */
+  --red-bg: #fde8e8;
+  --red-line: #f4b4b4;
+  --red-strong: #dc2626;
   --toast-bg: #17181a;
   --toast-ink: #ffffff;
 }
@@ -53,6 +57,9 @@
   --green-line: #1f6d52;
   --green-ink: #8ce6c3;
   --green-text: #4fd3a0;
+  --red-bg: #3d1517;
+  --red-line: #8c2b2e;
+  --red-strong: #f87171; /* 5.71:1 on the dark surface */
   --toast-bg: #eef0f3;
   --toast-ink: #17181a;
 }

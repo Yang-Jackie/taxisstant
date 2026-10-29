@@ -152,17 +152,28 @@ describe("FilterTool — loading (NF-3)", () => {
 
 // Package 10a-3 — the Bookmarks filter (D53), and the taxi stand's own icon (D52).
 describe("FilterTool — Bookmarks (package 10a-3)", () => {
-  it("offers Bookmarks after the layers, as an amber star, chip and tile alike", async () => {
+  it("offers Bookmarks first, as a red star, chip and tile alike, with the layers after it in the mockup's order", async () => {
     render(<FilterTool active={new Set()} onToggle={() => {}} onToggleBookmarks={() => {}} />);
-    const chip = toggles().at(-1)!;
+    const chip = toggles()[0]!;
     expect(chip).toHaveAccessibleName("Bookmarks");
-    expect(chip).toHaveClass("filter-tool__chip--find");
+    expect(chip).toHaveClass("filter-tool__chip--bookmark");
     expect(chip.querySelector(".icon-tabler-star")).not.toBeNull();
+    expect(toggles().map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Bookmarks",
+      "Hotspots",
+      "Taxi stands",
+      "Taxis",
+      "Fuel",
+      "Charge",
+      "Carpark",
+      "Hawker food",
+    ]);
 
     await userEvent.click(screen.getByRole("button", { name: "Show the layers' names" }));
 
-    expect(toggles().at(-1)).toHaveTextContent("Bookmarks");
-    expect(toggles().at(-1)!.querySelector(".icon-tabler-star")).not.toBeNull();
+    expect(toggles()[0]).toHaveTextContent("Bookmarks");
+    expect(toggles()[0]).toHaveClass("filter-tool__tile--bookmark");
+    expect(toggles()[0]!.querySelector(".icon-tabler-star")).not.toBeNull();
   });
 
   it("shows whether it's on, and reports a tap without turning any layer on", async () => {

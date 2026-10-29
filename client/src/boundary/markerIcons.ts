@@ -1,6 +1,6 @@
 // Marker icons in the style of the team's mockup: a white circle with the layer's icon, amber for finding passengers
 // (FR-1.2) and green for rest and facilities (FR-1.1). Icons: Tabler Icons (MIT), the set the mockup uses, and a taxi
-// stand drawn in their style (D52).
+// stand and a person hailing drawn in their style (D52).
 import starFilled from "@tabler/icons/filled/star.svg?raw";
 import bolt from "@tabler/icons/outline/bolt.svg?raw";
 import bowl from "@tabler/icons/outline/bowl.svg?raw";
@@ -8,9 +8,9 @@ import car from "@tabler/icons/outline/car.svg?raw";
 import cup from "@tabler/icons/outline/cup.svg?raw";
 import flame from "@tabler/icons/outline/flame.svg?raw";
 import gasStation from "@tabler/icons/outline/gas-station.svg?raw";
-import handStop from "@tabler/icons/outline/hand-stop.svg?raw";
 import parking from "@tabler/icons/outline/parking.svg?raw";
 import { DivIcon } from "leaflet";
+import hailing from "./icons/hailing.svg?raw";
 import taxiStand from "./icons/taxi-stand.svg?raw";
 import type { LayerType } from "../entity/LayerType";
 import type { RecommendationKind } from "../entity/RecommendationKind";
@@ -124,8 +124,8 @@ export function clusterIcon(t: LayerType, count: number): DivIcon {
 /** Suggestions take the colour of their group: pickups amber, rest stops green (the data dictionary's toggles). */
 export const SUGGESTION_GROUP: Record<RecommendationKind, "find" | "rest"> = { PICKUP: "find", REST_STOP: "rest" };
 
-/** Each suggestion's icon, on its toggle in the menu and its pins (D52): a hand hailing a taxi, and a cup. */
-export const SUGGESTION_ICON: Record<RecommendationKind, string> = { PICKUP: handStop, REST_STOP: cup };
+/** Each suggestion's icon, on its toggle in the menu and its pins (D52): a person hailing a taxi, and a cup. */
+export const SUGGESTION_ICON: Record<RecommendationKind, string> = { PICKUP: hailing, REST_STOP: cup };
 
 const PIN_WIDTH = 46;
 const PIN_HEIGHT = 28;
