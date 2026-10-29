@@ -56,6 +56,14 @@ describe("DataApiClient.get", () => {
     expect(result).toEqual({ status: "not-modified" });
   });
 
+  it("on 304, says how recent the server's copy is, from Last-Modified", async () => {
+    const fetchFn = vi.fn(
+      async () => new Response(null, { status: 304, headers: { "Last-Modified": "Wed, 28 Oct 2026 13:00:00 GMT" } }),
+    );
+    const result = await new DataApiClient({ fetchFn }).get(taxiStands, '"abc"');
+    expect(result).toEqual({ status: "not-modified", asOf: new Date("2026-10-28T13:00:00Z") });
+  });
+
   it("rejects on an error status, e.g. 503 before the server has data", async () => {
     await expect(
       new DataApiClient({ fetchFn: answering(503, { error: "not loaded" }) }).get(taxiStands),

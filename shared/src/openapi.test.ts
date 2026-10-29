@@ -37,6 +37,9 @@ describe("OpenAPI document", () => {
       expect(get?.operationId).toBe(`get${e.name}`);
       expect(Object.keys(get?.responses ?? {})).toEqual(["200", "304", "429", "503"]);
       expect(get?.parameters).toEqual([{ $ref: "#/components/parameters/IfNoneMatch" }]);
+      for (const code of ["200", "304"] as const) {
+        expect(Object.keys(get?.responses[code].headers ?? {}), code).toEqual(["ETag", "Last-Modified"]);
+      }
     }
   });
 

@@ -13,7 +13,18 @@ import { Taxi } from "../entity/Taxi";
 import { TaxiStand } from "../entity/TaxiStand";
 import { CacheManager } from "../services/CacheManager";
 import { DataApiClient } from "../services/DataApiClient";
-import { CARPARKS, callsTo, fakeServer, offline, ok, status, STANDS, type Answer } from "../testing/fakeServer";
+import {
+  CARPARKS,
+  callsTo,
+  fakeServer,
+  notModified,
+  offline,
+  ok,
+  status,
+  STANDS,
+  TAXIS,
+  type Answer,
+} from "../testing/fakeServer";
 import { DataSyncController } from "./DataSyncController";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -365,17 +376,53 @@ describe("DataSyncController — live layers (package 2d)", () => {
     await expect(p.open({ "*": offline }).dataSync.refreshLiveLayer("TAXIS")).rejects.toThrow();
   });
 
-  it("counts a 304 as confirmed now: the server says its latest data is the copy we have", async () => {
+  it("makes a 304'd copy as recent as the server's Last-Modified: its latest sync matched the copy we have", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
     const p = phone();
     await p.open().dataSync.refreshLiveLayer("TAXIS");
 
     vi.setSystemTime(new Date("2026-10-28T13:06:00Z"));
+    const next = p.open({ "/taxis": notModified(new Date("2026-10-28T13:05:30Z")) });
+    await next.dataSync.refreshLiveLayer("TAXIS");
+
+    expect(next.repo.getByLayerType("TAXIS")[0]!.seenAt.toISOString()).toBe("2026-10-28T13:05:30.000Z");
+  });
+
+  it("keeps a 304'd copy as old as it is when the server's own source is down: nothing to show (D22)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
+    const p = phone();
+    await p.open().dataSync.refreshLiveLayer("TAXIS");
+
+    vi.setSystemTime(new Date("2026-10-28T13:06:00Z"));
+    const next = p.open({ "/taxis": notModified(new Date("2026-10-28T13:00:00Z")) }); // the server's copy is old
+    await expect(next.dataSync.refreshLiveLayer("TAXIS")).rejects.toThrow(/too old/);
+    expect(next.repo.getByLayerType("TAXIS")[0]!.seenAt.toISOString()).toBe("2026-10-28T13:00:00.000Z");
+  });
+
+  it("never makes a copy older than it was, e.g. from a 304 without Last-Modified", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
+    const p = phone();
+    await p.open().dataSync.refreshLiveLayer("TAXIS");
+
+    vi.setSystemTime(new Date("2026-10-28T13:01:00Z"));
     const next = p.open({ "/taxis": status(304) });
     await next.dataSync.refreshLiveLayer("TAXIS");
 
-    expect(next.repo.getByLayerType("TAXIS")[0]!.seenAt.toISOString()).toBe("2026-10-28T13:06:00.000Z");
+    expect(next.repo.getByLayerType("TAXIS")[0]!.seenAt.toISOString()).toBe("2026-10-28T13:00:00.000Z");
+  });
+
+  it("rejects data that is already too old when it arrives, after storing it (D22, exception 4a)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
+    const old = async () =>
+      new Response(JSON.stringify({ asOf: "2026-10-28T12:50:00.000Z", etag: '"v1"', data: TAXIS }), { status: 200 });
+    const { repo, dataSync } = setUp({ "/taxis": old });
+
+    await expect(dataSync.refreshLiveLayer("TAXIS")).rejects.toThrow(/too old/);
+    expect(repo.getByLayerType("TAXIS")).toHaveLength(4); // stored, but too old to show
   });
 
   it("shares one request between a poll and a toggle that arrive together", async () => {

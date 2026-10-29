@@ -32,12 +32,18 @@ export function buildOpenApi() {
           responses: {
             "200": {
               description: "The data.",
-              headers: { ETag: { $ref: "#/components/headers/ETag" } },
+              headers: {
+                ETag: { $ref: "#/components/headers/ETag" },
+                "Last-Modified": { $ref: "#/components/headers/LastModified" },
+              },
               content: { "application/json": { schema: schemaRef(`${e.name}Response`) } },
             },
             "304": {
               description: "Not Modified: the client's copy (its If-None-Match) is still current. No body.",
-              headers: { ETag: { $ref: "#/components/headers/ETag" } },
+              headers: {
+                ETag: { $ref: "#/components/headers/ETag" },
+                "Last-Modified": { $ref: "#/components/headers/LastModified" },
+              },
             },
             "429": { $ref: "#/components/responses/TooManyRequests" },
             "503": { $ref: "#/components/responses/NotLoadedYet" },
@@ -71,6 +77,12 @@ export function buildOpenApi() {
       },
       headers: {
         ETag: { description: "The fingerprint of the data, the same as the body's etag.", schema: { type: "string" } },
+        LastModified: {
+          description:
+            "When the server last synced this data: the body's asOf, to the second. Also sent with 304, so a client " +
+            "can tell how recent its copy is; a copy kept while the source is down stays as old as it was.",
+          schema: { type: "string" },
+        },
       },
       responses: {
         TooManyRequests: {

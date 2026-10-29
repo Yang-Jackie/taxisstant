@@ -27,6 +27,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -42,6 +45,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -70,6 +76,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -85,6 +94,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -113,6 +125,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -128,6 +143,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -156,6 +174,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -171,6 +192,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -199,6 +223,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -214,6 +241,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -242,6 +272,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -257,6 +290,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -285,6 +321,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -300,6 +339,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -328,6 +370,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -343,6 +388,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -371,6 +419,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -386,6 +437,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -414,6 +468,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -429,6 +486,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -457,6 +517,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             },
             "content": {
@@ -472,6 +535,9 @@
             "headers": {
               "ETag": {
                 "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
               }
             }
           },
@@ -1365,6 +1431,12 @@
     "headers": {
       "ETag": {
         "description": "The fingerprint of the data, the same as the body's etag.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "LastModified": {
+        "description": "When the server last synced this data: the body's asOf, to the second. Also sent with 304, so a client can tell how recent its copy is; a copy kept while the source is down stays as old as it was.",
         "schema": {
           "type": "string"
         }

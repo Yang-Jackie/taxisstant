@@ -48,6 +48,8 @@ export class DataApiController {
       return;
     }
     res.set("ETag", entry.etag);
+    // When this copy was synced, on a 304 too: a copy the server kept while its source was down is that old (D22)
+    res.set("Last-Modified", new Date(entry.asOf).toUTCString());
     res.set("Cache-Control", "no-cache"); // a saved copy may be reused only after an ETag re-check
     if (req.get("If-None-Match") === entry.etag) {
       res.status(304).end();

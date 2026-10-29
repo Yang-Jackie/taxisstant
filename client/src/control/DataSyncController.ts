@@ -173,7 +173,8 @@ export class DataSyncController {
 
   /**
    * How one live endpoint gets into the repository: always asked (an unchanged answer is a cheap 304), and on failure
-   * the saved copy is enough only while it is recent enough (D22).
+   * the saved copy is enough only while it is recent enough (D22). Data that is already too old when it arrives counts
+   * as nothing to show: it is stored, but the refresh rejects.
    */
   private liveLayer<D>(
     endpoint: Endpoint<D[]>,
@@ -196,15 +197,21 @@ export class DataSyncController {
           if (cached && isRecent(observedAt(cached), new Date(), maxAgeMs)) return; // the saved copy still counts
           throw err;
         }
+        let latest: ApiResponse<D[]>;
         if (result.status === "ok") {
-          await this.cache.put(endpoint.path, result.response);
-          apply(result.response);
+          latest = result.response;
         } else if (cached) {
-          // 304 has no body, so the server's newer asOf never arrives; but it only says 304 because its latest sync
-          // matched, so the copy counts as confirmed now. (Hotspots' age comes from their slots, not from asOf.)
-          const confirmed = { ...cached, asOf: new Date().toISOString() };
-          await this.cache.put(endpoint.path, confirmed);
-          apply(confirmed);
+          // 304 has no body, but its Last-Modified says when the server last synced this data: the copy is that
+          // recent, and never older than we knew. (Hotspots' age comes from their slots, not from asOf.)
+          const asOf = Math.max(Date.parse(cached.asOf), result.asOf?.getTime() ?? 0);
+          latest = { ...cached, asOf: new Date(asOf).toISOString() };
+        } else {
+          return;
+        }
+        await this.cache.put(endpoint.path, latest);
+        apply(latest);
+        if (!isRecent(observedAt(latest), new Date(), maxAgeMs)) {
+          throw new Error(`GET ${endpoint.path}: the server's newest data is too old to show`);
         }
       },
     };

@@ -1,7 +1,10 @@
 import type { ApiResponse, Endpoint } from "@taxisstant/shared";
 
-/** What a GET can come back with (D4). Errors are thrown, not returned. */
-export type ApiResult<T> = { status: "ok"; response: ApiResponse<T> } | { status: "not-modified" };
+/**
+ * What a GET can come back with (D4). Errors are thrown, not returned. A 304 says, in Last-Modified, how recent the
+ * server's copy is: `asOf`, when the header is there.
+ */
+export type ApiResult<T> = { status: "ok"; response: ApiResponse<T> } | { status: "not-modified"; asOf?: Date };
 
 export interface DataApiClientOptions {
   baseUrl?: string;
@@ -40,7 +43,12 @@ export class DataApiClient {
       );
     }
 
-    if (res.status === 304) return { status: "not-modified" };
+    if (res.status === 304) {
+      const lastModified = Date.parse(res.headers.get("Last-Modified") ?? "");
+      return Number.isNaN(lastModified)
+        ? { status: "not-modified" }
+        : { status: "not-modified", asOf: new Date(lastModified) };
+    }
     if (!res.ok) throw new Error(`GET ${path} answered ${res.status}`);
 
     const parsed = endpoint.response.safeParse(await res.json().catch(() => undefined));

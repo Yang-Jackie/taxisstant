@@ -161,6 +161,11 @@ export const status =
   async () =>
     new Response(code === 304 ? null : "{}", { status: code });
 export const offline: Answer = () => Promise.reject(new TypeError("Failed to fetch"));
+/** A 304 whose Last-Modified says the server's copy was synced at `asOf`. */
+export const notModified =
+  (asOf: Date): Answer =>
+  async () =>
+    new Response(null, { status: 304, headers: { "Last-Modified": asOf.toUTCString() } });
 
 /** A fetch that answers each endpoint with its data, unless `answers` says otherwise for that path (or for all: "*"). */
 export function fakeServer(answers: Record<string, Answer> = {}) {

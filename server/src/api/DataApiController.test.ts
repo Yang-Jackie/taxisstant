@@ -55,6 +55,18 @@ describe("GET /api/taxi-stands", () => {
     expect(res.text ?? "").toBe("");
   });
 
+  it("sends the data's asOf as Last-Modified, on a 304 too, so the client knows how recent its copy is (D22)", async () => {
+    const cache = cacheWithStands();
+    const app = appWith(cache);
+
+    const res = await request(app).get("/api/taxi-stands");
+    const again = await request(app).get("/api/taxi-stands").set("If-None-Match", res.body.etag);
+
+    expect(res.headers["last-modified"]).toBe("Sun, 25 Oct 2026 08:00:00 GMT");
+    expect(again.status).toBe(304);
+    expect(again.headers["last-modified"]).toBe("Sun, 25 Oct 2026 08:00:00 GMT");
+  });
+
   it("answers 200 with the new data when the client's version is out of date", async () => {
     const res = await request(appWith(cacheWithStands()))
       .get("/api/taxi-stands")
