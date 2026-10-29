@@ -1,6 +1,6 @@
-import type { LatLngTuple } from "leaflet";
-import { useCallback, useEffect, type ReactNode } from "react";
-import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import type { LatLngTuple, Marker as LeafletMarker } from "leaflet";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents, type MarkerProps } from "react-leaflet";
 import type { Viewport } from "../entity/Bounds";
 import type { Hotspot } from "../entity/Hotspot";
 import type { Landmark } from "../entity/Landmark";
@@ -49,6 +49,22 @@ function positionOf(location: Location): LatLngTuple {
     positions.set(location, position);
   }
   return position;
+}
+
+/**
+ * A Marker whose title (its tooltip, and its name for screen readers) follows the prop. react-leaflet sets a marker's
+ * title only when it makes the marker, so a cluster's count, a hotspot's level or the driver's "last known position"
+ * would otherwise go stale.
+ */
+function TitledMarker({ title, ...props }: MarkerProps & { title: string }) {
+  const ref = useRef<LeafletMarker>(null);
+  useEffect(() => {
+    const marker = ref.current;
+    if (!marker) return;
+    marker.options.title = title; // Leaflet uses it again whenever it replaces the icon
+    marker.getElement()?.setAttribute("title", title);
+  }, [title]);
+  return <Marker ref={ref} title={title} {...props} />;
 }
 
 export interface MapViewProps {
@@ -100,7 +116,7 @@ function DriverDot({ driver }: { driver: DriverPosition }) {
         pathOptions={{ weight: 1, color: colour, fillColor: colour, fillOpacity: 0.1 }}
         interactive={false}
       />
-      <Marker
+      <TitledMarker
         position={positionOf(driver.location)}
         icon={driverIcon(driver.live)}
         title={driver.live ? "You are here" : "Your last known position"}
@@ -137,17 +153,17 @@ function PointMarkers<T extends Locatable>({ layer, view, keyOf, titleOf, popupO
   return (
     <>
       {items.map((item, i) => (
-        <Marker
+        <TitledMarker
           key={keyOf(item, i)}
           position={positionOf(item.getLocation())}
           icon={markerIcon(layer)}
           title={titleOf(item)}
         >
           {popupOf && <Popup>{popupOf(item)}</Popup>}
-        </Marker>
+        </TitledMarker>
       ))}
       {clusters.map((c) => (
-        <Marker
+        <TitledMarker
           key={`cluster-${c.id}`}
           position={positionOf(c.location)}
           icon={clusterIcon(layer, c.count)}
@@ -173,7 +189,7 @@ function HotspotCircles({ hotspots }: { hotspots: readonly Hotspot[] }) {
         />
       ))}
       {hotspots.map((h) => (
-        <Marker
+        <TitledMarker
           key={`flame-${h.id}`}
           position={positionOf(h.centre)}
           icon={markerIcon("HOTSPOT")}
@@ -182,7 +198,7 @@ function HotspotCircles({ hotspots }: { hotspots: readonly Hotspot[] }) {
           <Popup>
             <HotspotDetails hotspot={h} />
           </Popup>
-        </Marker>
+        </TitledMarker>
       ))}
     </>
   );

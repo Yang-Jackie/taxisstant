@@ -210,6 +210,13 @@ describe("MapView — live layers (package 2d)", () => {
     expect(markers[0]).toHaveClass("marker-chip--find");
   });
 
+  it("keeps a bubble's title in step with its count as taxis come and go (react-leaflet sets it only once)", () => {
+    const view = (count: number) => visibleWith({ TAXIS: { items: [], clusters: [{ ...carparkCluster, count }] } });
+    const { rerender } = render(<MapView visible={view(12)} />);
+    rerender(<MapView visible={view(13)} />);
+    expect(screen.getByTitle("13 available taxis: tap to zoom in")).toHaveTextContent("13");
+  });
+
   it("draws a cluster of taxis as a bubble with its count", () => {
     render(<MapView visible={visibleWith({ TAXIS: { items: [], clusters: [{ ...carparkCluster, count: 12 }] } })} />);
     expect(screen.getByTitle("12 available taxis: tap to zoom in")).toHaveTextContent("12");
@@ -242,6 +249,13 @@ describe("MapView — the driver (package 6)", () => {
     const { container } = render(<MapView visible={visibleWith()} driver={driver(true)} />);
     expect(screen.getByTitle("You are here")).toHaveClass("driver-dot");
     expect(container.querySelectorAll("path.leaflet-interactive, path")).not.toHaveLength(0);
+  });
+
+  it("says the dot is only the last known position once the GPS stops answering", () => {
+    const { rerender } = render(<MapView visible={visibleWith()} driver={driver(true)} />);
+    rerender(<MapView visible={visibleWith()} driver={driver(false)} />);
+    expect(screen.getByTitle("Your last known position")).toHaveClass("driver-dot--stale");
+    expect(screen.queryByTitle("You are here")).not.toBeInTheDocument();
   });
 
   it("greys the dot when the position isn't live (UC 0013 1a)", () => {
