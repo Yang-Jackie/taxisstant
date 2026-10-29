@@ -4,6 +4,7 @@ import { isRecommendationKind, type RecommendationKind } from "../entity/Recomme
 import {
   hiddenEnergyLayer,
   TEXT_SIZES,
+  type Language,
   type TextSize,
   type UserPreferences,
   type VehicleType,
@@ -33,12 +34,29 @@ const SavedPreferences = z.object({
     .catch(100),
   /** Saved only once the driver has chosen; until then the phone decides (D44). */
   darkMode: z.boolean().optional().catch(undefined),
+  /** Likewise (D47). */
+  language: z.enum(["EN", "ZH"]).optional().catch(undefined),
 });
 
 /** The phone's light or dark setting, as `window.matchMedia("(prefers-color-scheme: dark)")` gives it. */
 export interface ColourSchemeQuery {
   readonly matches: boolean;
   addEventListener(type: "change", listener: () => void): void;
+}
+
+/** The phone's languages, most preferred first. */
+function phoneLanguages(): readonly string[] {
+  const nav = typeof navigator === "undefined" ? undefined : navigator;
+  return nav?.languages?.length ? nav.languages : [nav?.language ?? "en"];
+}
+
+/** The first of the phone's languages the app speaks: Chinese (zh, zh-SG, zh-Hans …) or else English (D47). */
+export function languageFrom(phone: readonly string[]): Language {
+  for (const tag of phone) {
+    if (/^zh\b/i.test(tag)) return "ZH";
+    if (/^en\b/i.test(tag)) return "EN";
+  }
+  return "EN";
 }
 
 function phoneColourScheme(): ColourSchemeQuery {
@@ -50,11 +68,20 @@ function phoneColourScheme(): ColourSchemeQuery {
 export class SettingsController extends Store<UserPreferences> {
   private readonly localStore: Pick<LocalStore, "read" | "write">;
   private readonly phoneDark: ColourSchemeQuery;
+  private readonly phoneLanguage: Language;
   /** Dark mode as the driver chose it; undefined while the phone decides (D44). */
   private darkModeChosen: boolean | undefined;
+  /** The language as the driver chose it; undefined while the phone decides (D47). */
+  private languageChosen: Language | undefined;
 
-  constructor(localStore: Pick<LocalStore, "read" | "write">, phoneDark: ColourSchemeQuery = phoneColourScheme()) {
+  constructor(
+    localStore: Pick<LocalStore, "read" | "write">,
+    phoneDark: ColourSchemeQuery = phoneColourScheme(),
+    phoneLanguageTags: readonly string[] = phoneLanguages(),
+  ) {
+    const phoneLanguage = languageFrom(phoneLanguageTags);
     super({
+      language: phoneLanguage,
       visibleLayers: new Set(),
       activeSuggestions: new Set(),
       suggestionLayers: new Map(),
@@ -64,6 +91,7 @@ export class SettingsController extends Store<UserPreferences> {
     });
     this.localStore = localStore;
     this.phoneDark = phoneDark;
+    this.phoneLanguage = phoneLanguage;
     phoneDark.addEventListener("change", () => {
       if (this.darkModeChosen === undefined) this.setState({ ...this.getSnapshot(), darkMode: phoneDark.matches });
     });
@@ -85,8 +113,16 @@ export class SettingsController extends Store<UserPreferences> {
   async load(): Promise<void> {
     const saved = SavedPreferences.safeParse(await this.localStore.read(KEY));
     if (!saved.success) return; // not an object at all: keep the defaults
-    const { visibleLayers, activeSuggestions, suggestionLayers, skipNavPrompt, vehicleType, fontSize, darkMode } =
-      saved.data;
+    const {
+      visibleLayers,
+      activeSuggestions,
+      suggestionLayers,
+      skipNavPrompt,
+      vehicleType,
+      fontSize,
+      darkMode,
+      language,
+    } = saved.data;
     const hidden = hiddenEnergyLayer(vehicleType);
     const visible = new Set(visibleLayers.filter((t) => t !== hidden));
     const active = new Set(activeSuggestions);
@@ -97,7 +133,9 @@ export class SettingsController extends Store<UserPreferences> {
       owned.set(k, new Set(layers.filter((t) => visible.has(t))));
     }
     this.darkModeChosen = darkMode;
+    this.languageChosen = language;
     this.setState({
+      language: language ?? this.phoneLanguage,
       visibleLayers: visible,
       activeSuggestions: active,
       suggestionLayers: owned,
@@ -182,6 +220,13 @@ export class SettingsController extends Store<UserPreferences> {
     await this.save({ ...prefs, fontSize, darkMode });
   }
 
+  /** The design model's setLanguage (FR-2.1.2). Once chosen, it no longer follows the phone (D47). */
+  async setLanguage(l: Language): Promise<void> {
+    if (this.languageChosen === l) return;
+    this.languageChosen = l; // even the phone's own: chosen, it stays if the phone changes
+    await this.save({ ...this.getSnapshot(), language: l });
+  }
+
   /** Every suggestion's own layers, less `t`. */
   private without(t: LayerType): Map<RecommendationKind, ReadonlySet<LayerType>> {
     return new Map(
@@ -199,6 +244,7 @@ export class SettingsController extends Store<UserPreferences> {
       ...(next.vehicleType && { vehicleType: next.vehicleType }),
       fontSize: next.fontSize,
       ...(this.darkModeChosen !== undefined && { darkMode: this.darkModeChosen }),
+      ...(this.languageChosen && { language: this.languageChosen }),
     });
   }
 }

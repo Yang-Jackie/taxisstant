@@ -12,11 +12,6 @@ import { Store } from "./Store";
 
 const KEY = "bookmarks";
 
-/** UC 0011's messages, in its words. */
-const FAVOURITED = "Location has been favourited";
-const UNFAVOURITED = "Location has been unfavourited";
-const NOT_FOUND = "Unable to find bookmarked location. Please try again later";
-
 /** One saved bookmark, as IndexedDB keeps it. */
 const SavedBookmark = z.object({
   id: z.string(),
@@ -85,7 +80,7 @@ export class BookmarkController extends Store<BookmarkState> {
     if (adding) this.list.add(bookmarkOf(l, new Date()));
     else this.list.remove(id);
     this.publish();
-    this.mapDisplay.showNotice(adding ? FAVOURITED : UNFAVOURITED);
+    this.mapDisplay.showNotice(adding ? "bookmarkAdded" : "bookmarkRemoved"); // UC 0011's messages
     await this.save();
   }
 
@@ -107,7 +102,7 @@ export class BookmarkController extends Store<BookmarkState> {
       }
     }
     if (landmark) this.mapDisplay.highlight(landmark);
-    else this.mapDisplay.showNotice(NOT_FOUND);
+    else this.mapDisplay.showNotice("bookmarkNotFound"); // exception 3a
   }
 
   private publish(): void {

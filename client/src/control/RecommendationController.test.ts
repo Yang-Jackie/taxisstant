@@ -16,6 +16,7 @@ import { DataSyncController } from "./DataSyncController";
 import { LIVE_POLL_MS, MapDisplayController, SINGAPORE_VIEW } from "./MapDisplayController";
 import { rank, RecommendationController } from "./RecommendationController";
 import { SettingsController } from "./SettingsController";
+import { toastText } from "../testing/toastText";
 
 const NOW = new Date("2026-10-29T13:00:00Z");
 
@@ -44,6 +45,7 @@ const restStopAt = (id: string, score: number, km: number, near: Partial<Suggest
     ...near,
   });
 const prefs = (vehicleType?: VehicleType): UserPreferences => ({
+  language: "EN",
   visibleLayers: new Set(),
   activeSuggestions: new Set(),
   suggestionLayers: new Map(),
@@ -229,7 +231,7 @@ describe("RecommendationController.toggle — exceptions", () => {
 
       await recommendations.toggle(k, true);
 
-      expect(mapDisplay.getSnapshot().notice).toBe(toast);
+      expect(toastText(mapDisplay.getSnapshot().notice)).toBe(toast);
       expect(settings.isSuggestionActive(k)).toBe(false);
       expect(visibleLayers(settings)).toEqual([]);
       expect(recommendations.getSnapshot().pending.size).toBe(0);
@@ -242,7 +244,7 @@ describe("RecommendationController.toggle — exceptions", () => {
 
     await recommendations.toggle("PICKUP", true);
 
-    expect(mapDisplay.getSnapshot().notice).toBe(
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe(
       "Unable to calculate nearby pickup spots without your location. Please try again later.",
     );
     expect(settings.isSuggestionActive("PICKUP")).toBe(false);
@@ -255,7 +257,9 @@ describe("RecommendationController.toggle — exceptions", () => {
 
     await recommendations.toggle("REST_STOP", true);
 
-    expect(mapDisplay.getSnapshot().notice).toBe("There are no ideal rest stops nearby. Please try again later.");
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe(
+      "There are no ideal rest stops nearby. Please try again later.",
+    );
     expect(settings.isSuggestionActive("REST_STOP")).toBe(false);
     expect(visibleLayers(settings)).toEqual([]);
   });
@@ -430,6 +434,8 @@ describe("RecommendationController.start — suggestions left on by an earlier s
 
     expect(settings.isSuggestionActive("PICKUP")).toBe(false);
     expect(visibleLayers(settings)).toEqual(["TAXI_STAND"]); // the driver's own
-    expect(mapDisplay.getSnapshot().notice).toBe("Unable to load pickup markers. Please check your connection.");
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe(
+      "Unable to load pickup markers. Please check your connection.",
+    );
   });
 });

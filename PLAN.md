@@ -367,12 +367,17 @@ I review and approve before the next package starts. Claude asks me whenever a d
      - [x] dark mode: `setDisplay(…, darkMode)`, following the phone until chosen (D44); colours as theme tokens; OneMap's Night map; Leaflet's popups and controls themed
      - [x] "Ask before opening Google Maps", which undoes "Do not show this again" (D39)
      - [x] every setting saved and restored (FR-2.2.1); found in Chrome: the Settings drawer overflowed at the largest text (a fieldset's minimum width) and a long hint squeezed a radio
-   - **9b. English and Chinese**
-     - [ ] EN/ZH language switch (FR-2.1.2): every screen, toast and popup; the mockup's language button and the side menu's Language entry
+   - **9b. English and Chinese** ✅
+     - [x] EN/ZH language switch (FR-2.1.2, D47): every screen, toast, popup and screen-reader label, with i18next; the mockup's language button, the side menu's Language entry, and Settings
+     - [x] toasts as message keys; suggestion summaries built from their facts; dates, distances and counts in each language; the page's `lang` for screen readers
+     - [x] checks: every Chinese message exists, differs from the English, and fills in the same blanks
    - **9c. Help & Support**
      - [ ] Help & Support page (from the dialog map): how-to and data sources (D46)
 10. **Hardening and deployment**
     - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
+    - [ ] popups pan clear of the top bar and the location banner (seen in 9b: one near the top opened under the banner)
+    - [ ] load the Chinese words only when they're chosen (9b added 21 kB gzipped)
+    - [ ] a native speaker on the team checks the Chinese (9b)
     - [ ] the mockup's layer tools: a bottom sheet with icon buttons that collapses to icons only (replaces M4's text row in `FilterTool`)
     - [ ] wider test coverage
     - [ ] HTTPS deployment. `shared/` has runtime code since package 1, so the server runs with `tsx` or gets bundled. Set `TRUST_PROXY` if a reverse proxy sits in front, and `CORS_ORIGINS` only if the app is hosted elsewhere (D27)
@@ -456,6 +461,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D44 — Dark mode is on or off, starting as the phone (my decision, 29 Oct).** The design's `darkMode` Boolean. Until the driver flips it, it follows the phone's light or dark setting; their choice then sticks. Dark uses OneMap's Night map and dark menus.
 - **D45 — No narrator (my decision, 29 Oct).** Only the dialog map has "narrator on/off" (no FR, use case or design-model field). The phone's own screen reader (VoiceOver, TalkBack) covers it: every control has a label.
 - **D46 — Help & Support has how-to and data sources, no contact (my decision, 29 Oct).** The dialog map's "contact information for application support" isn't given anywhere. The page explains each feature, credits the data sources, and names the course and team; a contact can be added later.
+- **D47 — English and Chinese, starting as the phone (my decision, 29 Oct).** FR-2.1.2 with the design's `Language` (EN, ZH): i18next, as the Lab 3 stack decided, with every word in `boundary/i18n` (en.ts, and zh.ts typed to have the same keys). Chinese is Simplified, as written in Singapore (德士 for taxi, 小贩中心 for hawker centre). The language is the phone's until the driver chooses, like dark mode (D44). The mockup's button, top right, switches in one tap (Lab 1's "quick language options"); the side menu's Language entry and Settings also offer the choice (the dialog map). Controllers give toasts as message keys (`NoticeKey`) and the screen words them. Suggestion summaries are built on the phone from the sites' facts, so they translate. Names, addresses and other words from government data stay as the data gives them (English), as do the map credits.
 
 ## Decisions I'll be asked about
 

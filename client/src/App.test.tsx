@@ -4,6 +4,7 @@
 // Package 2b: every static layer is downloaded at startup (D18) and clustered while zoomed out (D17).
 // Package 6: the driver's position (UC 0013). Package 7: smart suggestions from the side menu (UC 0008/0009).
 // Package 8: bookmarks (UC 0011) and navigation to Google Maps (UC 0012). Package 9a: the Settings page (FR-2).
+// Package 9b: English and Chinese (FR-2.1.2).
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -613,5 +614,61 @@ describe("App — settings (package 9a)", () => {
 
     expect(screen.getByRole("alertdialog", { name: "Open Google Maps?" })).toBeInTheDocument();
     expect(open).toHaveBeenCalledOnce();
+  });
+});
+
+// Package 9b — English and Chinese in the whole app (FR-2.1.2, D47).
+describe("App — languages (package 9b)", () => {
+  it("switches every word to Chinese with the language button, top right, and tells the browser", async () => {
+    serve();
+    await openApp();
+
+    await userEvent.click(button("Switch to 中文"));
+
+    expect(button("德士站")).toBeInTheDocument(); // the layer buttons
+    expect(button("打开菜单")).toBeInTheDocument(); // the menu button's name for screen readers
+    expect(document.documentElement.lang).toBe("zh-Hans");
+    await userEvent.click(button("切换到English"));
+    expect(button("Taxi stands")).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("en");
+  });
+
+  it("gives toasts in Chinese, in the use case's meaning", async () => {
+    serve({ "/taxi-stands": status(503) });
+    await openApp();
+    await userEvent.click(button("Switch to 中文"));
+
+    await userEvent.click(button("德士站"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("无法加载德士站标记。请检查网络连接。");
+  });
+
+  it("chooses the language from the side menu's Language screen, and keeps it after a reload", async () => {
+    serve();
+    const first = await openApp();
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(button("Language"));
+    await userEvent.click(screen.getByRole("radio", { name: "中文" }));
+    expect(screen.getByRole("dialog", { name: "语言" })).toBeInTheDocument();
+    first.unmount();
+
+    await openApp();
+
+    expect(button("附近德士")).toBeInTheDocument();
+  });
+
+  it("words a suggested site's summary in Chinese", async () => {
+    serve();
+    const gps = fakeGeolocation();
+    vi.stubGlobal("navigator", { ...navigator, geolocation: gps.geolocation });
+    await openApp();
+    await waitFor(() => expect(gps.watching()).toBe(true));
+    act(() => gps.move(ORCHARD.latitude, ORCHARD.longitude));
+    await userEvent.click(button("Switch to 中文"));
+
+    await userEvent.click(button("打开菜单"));
+    await userEvent.click(screen.getByRole("button", { name: /^推荐载客点/ }));
+
+    expect(await screen.findByText("Orchard 拥挤 · 附近有 1 辆空德士")).toBeInTheDocument();
   });
 });

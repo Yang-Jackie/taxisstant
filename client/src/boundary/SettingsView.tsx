@@ -1,18 +1,28 @@
 import chevronLeft from "@tabler/icons/outline/chevron-left.svg?raw";
 import x from "@tabler/icons/outline/x.svg?raw";
 import { useId } from "react";
-import { TEXT_SIZES, type TextSize, type UserPreferences, type VehicleType } from "../entity/UserPreferences";
+import { useTranslation } from "react-i18next";
+import {
+  TEXT_SIZES,
+  type Language,
+  type TextSize,
+  type UserPreferences,
+  type VehicleType,
+} from "../entity/UserPreferences";
 import { Drawer } from "./Drawer";
+import { LanguageChoice } from "./LanguageChoice";
 import "./SettingsView.css";
 
-/** The vehicle types, and what choosing one does (FR-2.1.1, D43). */
-const VEHICLES: readonly { value: VehicleType | undefined; label: string; hint: string }[] = [
-  { value: undefined, label: "Not set", hint: "Shows fuel stations and charging points" },
-  { value: "FUEL", label: "Petrol or diesel", hint: "Hides charging points" },
-  { value: "EV", label: "Electric", hint: "Hides fuel stations" },
-];
+/** The vehicle types: what choosing one does is in its hint (FR-2.1.1, D43). */
+const VEHICLES: readonly (VehicleType | undefined)[] = [undefined, "FUEL", "EV"];
 
-const SIZE_NAMES: Record<TextSize, string> = { 100: "Normal", 115: "Large", 130: "Larger", 150: "Largest" };
+/** Each text size's name in the messages. */
+const SIZE_NAME: Record<TextSize, "normal" | "large" | "larger" | "largest"> = {
+  100: "normal",
+  115: "large",
+  130: "larger",
+  150: "largest",
+};
 
 interface SwitchProps {
   label: string;
@@ -51,6 +61,7 @@ function Switch({ label, hint, on, onChange }: SwitchProps) {
 
 export interface SettingsViewProps {
   preferences: UserPreferences;
+  onSetLanguage: (l: Language) => void;
   onSetVehicleType: (v: VehicleType | undefined) => void;
   /** The design model's setDisplay(fontSize, darkMode). */
   onSetDisplay: (fontSize: TextSize, darkMode: boolean) => void;
@@ -62,42 +73,47 @@ export interface SettingsViewProps {
 
 /**
  * The dialog map's Settings UI (FR-2): the design model's SettingsView. Each change takes effect and is saved at once
- * (FR-2.2.1). The language joins it in package 9b.
+ * (FR-2.2.1).
  */
 export function SettingsView({
   preferences: p,
+  onSetLanguage,
   onSetVehicleType,
   onSetDisplay,
   onSetSkipNavPrompt,
   onBack,
   onClose,
 }: SettingsViewProps) {
+  const { t } = useTranslation();
   const id = useId();
   return (
-    <Drawer label="Settings" onClose={onClose}>
+    <Drawer label={t("settings.title")} onClose={onClose}>
       <header className="settings__header">
         <button
           type="button"
           className="settings__icon-button"
-          aria-label="Back to the menu"
+          aria-label={t("menu.back")}
           autoFocus
           onClick={onBack}
           dangerouslySetInnerHTML={{ __html: chevronLeft }}
         />
-        <h2>Settings</h2>
+        <h2>{t("settings.title")}</h2>
         <button
           type="button"
           className="settings__icon-button"
-          aria-label="Close the menu"
+          aria-label={t("menu.close")}
           onClick={onClose}
           dangerouslySetInnerHTML={{ __html: x }}
         />
       </header>
 
+      <LanguageChoice language={p.language} onChange={onSetLanguage} />
+
       <fieldset className="settings__group">
-        <legend>What do you drive?</legend>
+        <legend>{t("settings.vehicle")}</legend>
         {VEHICLES.map((v) => {
-          const key = `${id}-${v.value ?? "none"}`;
+          const name = v ?? "none";
+          const key = `${id}-${name}`;
           return (
             <label key={key} className="settings__choice">
               <input
@@ -105,15 +121,15 @@ export function SettingsView({
                 name={`${id}-vehicle`}
                 aria-labelledby={`${key}-label`}
                 aria-describedby={`${key}-hint`}
-                checked={p.vehicleType === v.value}
-                onChange={() => onSetVehicleType(v.value)}
+                checked={p.vehicleType === v}
+                onChange={() => onSetVehicleType(v)}
               />
               <span className="settings__text">
                 <span className="settings__label" id={`${key}-label`}>
-                  {v.label}
+                  {t(`settings.vehicleType.${name}.label`)}
                 </span>
                 <span className="settings__hint" id={`${key}-hint`}>
-                  {v.hint}
+                  {t(`settings.vehicleType.${name}.hint`)}
                 </span>
               </span>
             </label>
@@ -122,7 +138,7 @@ export function SettingsView({
       </fieldset>
 
       <fieldset className="settings__group">
-        <legend>Text size</legend>
+        <legend>{t("settings.textSize")}</legend>
         <div className="settings__sizes">
           {TEXT_SIZES.map((size) => (
             <label key={size} className="settings__size">
@@ -132,7 +148,7 @@ export function SettingsView({
                 checked={p.fontSize === size}
                 onChange={() => onSetDisplay(size, p.darkMode)}
               />
-              <span className="settings__size-name">{SIZE_NAMES[size]}</span>
+              <span className="settings__size-name">{t(`settings.size.${SIZE_NAME[size]}`)}</span>
               {/* How big the text would be: the page is already at the current size, so relative to that */}
               <span className="settings__sample" aria-hidden="true" style={{ fontSize: `${size / p.fontSize}rem` }}>
                 Aa
@@ -144,13 +160,13 @@ export function SettingsView({
 
       <div className="settings__group">
         <Switch
-          label="Dark mode"
-          hint="Dark menus and a night map"
+          label={t("settings.darkMode")}
+          hint={t("settings.darkModeHint")}
           on={p.darkMode}
           onChange={(on) => onSetDisplay(p.fontSize, on)}
         />
         <Switch
-          label="Ask before opening Google Maps"
+          label={t("settings.askBeforeMaps")}
           on={!p.skipNavPrompt}
           onChange={(ask) => onSetSkipNavPrompt(!ask)}
         />

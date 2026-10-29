@@ -1,5 +1,6 @@
 import type { LatLngTuple, Marker as LeafletMarker } from "leaflet";
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useTranslation } from "react-i18next";
 import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents, type MarkerProps } from "react-leaflet";
 import type { Viewport } from "../entity/Bounds";
 import type { Hotspot } from "../entity/Hotspot";
@@ -32,16 +33,6 @@ import "./MapView.css";
 export const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors';
 
-/** How each layer's markers are described when grouped. */
-const PLURAL: Record<Exclude<LayerType, "HOTSPOT">, string> = {
-  TAXIS: "available taxis",
-  TAXI_STAND: "taxi stands",
-  CARPARK: "carparks",
-  FUEL: "fuel stations",
-  CHARGING: "charging places",
-  HAWKER: "hawker centres",
-};
-
 /**
  * One position array per location. react-leaflet moves a marker whenever it gets a new array, and moving a marker
  * moves its open popup, which makes Leaflet pan and report a move: a new array on every render can loop.
@@ -63,13 +54,18 @@ function positionOf(location: Location): LatLngTuple {
  */
 function TitledMarker({ title, ...props }: MarkerProps & { title: string }) {
   const ref = useRef<LeafletMarker>(null);
+  useMarkerTitle(ref, title);
+  return <Marker ref={ref} title={title} {...props} />;
+}
+
+/** Keeps a marker's title as `title`, which also changes with the language (FR-2.1.2). */
+function useMarkerTitle(ref: RefObject<LeafletMarker | null>, title: string): void {
   useEffect(() => {
     const marker = ref.current;
     if (!marker) return;
     marker.options.title = title; // Leaflet uses it again whenever it replaces the icon
     marker.getElement()?.setAttribute("title", title);
-  }, [title]);
-  return <Marker ref={ref} title={title} {...props} />;
+  }, [ref, title]);
 }
 
 export interface MapViewProps {
@@ -122,6 +118,7 @@ function FocusFollower({ focus }: { focus: MapFocus | null }) {
 
 /** The mockup's blue dot, with how far off the fix may be; grey when not live (UC 0013 1a). */
 function DriverDot({ driver }: { driver: DriverPosition }) {
+  const { t } = useTranslation();
   const colour = driver.live ? "#1e6fe0" : "#8a8d93";
   return (
     <>
@@ -134,7 +131,7 @@ function DriverDot({ driver }: { driver: DriverPosition }) {
       <TitledMarker
         position={positionOf(driver.location)}
         icon={driverIcon(driver.live)}
-        title={driver.live ? "You are here" : "Your last known position"}
+        title={driver.live ? t("map.you") : t("map.lastKnown")}
         zIndexOffset={1000}
         keyboard={false}
       />
@@ -163,6 +160,7 @@ interface PointMarkersProps<T extends Locatable> {
 
 /** One layer's markers and cluster bubbles; tapping a bubble zooms to where it splits (D17). */
 function PointMarkers<T extends Locatable>({ layer, view, keyOf, titleOf, popupOf }: PointMarkersProps<T>) {
+  const { t } = useTranslation();
   const map = useMap();
   const { items, clusters } = view;
   return (
@@ -182,7 +180,7 @@ function PointMarkers<T extends Locatable>({ layer, view, keyOf, titleOf, popupO
           key={`cluster-${c.id}`}
           position={positionOf(c.location)}
           icon={clusterIcon(layer, c.count)}
-          title={`${c.count} ${PLURAL[layer]}: tap to zoom in`}
+          title={t(`map.cluster.${layer}`, { count: c.count })}
           eventHandlers={{ click: () => map.setView([c.location.latitude, c.location.longitude], c.zoomTo) }}
         />
       ))}
@@ -203,7 +201,10 @@ function HighlightedLandmark({
   actions?: PlaceActions;
   onClosed?: (l: Landmark) => void;
 }) {
+  const { t } = useTranslation();
+  const title = t("map.highlighted", { name: landmark.name });
   const ref = useRef<LeafletMarker>(null);
+  useMarkerTitle(ref, title);
   useEffect(() => {
     ref.current?.openPopup();
   }, []);
@@ -212,7 +213,7 @@ function HighlightedLandmark({
       ref={ref}
       position={positionOf(landmark.location)}
       icon={highlightIcon(landmark.getType())}
-      title={`${landmark.name}, from your bookmarks`}
+      title={title}
       zIndexOffset={2000}
       eventHandlers={{ popupclose: () => onClosed?.(landmark) }}
     >
@@ -232,7 +233,7 @@ function HotspotCircles({
   hotspots: readonly Hotspot[];
   onNavigate?: (t: NavigationTarget) => void;
 }) {
-  const busy = (h: Hotspot) => (h.density === "HIGH" ? "very crowded" : "crowded");
+  const { t } = useTranslation();
   return (
     <>
       {hotspots.map((h) => (
@@ -248,7 +249,7 @@ function HotspotCircles({
           key={`flame-${h.id}`}
           position={positionOf(h.centre)}
           icon={markerIcon("HOTSPOT")}
-          title={`${h.stationName}: ${busy(h)}`}
+          title={t(`map.hotspot.${h.density}`, { station: h.stationName })}
         >
           <Popup>
             <HotspotDetails hotspot={h} onNavigate={onNavigate} />
@@ -260,7 +261,6 @@ function HotspotCircles({
 }
 
 const SUGGESTION_COLOUR = { find: "#e8930c", rest: "#0e7a57" } as const;
-const SUGGESTION_NAME = { PICKUP: "Suggested pickup", REST_STOP: "Suggested rest stop" } as const;
 
 /** Each suggested site's area, outlined in its suggestion's colour, with a numbered pin to tap (D33). */
 function SuggestionAreas({
@@ -270,6 +270,7 @@ function SuggestionAreas({
   suggestions: RecommendationResults;
   onNavigate?: (t: NavigationTarget) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {RECOMMENDATION_KINDS.flatMap((k) =>
@@ -294,7 +295,7 @@ function SuggestionAreas({
             key={`pin-${k}-${r.site.id}`}
             position={positionOf(r.site.centre)}
             icon={suggestionIcon(k, i + 1)}
-            title={`${SUGGESTION_NAME[k]} ${i + 1}: ${r.site.name}`}
+            title={t(`map.suggestionPin.${k}`, { place: i + 1, name: r.site.name })}
             zIndexOffset={500}
           >
             <Popup>
@@ -320,6 +321,7 @@ export function MapView({
   onHighlightClosed,
   dark = false,
 }: MapViewProps) {
+  const { t } = useTranslation();
   const fuelShown = visible.FUEL.items.length > 0 || visible.FUEL.clusters.length > 0;
   return (
     <MapContainer
@@ -345,7 +347,7 @@ export function MapView({
           popupOf={(item) => <LandmarkDetails item={item} actions={actions} />}
         />
       ))}
-      <PointMarkers layer="TAXIS" view={visible.TAXIS} keyOf={(_, i) => String(i)} titleOf={() => "Available taxi"} />
+      <PointMarkers layer="TAXIS" view={visible.TAXIS} keyOf={(_, i) => String(i)} titleOf={() => t("map.taxi")} />
       <SuggestionAreas suggestions={suggestions} onNavigate={actions?.onNavigate} />
       {highlighted && (
         <HighlightedLandmark

@@ -10,6 +10,7 @@ import type { Taxi } from "../entity/Taxi";
 import { LIVE_LAYERS, type DataSyncController, type LiveLayer } from "./DataSyncController";
 import type { DataSyncObserver } from "./DataSyncObserver";
 import type { LocationObserver } from "./LocationObserver";
+import type { NoticeKey } from "./Notice";
 import { EMPTY_VIEW, LayerClusters, type LayerView } from "./LayerClusters";
 import type { SettingsController } from "./SettingsController";
 import { Store } from "./Store";
@@ -26,8 +27,8 @@ export interface MapFocus {
 
 export interface MapDisplayState {
   readonly visible: VisibleLayers;
-  /** A message for the user, shown as a toast (D3). */
-  readonly notice: string | null;
+  /** A message for the user, shown as a toast (D3), in their language (FR-2.1.2). */
+  readonly notice: NoticeKey | null;
   /** The driver's dot: the design model's driverLocation (UC 0013). */
   readonly driver: DriverPosition | null;
   readonly focus: MapFocus | null;
@@ -40,19 +41,8 @@ export interface MapDisplayState {
 /** Centring on the driver zooms in at least this far: street level, where taxi stands and carparks show one by one. */
 const DRIVER_ZOOM = 15;
 
-/** Each layer's toast when it can't be loaded, worded as in UC 0001–0007 (exception 4a). */
-const LOAD_FAILED: Record<StaticLayer | LiveLayer, string> = {
-  TAXIS: "Unable to load nearby taxi markers. Please check your connection.",
-  HOTSPOT: "Unable to load hotspot markers. Please check your connection.",
-  TAXI_STAND: "Unable to load taxi stand markers. Please check your connection.",
-  CARPARK: "Unable to load carpark markers. Please check your connection.",
-  FUEL: "Unable to load fuel station markers. Please check your connection.",
-  CHARGING: "Unable to load charging point markers. Please check your connection.",
-  HAWKER: "Unable to load hawker centre markers. Please check your connection.",
-};
-
 /** Hotspots turned on when no station is busy: not a failure, but the empty map needs a word (D23). */
-const NO_HOTSPOTS = "No stations are crowded right now.";
+const NO_HOTSPOTS: NoticeKey = "noHotspots";
 
 /** Live layers and suggestions are polled together this often while any is on and the app is in front (D25). */
 export const LIVE_POLL_MS = 30_000;
@@ -207,8 +197,8 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
   }
 
   /** The app's one toast (D3): a newer message replaces the one showing. */
-  showNotice(message: string): void {
-    this.setState({ ...this.getSnapshot(), notice: message });
+  showNotice(notice: NoticeKey): void {
+    this.setState({ ...this.getSnapshot(), notice });
   }
 
   dismissNotice(): void {
@@ -227,7 +217,7 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
       await this.dataSync.refreshLayer(t);
     } catch {
       await this.settings.setLayerVisible(t, false);
-      this.showNotice(LOAD_FAILED[t]);
+      this.showNotice(`loadFailed.${t}`); // each use case's exception 4a
     }
   }
 
@@ -236,7 +226,7 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
       await this.dataSync.refreshLiveLayer(t);
     } catch {
       await this.settings.setLayerVisible(t, false);
-      this.showNotice(LOAD_FAILED[t]);
+      this.showNotice(`loadFailed.${t}`); // each use case's exception 4a
       return;
     }
     if (t === "HOTSPOT" && !this.repo.getByLayerType("HOTSPOT").some((h) => h.isCurrent(new Date()))) {

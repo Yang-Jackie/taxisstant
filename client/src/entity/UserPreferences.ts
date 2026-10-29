@@ -1,6 +1,9 @@
 import type { LayerType } from "./LayerType";
 import type { RecommendationKind } from "./RecommendationKind";
 
+/** The design model's Language (FR-2.1.2). */
+export type Language = "EN" | "ZH";
+
 /** The design model's VehicleType: what the driver refuels with. */
 export type VehicleType = "FUEL" | "EV";
 
@@ -15,8 +18,10 @@ export function hiddenEnergyLayer(v: VehicleType | undefined): "CHARGING" | "FUE
   return undefined;
 }
 
-/** The driver's settings. The design model's language comes in package 9b. */
+/** The driver's settings: the design model's UserPreferences. */
 export interface UserPreferences {
+  /** The phone's own language until the driver chooses (FR-2.1.2). */
+  readonly language: Language;
   readonly visibleLayers: ReadonlySet<LayerType>;
   /** The suggestions that are on (UC 0008/0009). */
   readonly activeSuggestions: ReadonlySet<RecommendationKind>;

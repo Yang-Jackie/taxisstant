@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { NavigationTarget } from "../control/NavigationController";
 import "./NavigationPrompt.css";
 
@@ -10,6 +11,7 @@ export interface NavigationPromptProps {
 
 /** UC 0012 step 3 (the dialog map's "Redirect confirmation message"): open Google Maps, Yes or No? */
 export function NavigationPrompt({ target, onAnswer }: NavigationPromptProps) {
+  const { t } = useTranslation();
   const [doNotShow, setDoNotShow] = useState(false);
   const titleId = useId();
   const textId = useId();
@@ -31,18 +33,18 @@ export function NavigationPrompt({ target, onAnswer }: NavigationPromptProps) {
         aria-labelledby={titleId}
         aria-describedby={textId}
       >
-        <h2 id={titleId}>Open Google Maps?</h2>
-        <p id={textId}>Get directions to {target.name} in Google Maps.</p>
+        <h2 id={titleId}>{t("navigation.title")}</h2>
+        <p id={textId}>{t("navigation.text", { name: target.name })}</p>
         <label className="nav-prompt__skip">
           <input type="checkbox" checked={doNotShow} onChange={(e) => setDoNotShow(e.target.checked)} />
-          Do not show this again
+          {t("navigation.doNotShow")}
         </label>
         <div className="nav-prompt__buttons">
           <button type="button" onClick={() => onAnswer(false, doNotShow)}>
-            No
+            {t("navigation.no")}
           </button>
           <button type="button" className="nav-prompt__yes" autoFocus onClick={() => onAnswer(true, doNotShow)}>
-            Yes
+            {t("navigation.yes")}
           </button>
         </div>
       </div>

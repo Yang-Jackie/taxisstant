@@ -10,6 +10,7 @@ import type { DataSyncObserver } from "./DataSyncObserver";
 import type { LocationController } from "./LocationController";
 import type { LocationObserver } from "./LocationObserver";
 import type { MapDisplayController } from "./MapDisplayController";
+import type { NoticeKey } from "./Notice";
 import type { SettingsController } from "./SettingsController";
 import { Store } from "./Store";
 
@@ -48,21 +49,6 @@ const ENERGY_BONUS = 1.25;
 export const RELATED_LAYERS: Readonly<Record<RecommendationKind, readonly LayerType[]>> = {
   PICKUP: ["TAXI_STAND", "TAXIS", "HOTSPOT"],
   REST_STOP: ["CHARGING", "FUEL", "CARPARK", "HAWKER"],
-};
-
-/** Exception 2a, in each use case's words. */
-const LOAD_FAILED: Record<RecommendationKind, string> = {
-  PICKUP: "Unable to load pickup markers. Please check your connection.",
-  REST_STOP: "Unable to load rest stop markers. Please check your connection.",
-};
-/** Exception 4a, in each use case's words: nowhere to rank from, or nothing good enough near. */
-const CANT_CALCULATE: Record<RecommendationKind, string> = {
-  PICKUP: "Unable to calculate nearby pickup spots without your location. Please try again later.",
-  REST_STOP: "Unable to calculate nearby rest stops without your location. Please try again later.",
-};
-const NONE_NEARBY: Record<RecommendationKind, string> = {
-  PICKUP: "There are no ideal pickup spots nearby. Please try again later.",
-  REST_STOP: "There are no ideal rest stops nearby. Please try again later.",
 };
 
 const NOTHING: RecommendationResults = { PICKUP: [], REST_STOP: [] };
@@ -141,7 +127,7 @@ export class RecommendationController extends Store<RecommendationState> impleme
           await this.dataSync.refreshSuggestions(k);
         } catch {
           await this.settings.setSuggestionActive(k, false);
-          this.mapDisplay.showNotice(LOAD_FAILED[k]);
+          this.mapDisplay.showNotice(`suggestionLoadFailed.${k}`);
         }
       }),
     );
@@ -162,7 +148,7 @@ export class RecommendationController extends Store<RecommendationState> impleme
     try {
       await this.dataSync.refreshSuggestions(k);
     } catch {
-      this.mapDisplay.showNotice(LOAD_FAILED[k]); // exception 2a: the toggle stays off
+      this.mapDisplay.showNotice(`suggestionLoadFailed.${k}`); // exception 2a: the toggle stays off
       return;
     } finally {
       this.setPending(k, false);
@@ -171,8 +157,12 @@ export class RecommendationController extends Store<RecommendationState> impleme
     const { reason } = this.ranking(k);
     if (reason) {
       // Exception 4a; a list that went out of date while loading is 2a
-      const notice = { NO_POSITION: CANT_CALCULATE, NONE_NEARBY: NONE_NEARBY, OUT_OF_DATE: LOAD_FAILED }[reason][k];
-      this.mapDisplay.showNotice(notice);
+      const notices: Record<NoResultsReason, NoticeKey> = {
+        NO_POSITION: `cantCalculate.${k}`,
+        NONE_NEARBY: `noneNearby.${k}`,
+        OUT_OF_DATE: `suggestionLoadFailed.${k}`,
+      };
+      this.mapDisplay.showNotice(notices[reason]);
       return;
     }
     const hidden = hiddenEnergyLayer(this.settings.getPreferences().vehicleType); // not the other energy (D43)

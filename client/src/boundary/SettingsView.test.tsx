@@ -1,12 +1,14 @@
 // Package 9a acceptance tests — SettingsView «boundary»: the dialog map's Settings UI (FR-2). It shows the
 // preferences and reports each change; SettingsController saves it (FR-2.2.1).
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { UserPreferences } from "../entity/UserPreferences";
+import { i18next } from "./i18n";
 import { SettingsView, type SettingsViewProps } from "./SettingsView";
 
 const defaults: UserPreferences = {
+  language: "EN",
   visibleLayers: new Set(),
   activeSuggestions: new Set(),
   suggestionLayers: new Map(),
@@ -17,6 +19,7 @@ const defaults: UserPreferences = {
 
 function renderSettings(preferences: Partial<UserPreferences> = {}, props: Partial<SettingsViewProps> = {}) {
   const handlers = {
+    onSetLanguage: vi.fn(),
     onSetVehicleType: vi.fn(),
     onSetDisplay: vi.fn(),
     onSetSkipNavPrompt: vi.fn(),
@@ -87,5 +90,22 @@ describe("SettingsView", () => {
     await userEvent.keyboard("{Escape}");
     expect(onBack).toHaveBeenCalledOnce();
     expect(onClose).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("SettingsView — the language (package 9b)", () => {
+  it("shows the language first, and reports a new one (the dialog map's 'language select')", async () => {
+    const { onSetLanguage } = renderSettings({ language: "EN" });
+    expect(screen.getByRole("radio", { name: "English" })).toBeChecked();
+    await userEvent.click(screen.getByRole("radio", { name: "中文" }));
+    expect(onSetLanguage).toHaveBeenCalledExactlyOnceWith("ZH");
+  });
+
+  it("speaks Chinese", async () => {
+    await act(() => i18next.changeLanguage("zh"));
+    renderSettings({ language: "ZH" });
+    expect(screen.getByRole("dialog", { name: "设置" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "电动车" })).toHaveAccessibleDescription("隐藏加油站");
+    expect(screen.getByRole("switch", { name: "深色模式" })).toBeInTheDocument();
   });
 });

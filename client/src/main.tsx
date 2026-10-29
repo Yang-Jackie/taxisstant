@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "leaflet/dist/leaflet.css";
 import "./index.css";
 import "./boundary/leafletSetup";
+import "./boundary/i18n"; // every word, in English and Chinese, before anything renders
 import { App } from "./App";
 import { ControllersContext, initControllers, startControllers } from "./startup";
 

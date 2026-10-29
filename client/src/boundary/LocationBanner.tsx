@@ -1,26 +1,12 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import "./LocationBanner.css";
 
-/** How to allow location again, by browser: a web page can't open those settings itself (D30). */
-function stepsFor(userAgent: string): string[] {
-  if (/iPhone|iPad|iPod/.test(userAgent)) {
-    return [
-      "Open the Settings app, then Privacy & Security, then Location Services.",
-      "Turn Location Services on, then tap Safari Websites and choose While Using the App.",
-      "Come back here and tap Try again.",
-    ];
-  }
-  if (/Android/.test(userAgent)) {
-    return [
-      "Tap the icon left of the address bar, then Permissions (or Site settings).",
-      "Set Location to Allow, and make sure the phone's Location is on.",
-      "Come back here and tap Try again.",
-    ];
-  }
-  return [
-    "Open this site's settings in your browser (the icon left of the address).",
-    "Allow Location, then tap Try again.",
-  ];
+/** Which steps allow location again on this browser: a web page can't open those settings itself (D30). */
+function stepsFor(userAgent: string): "ios" | "android" | "other" {
+  if (/iPhone|iPad|iPod/.test(userAgent)) return "ios";
+  if (/Android/.test(userAgent)) return "android";
+  return "other";
 }
 
 export interface LocationBannerProps {
@@ -30,13 +16,14 @@ export interface LocationBannerProps {
 
 /** UC 0013 exception 1a: location is denied. Its "Open Settings" becomes steps to follow (D30). */
 export function LocationBanner({ onRetry, userAgent = globalThis.navigator?.userAgent ?? "" }: LocationBannerProps) {
+  const { t } = useTranslation();
   const [showSteps, setShowSteps] = useState(false);
   return (
-    <section className="location-banner" aria-label="Location access">
-      <p>Location access required to show real-time position.</p>
+    <section className="location-banner" aria-label={t("location.region")}>
+      <p>{t("location.needed")}</p>
       {showSteps && (
         <ol>
-          {stepsFor(userAgent).map((step) => (
+          {t(`location.steps.${stepsFor(userAgent)}`, { returnObjects: true }).map((step) => (
             <li key={step}>{step}</li>
           ))}
         </ol>
@@ -44,11 +31,11 @@ export function LocationBanner({ onRetry, userAgent = globalThis.navigator?.user
       <div className="location-banner__actions">
         {!showSteps && (
           <button type="button" onClick={() => setShowSteps(true)}>
-            How to turn it on
+            {t("location.howTo")}
           </button>
         )}
         <button type="button" onClick={onRetry}>
-          Try again
+          {t("location.retry")}
         </button>
       </div>
     </section>

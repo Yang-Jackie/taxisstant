@@ -10,29 +10,22 @@ import { SuggestedPickup } from "../entity/SuggestedPickup";
 import { Sidemenu, type SidemenuProps } from "./Sidemenu";
 
 const asOf = new Date("2026-10-29T13:05:00Z"); // 21:05 in Singapore
-const pickup = (id: string, name: string, summary: string, centre: Location) =>
+/** A pickup at a crowded Orchard with `taxis` empty taxis nearby: its summary is built from these facts. */
+const pickup = (id: string, name: string, taxis: number, centre: Location) =>
   new SuggestedPickup({
     id,
     name,
     centre,
     radius: 300,
     score: 0.5,
-    summary,
+    summary: "(the server's English summary, which the app no longer shows)",
     asOf,
-    taxiCount: 0,
+    taxiCount: taxis,
+    crowdDensity: "MEDIUM",
+    stationName: "Orchard",
   });
-const mtElizabeth = pickup(
-  "A05",
-  "Mt Elizabeth Hospital",
-  "Orchard crowded · 1 empty taxi nearby",
-  new Location(1.304571786, 103.835547),
-);
-const luckyPlaza = pickup(
-  "A01",
-  "Lucky Plaza",
-  "Orchard crowded · 3 empty taxis nearby",
-  new Location(1.304294727, 103.8338467),
-);
+const mtElizabeth = pickup("A05", "Mt Elizabeth Hospital", 1, new Location(1.304571786, 103.835547));
+const luckyPlaza = pickup("A01", "Lucky Plaza", 3, new Location(1.304294727, 103.8338467));
 
 const none: RecommendationState = { results: { PICKUP: [], REST_STOP: [] }, noResults: {}, pending: new Set() };
 const pickupsOn: RecommendationState = {
@@ -154,5 +147,12 @@ describe("Sidemenu", () => {
     renderMenu({ onOpenSettings });
     await userEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(onOpenSettings).toHaveBeenCalledOnce();
+  });
+
+  it("opens the language choice from its Language entry (the dialog map's 'Language selection button pressed')", async () => {
+    const onOpenLanguage = vi.fn();
+    renderMenu({ onOpenLanguage });
+    await userEvent.click(screen.getByRole("button", { name: "Language" }));
+    expect(onOpenLanguage).toHaveBeenCalledOnce();
   });
 });

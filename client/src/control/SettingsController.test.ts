@@ -348,3 +348,46 @@ describe("SettingsController — vehicle type, text size and dark mode (package 
     expect(notChosen.getPreferences().darkMode).toBe(true);
   });
 });
+
+describe("SettingsController — the language (package 9b, FR-2.1.2)", () => {
+  const noDark = { matches: false, addEventListener: () => {} };
+
+  it("starts in the phone's language: Chinese for any zh, else English (D47)", () => {
+    const languageFor = (tags: string[]) =>
+      new SettingsController(memoryStore(), noDark, tags).getPreferences().language;
+    expect(languageFor(["zh-SG"])).toBe("ZH");
+    expect(languageFor(["zh-Hans-CN", "en"])).toBe("ZH");
+    expect(languageFor(["en-GB", "zh-SG"])).toBe("EN");
+    expect(languageFor(["ms-MY", "zh-TW"])).toBe("ZH"); // the first the app speaks
+    expect(languageFor(["ta-SG"])).toBe("EN");
+  });
+
+  it("saves a chosen language, which load() brings back whatever the phone says", async () => {
+    const store = memoryStore();
+    await new SettingsController(store, noDark, ["en"]).setLanguage("ZH");
+
+    expect(store.data.get("preferences")).toMatchObject({ language: "ZH" });
+    const afterReload = new SettingsController(store, noDark, ["en"]);
+    await afterReload.load();
+    expect(afterReload.getPreferences().language).toBe("ZH");
+  });
+
+  it("doesn't save the phone's language as a choice", async () => {
+    const store = memoryStore();
+    const settings = new SettingsController(store, noDark, ["zh-SG"]);
+    await settings.setLayerVisible("FUEL", true);
+    expect(store.data.get("preferences")).not.toHaveProperty("language");
+  });
+
+  it("saves choosing the phone's own language, so it stays if the phone changes later", async () => {
+    const store = memoryStore();
+    await new SettingsController(store, noDark, ["en"]).setLanguage("EN");
+    expect(store.data.get("preferences")).toMatchObject({ language: "EN" });
+  });
+
+  it("load() goes by the phone when the saved language is one it doesn't know", async () => {
+    const settings = new SettingsController(memoryStore({ preferences: { language: "FR" } }), noDark, ["zh"]);
+    await settings.load();
+    expect(settings.getPreferences().language).toBe("ZH");
+  });
+});

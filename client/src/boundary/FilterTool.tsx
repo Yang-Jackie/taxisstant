@@ -1,16 +1,6 @@
+import { useTranslation } from "react-i18next";
 import { LAYER_TYPES, type LayerType } from "../entity/LayerType";
 import "./FilterTool.css";
-
-/** Button labels, as in the team's mockup. */
-const LABELS: Record<LayerType, string> = {
-  TAXI_STAND: "Taxi stands",
-  TAXIS: "Nearby taxis",
-  HOTSPOT: "Hotspots",
-  CARPARK: "Carpark",
-  FUEL: "Fuel",
-  CHARGING: "Charge",
-  HAWKER: "Hawker food",
-};
 
 export interface FilterToolProps {
   active: ReadonlySet<LayerType>;
@@ -19,12 +9,14 @@ export interface FilterToolProps {
   layers?: readonly LayerType[];
 }
 
+/** The layer toggles, labelled as in the team's mockup. */
 export function FilterTool({ active, onToggle, layers = LAYER_TYPES }: FilterToolProps) {
+  const { t } = useTranslation();
   return (
-    <nav className="filter-tool" aria-label="Map layers">
-      {layers.map((t) => (
-        <button key={t} type="button" aria-pressed={active.has(t)} onClick={() => onToggle(t)}>
-          {LABELS[t]}
+    <nav className="filter-tool" aria-label={t("layers.label")}>
+      {layers.map((layer) => (
+        <button key={layer} type="button" aria-pressed={active.has(layer)} onClick={() => onToggle(layer)}>
+          {t(`layers.${layer}`)}
         </button>
       ))}
     </nav>

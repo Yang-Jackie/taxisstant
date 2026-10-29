@@ -13,6 +13,7 @@ import { callsTo, fakeServer, hotspotsAt, offline, ok, status, TAXIS, type Answe
 import { DataSyncController, type LiveLayer } from "./DataSyncController";
 import { LIVE_POLL_MS, MapDisplayController, SINGAPORE_VIEW } from "./MapDisplayController";
 import { SettingsController } from "./SettingsController";
+import { toastText } from "../testing/toastText";
 
 function memoryStore(initial: Record<string, unknown> = {}) {
   const data = new Map<string, unknown>(Object.entries(initial));
@@ -79,7 +80,7 @@ describe("MapDisplayController", () => {
     await mapDisplay.toggleLayer("TAXI_STAND");
 
     expect(settings.isLayerVisible("TAXI_STAND")).toBe(false);
-    expect(mapDisplay.getSnapshot().notice).toMatch(/unable to load taxi stand markers/i);
+    expect(toastText(mapDisplay.getSnapshot().notice)).toMatch(/unable to load taxi stand markers/i);
     expect(ids(mapDisplay, "TAXI_STAND")).toEqual([]);
   });
 
@@ -162,7 +163,7 @@ describe("MapDisplayController — every static layer (package 2b, UC 0004–000
 
       await mapDisplay.toggleLayer(layer);
 
-      expect(mapDisplay.getSnapshot().notice).toMatch(toast);
+      expect(toastText(mapDisplay.getSnapshot().notice)).toMatch(toast);
       expect(settings.isLayerVisible(layer)).toBe(false);
     });
   }
@@ -302,7 +303,7 @@ describe("MapDisplayController — live layers (package 2d)", () => {
 
     await mapDisplay.toggleLayer("HOTSPOT");
 
-    expect(mapDisplay.getSnapshot().notice).toBe("No stations are crowded right now.");
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe("No stations are crowded right now.");
     expect(settings.isLayerVisible("HOTSPOT")).toBe(true);
   });
 
@@ -316,7 +317,7 @@ describe("MapDisplayController — live layers (package 2d)", () => {
 
       await mapDisplay.toggleLayer(layer);
 
-      expect(mapDisplay.getSnapshot().notice).toMatch(toast);
+      expect(toastText(mapDisplay.getSnapshot().notice)).toMatch(toast);
       expect(settings.isLayerVisible(layer)).toBe(false);
     });
   }

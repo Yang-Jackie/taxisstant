@@ -1,6 +1,10 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FilterTool } from "./boundary/FilterTool";
+import { HTML_LANG, i18next, LOCALE } from "./boundary/i18n";
 import type { PlaceActions } from "./boundary/LandmarkDetails";
+import { LanguageButton } from "./boundary/LanguageButton";
+import { LanguageView } from "./boundary/LanguageView";
 import { LocationBanner } from "./boundary/LocationBanner";
 import { LocationButton } from "./boundary/LocationButton";
 import { MapView } from "./boundary/MapView";
@@ -34,7 +38,8 @@ export function App() {
   const saved = useStore(bookmarks);
   const route = useStore(navigation);
   // The drawer's screens, as in the dialog map: the side menu, and Settings reached from it
-  const [panel, setPanel] = useState<"menu" | "settings" | null>(null);
+  const [panel, setPanel] = useState<"menu" | "settings" | "language" | null>(null);
+  const { t } = useTranslation();
   const dismissNotice = useCallback(() => mapDisplay.dismissNotice(), [mapDisplay]);
   const onPan = useCallback((viewport: Viewport) => mapDisplay.refreshVisible(viewport), [mapDisplay]);
   const closeMenu = useCallback(() => setPanel(null), []);
@@ -68,6 +73,12 @@ export function App() {
     (ok: boolean, doNotShow: boolean) => navigation.confirm(ok, doNotShow),
     [navigation],
   );
+
+  // The driver's language, for every word on screen and for screen readers (FR-2.1.2)
+  useEffect(() => {
+    void i18next.changeLanguage(LOCALE[preferences.language]);
+    document.documentElement.lang = HTML_LANG[preferences.language];
+  }, [preferences.language]);
 
   // Text size and dark mode apply to the whole page: rem-based text scales with the root (FR-2, D44)
   useEffect(() => {
@@ -106,6 +117,7 @@ export function App() {
         dark={preferences.darkMode}
       />
       <MenuButton onClick={() => setPanel("menu")} />
+      <LanguageButton language={preferences.language} onChange={(l) => void settings.setLanguage(l)} />
       <LocationButton
         enabled={display.driver !== null}
         highlighted={display.driverOffCentre}
@@ -127,6 +139,7 @@ export function App() {
           bookmarks={saved.bookmarks}
           driverAt={whereabouts.position?.location}
           onSelectBookmark={showBookmark}
+          onOpenLanguage={() => setPanel("language")}
           onOpenSettings={() => setPanel("settings")}
           onClose={closeMenu}
         />
@@ -134,6 +147,7 @@ export function App() {
       {panel === "settings" && (
         <SettingsView
           preferences={preferences}
+          onSetLanguage={(l) => void settings.setLanguage(l)}
           onSetVehicleType={(v) => void settings.setVehicleType(v)}
           onSetDisplay={(fontSize, darkMode) => void settings.setDisplay(fontSize, darkMode)}
           onSetSkipNavPrompt={(skip) => void settings.setSkipNavPrompt(skip)}
@@ -142,7 +156,15 @@ export function App() {
         />
       )}
       {route.pending && <NavigationPrompt target={route.pending} onAnswer={answerNavigation} />}
-      {display.notice && <Toast message={display.notice} onDismiss={dismissNotice} />}
+      {panel === "language" && (
+        <LanguageView
+          language={preferences.language}
+          onChange={(l) => void settings.setLanguage(l)}
+          onBack={() => setPanel("menu")}
+          onClose={closeMenu}
+        />
+      )}
+      {display.notice && <Toast message={t(`toast.${display.notice}`)} onDismiss={dismissNotice} />}
     </div>
   );
 }

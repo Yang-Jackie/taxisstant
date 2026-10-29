@@ -15,6 +15,7 @@ import { BookmarkController } from "./BookmarkController";
 import { DataSyncController } from "./DataSyncController";
 import { MapDisplayController, SINGAPORE_VIEW } from "./MapDisplayController";
 import { SettingsController } from "./SettingsController";
+import { toastText } from "../testing/toastText";
 
 function memoryStore(initial: Record<string, unknown> = {}) {
   const data = new Map<string, unknown>(Object.entries(initial));
@@ -55,7 +56,7 @@ describe("BookmarkController — the star (UC 0011's alternative flows)", () => 
     expect(bookmarks.isBookmarked(suntec)).toBe(true);
     expect(bookmarks.getSnapshot().bookmarks.map((b) => b.label)).toEqual(["Suntec City"]);
     expect(bookmarks.getSnapshot().ids.has("CARPARK:1")).toBe(true);
-    expect(mapDisplay.getSnapshot().notice).toBe("Location has been favourited");
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe("Location has been favourited");
   });
 
   it("takes the bookmark away when the star is lit, and says so", async () => {
@@ -67,7 +68,7 @@ describe("BookmarkController — the star (UC 0011's alternative flows)", () => 
 
     expect(bookmarks.isBookmarked(suntec)).toBe(false);
     expect(bookmarks.getBookmarks()).toEqual([]);
-    expect(mapDisplay.getSnapshot().notice).toBe("Location has been unfavourited");
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe("Location has been unfavourited");
   });
 
   it('saves them under "bookmarks" as plain data, and load() brings them back, newest first', async () => {
@@ -168,7 +169,9 @@ describe("BookmarkController.openBookmark (UC 0011 steps 2–4)", () => {
     await bookmarks.openBookmark("CARPARK:1");
 
     expect(mapDisplay.getSnapshot().highlighted).toBeNull();
-    expect(mapDisplay.getSnapshot().notice).toBe("Unable to find bookmarked location. Please try again later");
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe(
+      "Unable to find bookmarked location. Please try again later",
+    );
   });
 
   it("3a: says it can't find it when its layer can't be loaded at all", async () => {
@@ -181,7 +184,9 @@ describe("BookmarkController.openBookmark (UC 0011 steps 2–4)", () => {
 
     await bookmarks.openBookmark("CARPARK:1");
 
-    expect(mapDisplay.getSnapshot().notice).toBe("Unable to find bookmarked location. Please try again later");
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe(
+      "Unable to find bookmarked location. Please try again later",
+    );
   });
 });
 

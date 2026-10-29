@@ -1,6 +1,6 @@
 // Package 2b tests — LandmarkDetails: what a marker's popup says, per layer.
 // Package 8: its star (UC 0011) and Navigate (UC 0012), and Navigate in hotspot and suggestion popups (D39).
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Carpark } from "../entity/Carpark";
@@ -11,6 +11,7 @@ import { Hotspot } from "../entity/Hotspot";
 import { Location } from "../entity/Location";
 import { TaxiStand } from "../entity/TaxiStand";
 import { SuggestedPickup } from "../entity/SuggestedPickup";
+import { i18next } from "./i18n";
 import { HotspotDetails, LandmarkDetails, SuggestionDetails, type PlaceActions } from "./LandmarkDetails";
 
 const at = (address?: string) => new Location(1.3, 103.8, address);
@@ -110,6 +111,15 @@ describe("LandmarkDetails — live availability (package 2d)", () => {
     );
     render(<LandmarkDetails item={carpark} now={now} />);
     expect(text()).toContain("117 lots free · as of 20:50");
+  });
+
+  it("carpark: says one free lot as one", () => {
+    const carpark = new Carpark({ id: "1", name: "Suntec City", location: at(), agency: "LTA" }).withAvailability(
+      1,
+      asOf,
+    );
+    render(<LandmarkDetails item={carpark} now={now} />);
+    expect(text()).toContain("1 lot free · as of 20:50");
   });
 
   it("charging station: free chargers out of all of them, and as of when", () => {
@@ -228,5 +238,32 @@ describe("LandmarkDetails — star and Navigate (package 8, D39)", () => {
     render(<SuggestionDetails recommendation={{ site, distanceM: 100 }} onNavigate={onNavigate} />);
     for (const button of screen.getAllByRole("button", { name: "Navigate" })) await userEvent.click(button);
     expect(onNavigate.mock.calls.map(([t]) => t.name)).toEqual(["City Hall", "Lucky Plaza"]);
+  });
+});
+
+describe("LandmarkDetails — in Chinese (package 9b)", () => {
+  it("says a carpark's free lots and its time in Chinese; names and places stay as the data gives them", async () => {
+    await act(() => i18next.changeLanguage("zh"));
+    const asOf = new Date("2026-10-28T12:50:00Z");
+    const suntec = new Carpark({ id: "1", name: "Suntec City", location: at(), agency: "LTA", area: "Marina" });
+    render(<LandmarkDetails item={suntec.withAvailability(117, asOf)} now={asOf} />);
+    expect(screen.getByRole("heading", { name: "Suntec City" })).toBeInTheDocument();
+    expect(text()).toContain("LTA 停车场 · Marina");
+    expect(text()).toContain("117 个空位 · 20:50 更新");
+  });
+
+  it("gives a hawker centre's next closure with Chinese dates", async () => {
+    await act(() => i18next.changeLanguage("zh"));
+    const centre = new HawkerCentre({
+      id: "adam",
+      name: "Adam Road Food Centre",
+      location: at("2, Adam Road"),
+      foodStalls: 32,
+      marketStalls: 0,
+      closures: [{ from: "2026-12-07", to: "2026-12-08", reason: "cleaning" }],
+    });
+    render(<LandmarkDetails item={centre} now={new Date("2026-10-29T04:00:00Z")} />);
+    expect(text()).toContain("32 个熟食摊位");
+    expect(text()).toContain("下次休息：12月7日 – 12月8日（清洗）");
   });
 });
