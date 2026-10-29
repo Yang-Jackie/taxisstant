@@ -1,4 +1,4 @@
-import { Popup as LeafletPopup, point, type LatLngTuple, type Marker as LeafletMarker } from "leaflet";
+import { Popup as LeafletPopup, point, type DivIcon, type LatLngTuple, type Marker as LeafletMarker } from "leaflet";
 import { Fragment, useCallback, useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -27,7 +27,15 @@ import { bookmarkIdOf } from "../entity/Bookmark";
 import type { NavigationTarget } from "../control/NavigationController";
 import { HotspotDetails, LandmarkDetails, SuggestionDetails, type PlaceActions } from "./LandmarkDetails";
 import type { MapInsets } from "./useMapInsets";
-import { clusterIcon, driverIcon, highlightIcon, markerIcon, SUGGESTION_GROUP, suggestionIcon } from "./markerIcons";
+import {
+  bookmarkIcon,
+  clusterIcon,
+  driverIcon,
+  highlightIcon,
+  markerIcon,
+  SUGGESTION_GROUP,
+  suggestionIcon,
+} from "./markerIcons";
 import {
   MAX_ZOOM,
   MIN_ZOOM,
@@ -45,12 +53,13 @@ export const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors';
 
 /**
- * Leaflet stacks shapes (400) under markers (600) under popups (700). Two panes go between markers and popups (D51):
- * the suggestions, so that no layer's markers cover a suggested area or its pin, and over them what the driver keeps an
- * eye on, their own dot and a chosen bookmark. The panes take no taps themselves, so the markers under them still do.
- * Their markers' popups go in Leaflet's popup pane: react-leaflet would put them in the markers' own pane, under the
- * markers above.
+ * Leaflet stacks shapes (400) under markers (600) under popups (700). Three panes go between markers and popups: the
+ * driver's bookmarks (D53); over them the suggestions, so that no layer's markers cover a suggested area or its pin
+ * (D51); and over those what the driver keeps an eye on, their own dot and a chosen bookmark. The panes take no taps
+ * themselves, so the markers under them still do. Their markers' popups go in Leaflet's popup pane: react-leaflet would
+ * put them in the markers' own pane, under the markers above.
  */
+const BOOKMARK_PANE = { zIndex: 605, pointerEvents: "none" } as const;
 const SUGGESTION_PANE = { zIndex: 610, pointerEvents: "none" } as const;
 const TOP_PANE = { zIndex: 620, pointerEvents: "none" } as const;
 
@@ -99,6 +108,8 @@ export interface MapViewProps {
   focus?: MapFocus | null;
   /** The suggested sites, best first per suggestion (UC 0008/0009). */
   suggestions?: RecommendationResults;
+  /** With the Bookmarks filter on, every bookmark's landmark, starred (D53). */
+  bookmarked?: readonly Landmark[];
   /** What the popups' buttons do: bookmark and navigate (D39). Without them, popups give facts only. */
   actions?: PlaceActions;
   /** A landmark to show highlighted with its details open: a chosen bookmark (UC 0011). */
@@ -210,18 +221,18 @@ function StablePopup({ content }: { content: ReactNode }) {
 /** One landmark's marker, with its details made only when the landmark or what its popup can do changes. */
 function PointMarker<T extends Locatable>({
   item,
-  layer,
+  icon,
   title,
   popupOf,
 }: {
   item: T;
-  layer: Exclude<LayerType, "HOTSPOT">;
+  icon: DivIcon;
   title: string;
   popupOf?: (item: T) => ReactNode;
 }) {
   const content = useMemo(() => popupOf?.(item), [popupOf, item]);
   return (
-    <TitledMarker position={positionOf(item.getLocation())} icon={markerIcon(layer)} title={title}>
+    <TitledMarker position={positionOf(item.getLocation())} icon={icon} title={title}>
       {content && <StablePopup content={content} />}
     </TitledMarker>
   );
@@ -235,7 +246,13 @@ function PointMarkers<T extends Locatable>({ layer, view, keyOf, titleOf, popupO
   return (
     <>
       {items.map((item, i) => (
-        <PointMarker key={keyOf(item, i)} item={item} layer={layer} title={titleOf(item)} popupOf={popupOf} />
+        <PointMarker
+          key={keyOf(item, i)}
+          item={item}
+          icon={markerIcon(layer)}
+          title={titleOf(item)}
+          popupOf={popupOf}
+        />
       ))}
       {clusters.map((c) => (
         <TitledMarker
@@ -408,6 +425,7 @@ function SuggestionAreas({
 }
 
 const NO_SUGGESTIONS: RecommendationResults = { PICKUP: [], REST_STOP: [] };
+const NO_LANDMARKS: readonly Landmark[] = [];
 const NO_INSETS: MapInsets = { top: 0, bottom: 0 };
 
 export function MapView({
@@ -416,6 +434,7 @@ export function MapView({
   driver = null,
   focus = null,
   suggestions = NO_SUGGESTIONS,
+  bookmarked = NO_LANDMARKS,
   actions,
   highlighted = null,
   onHighlightClosed,
@@ -451,6 +470,18 @@ export function MapView({
         />
       ))}
       <PointMarkers layer="TAXIS" view={visible.TAXIS} keyOf={(_, i) => String(i)} titleOf={() => t("map.taxi")} />
+      {/* Every bookmark, starred, whatever layers are on and never in a cluster (D53) */}
+      <Pane name="bookmarks" style={BOOKMARK_PANE}>
+        {bookmarked.map((l) => (
+          <PointMarker
+            key={bookmarkIdOf(l)}
+            item={l}
+            icon={bookmarkIcon(l.getType())}
+            title={t("map.bookmarked", { name: l.name })}
+            popupOf={landmarkPopup}
+          />
+        ))}
+      </Pane>
       <Pane name="suggestions" style={SUGGESTION_PANE}>
         <SuggestionAreas suggestions={suggestions} onNavigate={actions?.onNavigate} />
       </Pane>

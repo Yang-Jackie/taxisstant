@@ -23,6 +23,8 @@ export interface UserPreferences {
   /** The phone's own language until the driver chooses (FR-2.1.2). */
   readonly language: Language;
   readonly visibleLayers: ReadonlySet<LayerType>;
+  /** The Bookmarks filter: every bookmark on the map, whatever layers are on (D53). */
+  readonly showBookmarks: boolean;
   /** The suggestions that are on (UC 0008/0009). */
   readonly activeSuggestions: ReadonlySet<RecommendationKind>;
   /** The layers each suggestion turned on itself, which it turns off again with it (D35). */

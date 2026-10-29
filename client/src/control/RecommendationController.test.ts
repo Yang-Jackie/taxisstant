@@ -50,6 +50,7 @@ const prefs = (vehicleType?: VehicleType): UserPreferences => ({
   activeSuggestions: new Set(),
   suggestionLayers: new Map(),
   skipNavPrompt: false,
+  showBookmarks: false,
   fontSize: 100,
   darkMode: false,
   ...(vehicleType && { vehicleType }),

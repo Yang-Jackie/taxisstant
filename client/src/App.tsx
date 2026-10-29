@@ -115,6 +115,7 @@ export function App() {
         driver={display.driver}
         focus={display.focus}
         suggestions={suggestions.results}
+        bookmarked={saved.onMap}
         actions={actions}
         highlighted={display.highlighted}
         onHighlightClosed={endHighlight}
@@ -135,6 +136,8 @@ export function App() {
           onToggle={(t) => void mapDisplay.toggleLayer(t)}
           layers={LAYER_TYPES.filter((t) => t !== hiddenEnergyLayer(preferences.vehicleType))}
           loading={display.loading}
+          bookmarksShown={preferences.showBookmarks}
+          onToggleBookmarks={() => void bookmarks.toggleShown()}
         />
       </div>
       {panel === "menu" && (

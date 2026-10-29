@@ -57,6 +57,14 @@ function visibleWith(layers: Partial<VisibleLayers> = {}): VisibleLayers {
 
 const markers = (container: HTMLElement) => container.querySelectorAll(".leaflet-marker-icon");
 
+/** Where an element's pane is in the stack: Leaflet's own panes as leaflet.css (which jsdom doesn't load) has them. */
+function stackOf(el: Element | null): number {
+  const pane = el?.closest<HTMLElement>(".leaflet-pane");
+  const leaflet = { "leaflet-overlay-pane": 400, "leaflet-marker-pane": 600, "leaflet-popup-pane": 700 };
+  const own = Object.entries(leaflet).find(([name]) => pane?.classList.contains(name));
+  return own ? own[1] : Number(pane?.style.zIndex);
+}
+
 /** jsdom lays nothing out, so every element is 0×0; give the map a phone-sized box. */
 function withScreenSize() {
   vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(400);
@@ -337,19 +345,19 @@ describe("MapView — suggestions (package 7)", () => {
     expect(screen.getByTitle("Suggested rest stop 1: Maxwell Food Centre")).toHaveClass("suggestion-pin--rest");
   });
 
+  it("puts each suggestion's own icon on its pins, the hailing hand and the cup, not the bookmarks' star (D52)", () => {
+    render(<MapView visible={visibleWith()} suggestions={suggestions} />);
+    const pin = (title: string) => screen.getByTitle(title);
+    expect(pin("Suggested pickup 1: Lucky Plaza").querySelector(".icon-tabler-hand-stop")).not.toBeNull();
+    expect(pin("Suggested rest stop 1: Maxwell Food Centre").querySelector(".icon-tabler-cup")).not.toBeNull();
+    expect(document.querySelectorAll(".suggestion-pin .icon-tabler-star")).toHaveLength(0);
+  });
+
   it("outlines each site's area in its suggestion's colour", () => {
     const { container } = render(<MapView visible={visibleWith()} suggestions={suggestions} />);
     expect(container.querySelectorAll('path[stroke="#e8930c"]')).toHaveLength(2);
     expect(container.querySelectorAll('path[stroke="#0e7a57"]')).toHaveLength(1);
   });
-
-  /** Where an element's pane is in the stack: Leaflet's own panes as leaflet.css (which jsdom doesn't load) has them. */
-  function stackOf(el: Element | null): number {
-    const pane = el?.closest<HTMLElement>(".leaflet-pane");
-    const leaflet = { "leaflet-overlay-pane": 400, "leaflet-marker-pane": 600, "leaflet-popup-pane": 700 };
-    const own = Object.entries(leaflet).find(([name]) => pane?.classList.contains(name));
-    return own ? own[1] : Number(pane?.style.zIndex);
-  }
 
   it("lays each area's outline and pin over every layer's markers, and its fill under them (D51)", () => {
     const { container } = render(
@@ -433,6 +441,7 @@ describe("MapView — bookmarks and navigation (package 8)", () => {
   it("shows a highlighted landmark ringed, with its details open, even with its layer off", async () => {
     const { container } = render(<MapView visible={visibleWith()} highlighted={suntec} actions={actions()} />);
     expect(screen.getByTitle("Suntec City, from your bookmarks")).toHaveClass("marker-chip--highlighted");
+    expect(screen.getByTitle("Suntec City, from your bookmarks").querySelector(".marker-chip__star")).not.toBeNull();
     expect(await screen.findByRole("heading", { name: "Suntec City" })).toBeInTheDocument();
     expect(container.querySelectorAll(".leaflet-popup")).toHaveLength(1);
   });
@@ -443,6 +452,47 @@ describe("MapView — bookmarks and navigation (package 8)", () => {
     await screen.findByRole("heading", { name: "Suntec City" });
     fireEvent.click(document.querySelector(".leaflet-popup-close-button")!);
     expect(onHighlightClosed).toHaveBeenCalledWith(suntec);
+  });
+});
+
+// Package 10a-3 — the Bookmarks filter: every bookmark on the map, starred (D53).
+describe("MapView — bookmarks on the map (package 10a-3)", () => {
+  const actions = (): PlaceActions => ({
+    bookmarked: new Set(["CARPARK:1"]),
+    onToggleBookmark: vi.fn(),
+    onNavigate: vi.fn(),
+  });
+
+  it("draws each bookmarked landmark as its layer's marker with a star, even with its layer off", () => {
+    render(<MapView visible={visibleWith()} bookmarked={[suntec]} />);
+    const marker = screen.getByTitle("Suntec City, bookmarked");
+    expect(marker).toHaveClass("marker-chip--rest", "marker-chip--bookmarked");
+    expect(marker.querySelector(".icon-tabler-parking")).not.toBeNull();
+    expect(marker.querySelector(".marker-chip__star")).not.toBeNull();
+  });
+
+  it("lays them over the layers' markers and under the suggestions, letting taps through to what's below", () => {
+    const { container } = render(
+      <MapView visible={visibleWith({ CARPARK: { items: [suntec], clusters: [] } })} bookmarked={[suntec]} />,
+    );
+    const starred = stackOf(screen.getByTitle("Suntec City, bookmarked"));
+    expect(starred).toBeGreaterThan(stackOf(screen.getByTitle("Suntec City")));
+    expect(starred).toBeLessThan(stackOf(container.querySelector(".leaflet-suggestions-pane")));
+    expect(screen.getByTitle("Suntec City, bookmarked").closest(".leaflet-pane")).toHaveStyle({
+      pointerEvents: "none",
+    });
+  });
+
+  it("opens a bookmarked landmark's details, its star lit, when tapped", async () => {
+    render(<MapView visible={visibleWith()} bookmarked={[suntec]} actions={actions()} />);
+    fireEvent.click(screen.getByTitle("Suntec City, bookmarked"));
+    expect(await screen.findByRole("button", { name: "Remove the bookmark for Suntec City" })).toBeInTheDocument();
+    expect(stackOf(screen.getByRole("heading", { name: "Suntec City" }))).toBe(700);
+  });
+
+  it("draws none without bookmarks to show", () => {
+    const { container } = render(<MapView visible={visibleWith()} />);
+    expect(container.querySelectorAll(".marker-chip--bookmarked")).toHaveLength(0);
   });
 });
 

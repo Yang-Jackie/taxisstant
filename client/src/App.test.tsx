@@ -216,11 +216,11 @@ describe("App (with controllers)", () => {
 
 // Package 2d — live layers in the whole app.
 describe("App — live layers (package 2d)", () => {
-  it("shows nearby taxis when turned on (UC 0002), clustered over the island", async () => {
+  it("shows taxis when turned on (UC 0002), clustered over the island", async () => {
     const fetchFn = serve();
     const { container } = await openApp();
 
-    await userEvent.click(button("Nearby taxis"));
+    await userEvent.click(button("Taxis"));
 
     await waitFor(() => expect(shown(container)).toBe(4));
     expect(callsTo(fetchFn, "/taxis")).toBeGreaterThanOrEqual(1);
@@ -237,20 +237,20 @@ describe("App — live layers (package 2d)", () => {
     expect(screen.queryByTitle(/Jurong East/)).not.toBeInTheDocument(); // LOW isn't a hotspot (D23)
   });
 
-  it("gives nearby taxis their toast and switches back when they can't be loaded", async () => {
+  it("gives taxis their toast and switches back when they can't be loaded", async () => {
     serve({ "/taxis": status(503) });
     await openApp();
 
-    await userEvent.click(button("Nearby taxis"));
+    await userEvent.click(button("Taxis"));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/unable to load nearby taxi markers/i);
-    expect(button("Nearby taxis")).toHaveAttribute("aria-pressed", "false");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/unable to load taxi markers/i);
+    expect(button("Taxis")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("pauses polling while the page is hidden, and asks again when it is shown (D25)", async () => {
     const fetchFn = serve();
     const { container } = await openApp();
-    await userEvent.click(button("Nearby taxis"));
+    await userEvent.click(button("Taxis"));
     await waitFor(() => expect(shown(container)).toBe(4)); // the first request has finished, not just started
     const before = callsTo(fetchFn, "/taxis");
 
@@ -488,6 +488,23 @@ describe("App — bookmarks and navigation (package 8)", () => {
     expect(await screen.findByTitle("Suntec City, from your bookmarks")).toHaveClass("marker-chip--highlighted");
   });
 
+  it("shows every bookmark with the Bookmarks filter, even with its layer off, and keeps it on after a reload (D53)", async () => {
+    serve();
+    const first = await openSuntec();
+    await userEvent.click(button("Bookmark Suntec City"));
+    await userEvent.click(button("Carpark")); // the layer off again
+    await userEvent.click(button("Bookmarks"));
+
+    expect(await screen.findByTitle("Suntec City, bookmarked")).toHaveClass("marker-chip--bookmarked");
+    expect(screen.queryByTitle("Suntec City")).not.toBeInTheDocument();
+    expect(button("Bookmarks")).toHaveAttribute("aria-pressed", "true");
+    first.unmount();
+
+    await openApp();
+
+    expect(await screen.findByTitle("Suntec City, bookmarked")).toBeInTheDocument();
+  });
+
   it("keeps bookmarks after a reload", async () => {
     serve();
     const first = await openSuntec();
@@ -670,7 +687,7 @@ describe("App — languages (package 9b)", () => {
 
     await openApp();
 
-    expect(button("附近德士")).toBeInTheDocument();
+    expect(button("德士")).toBeInTheDocument();
   });
 
   it("words a suggested site's summary in Chinese", async () => {

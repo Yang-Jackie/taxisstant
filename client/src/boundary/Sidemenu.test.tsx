@@ -114,6 +114,15 @@ describe("Sidemenu", () => {
     });
   }
 
+  it("marks Smart suggestions with sparkles, Bookmarks with the star, and each suggestion with its own icon (D52)", () => {
+    renderMenu();
+    const heading = (name: string) => screen.getByRole("heading", { name });
+    expect(heading("Smart suggestions").querySelector(".icon-tabler-sparkles")).not.toBeNull();
+    expect(heading("Bookmarks").querySelector(".icon-tabler-star")).not.toBeNull();
+    expect(toggle("Suggested pickup").querySelector(".icon-tabler-hand-stop")).not.toBeNull(); // not Hotspot's flame
+    expect(toggle("Suggested rest stop").querySelector(".icon-tabler-cup")).not.toBeNull();
+  });
+
   it("closes with its close button, a tap outside it, or Escape", async () => {
     const { onClose } = renderMenu();
     await userEvent.click(screen.getByRole("button", { name: "Close the menu" }));

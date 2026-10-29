@@ -1,11 +1,9 @@
 import car from "@tabler/icons/outline/car.svg?raw";
-import cup from "@tabler/icons/outline/cup.svg?raw";
-import flame from "@tabler/icons/outline/flame.svg?raw";
-import bookmarkIcon from "@tabler/icons/outline/bookmarks.svg?raw";
 import helpIcon from "@tabler/icons/outline/help-circle.svg?raw";
 import settingsIcon from "@tabler/icons/outline/settings.svg?raw";
-import worldIcon from "@tabler/icons/outline/world.svg?raw";
+import sparkles from "@tabler/icons/outline/sparkles.svg?raw";
 import star from "@tabler/icons/outline/star.svg?raw";
+import worldIcon from "@tabler/icons/outline/world.svg?raw";
 import x from "@tabler/icons/outline/x.svg?raw";
 import { useTranslation } from "react-i18next";
 import type { NavigationTarget } from "../control/NavigationController";
@@ -16,12 +14,9 @@ import { RECOMMENDATION_KINDS, type RecommendationKind } from "../entity/Recomme
 import type { SuggestedSite } from "../entity/SuggestedSite";
 import { BookmarkPanel } from "./BookmarkPanel";
 import { Drawer } from "./Drawer";
-import { SUGGESTION_GROUP } from "./markerIcons";
+import { SUGGESTION_GROUP, SUGGESTION_ICON } from "./markerIcons";
 import { RecommendationCard } from "./RecommendationCard";
 import "./Sidemenu.css";
-
-/** The mockup's icons for the two suggestions. */
-const ICON: Record<RecommendationKind, string> = { PICKUP: flame, REST_STOP: cup };
 
 export interface SidemenuProps {
   /** The suggestions that are on. */
@@ -82,7 +77,7 @@ export function Sidemenu({
         />
       </header>
       <h2 className="sidemenu__label">
-        <span dangerouslySetInnerHTML={{ __html: star }} />
+        <span dangerouslySetInnerHTML={{ __html: sparkles }} />
         {t("menu.suggestions")}
       </h2>
       {RECOMMENDATION_KINDS.map((k) => {
@@ -96,7 +91,7 @@ export function Sidemenu({
               aria-busy={pending}
               onClick={() => onToggleSuggestion(k)}
             >
-              <span className="sidemenu__icon" dangerouslySetInnerHTML={{ __html: ICON[k] }} />
+              <span className="sidemenu__icon" dangerouslySetInnerHTML={{ __html: SUGGESTION_ICON[k] }} />
               <span className="sidemenu__toggle-text">
                 <span className="sidemenu__title">{t(`menu.entry.${k}.title`)}</span>
                 <span className="sidemenu__subtitle">
@@ -117,7 +112,8 @@ export function Sidemenu({
         );
       })}
       <h2 className="sidemenu__label">
-        <span dangerouslySetInnerHTML={{ __html: bookmarkIcon }} />
+        {/* The star, as in a place's details and on a bookmarked marker (D52) */}
+        <span dangerouslySetInnerHTML={{ __html: star }} />
         {t("menu.bookmarks")}
       </h2>
       <div className="sidemenu__bookmarks">

@@ -42,6 +42,7 @@ describe("SettingsController", () => {
 
     expect(store.data.get("preferences")).toEqual({
       visibleLayers: ["TAXI_STAND"],
+      showBookmarks: false,
       activeSuggestions: [],
       suggestionLayers: {},
       skipNavPrompt: false,
@@ -165,6 +166,7 @@ describe("SettingsController — suggestions (package 7, D35)", () => {
 
     expect(store.data.get("preferences")).toEqual({
       visibleLayers: ["CARPARK", "HAWKER"],
+      showBookmarks: false,
       activeSuggestions: ["REST_STOP"],
       suggestionLayers: { REST_STOP: ["CARPARK", "HAWKER"] },
       skipNavPrompt: false,
@@ -221,6 +223,35 @@ describe("SettingsController — the navigation prompt (package 8)", () => {
     const settings = new SettingsController(memoryStore({ preferences: { skipNavPrompt: "yes" } }));
     await settings.load();
     expect(settings.getPreferences().skipNavPrompt).toBe(false);
+  });
+});
+
+describe("SettingsController — the Bookmarks filter (package 10a-3, D53)", () => {
+  it("starts off, turns on and off, saves it, and load() brings it back", async () => {
+    const store = memoryStore();
+    const settings = new SettingsController(store);
+    expect(settings.getPreferences().showBookmarks).toBe(false);
+
+    await settings.setBookmarksShown(true);
+
+    expect(store.data.get("preferences")).toMatchObject({ showBookmarks: true });
+    const afterReload = new SettingsController(store);
+    await afterReload.load();
+    expect(afterReload.getPreferences().showBookmarks).toBe(true);
+    await afterReload.setBookmarksShown(false);
+    expect(store.data.get("preferences")).toMatchObject({ showBookmarks: false });
+  });
+
+  it("doesn't save when it's already as asked", async () => {
+    const store = memoryStore();
+    await new SettingsController(store).setBookmarksShown(false);
+    expect(store.data.has("preferences")).toBe(false);
+  });
+
+  it("load() reads it as off when the saved value isn't a yes or no", async () => {
+    const settings = new SettingsController(memoryStore({ preferences: { showBookmarks: "yes" } }));
+    await settings.load();
+    expect(settings.getPreferences().showBookmarks).toBe(false);
   });
 });
 

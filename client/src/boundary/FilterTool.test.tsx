@@ -12,7 +12,7 @@ import { i18next } from "./i18n";
 const toggles = () => screen.getAllByRole("button").filter((b) => b.hasAttribute("aria-pressed"));
 
 /** The labels from the team's mockup, one per LayerType. */
-const LABELS = ["Taxi stands", "Nearby taxis", "Hotspots", "Carpark", "Fuel", "Charge", "Hawker food"];
+const LABELS = ["Taxi stands", "Taxis", "Hotspots", "Carpark", "Fuel", "Charge", "Hawker food"];
 
 describe("FilterTool", () => {
   it("shows one toggle button per map layer, labelled as in the mockup", () => {
@@ -62,7 +62,7 @@ describe("FilterTool — the mockup's bottom sheet (package 10a)", () => {
     expect(toggles().map((b) => b.getAttribute("aria-label"))).toEqual([
       "Hotspots",
       "Taxi stands",
-      "Nearby taxis",
+      "Taxis",
       "Fuel",
       "Charge",
       "Carpark",
@@ -98,7 +98,7 @@ describe("FilterTool — the mockup's bottom sheet (package 10a)", () => {
     expect(toggles().map((b) => b.textContent?.trim())).toEqual([
       "Hotspots",
       "Taxi stands",
-      "Nearby taxis",
+      "Taxis",
       "Fuel",
       "Charge",
       "Carpark",
@@ -147,5 +147,50 @@ describe("FilterTool — loading (NF-3)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Show the layers' names" }));
 
     expect(screen.getByRole("button", { name: "Fuel" })).toHaveAttribute("aria-busy", "true");
+  });
+});
+
+// Package 10a-3 — the Bookmarks filter (D53), and the taxi stand's own icon (D52).
+describe("FilterTool — Bookmarks (package 10a-3)", () => {
+  it("offers Bookmarks after the layers, as an amber star, chip and tile alike", async () => {
+    render(<FilterTool active={new Set()} onToggle={() => {}} onToggleBookmarks={() => {}} />);
+    const chip = toggles().at(-1)!;
+    expect(chip).toHaveAccessibleName("Bookmarks");
+    expect(chip).toHaveClass("filter-tool__chip--find");
+    expect(chip.querySelector(".icon-tabler-star")).not.toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Show the layers' names" }));
+
+    expect(toggles().at(-1)).toHaveTextContent("Bookmarks");
+    expect(toggles().at(-1)!.querySelector(".icon-tabler-star")).not.toBeNull();
+  });
+
+  it("shows whether it's on, and reports a tap without turning any layer on", async () => {
+    const onToggle = vi.fn();
+    const onToggleBookmarks = vi.fn();
+    const { rerender } = render(
+      <FilterTool active={new Set()} onToggle={onToggle} onToggleBookmarks={onToggleBookmarks} />,
+    );
+    expect(screen.getByRole("button", { name: "Bookmarks" })).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Bookmarks" }));
+    expect(onToggleBookmarks).toHaveBeenCalledOnce();
+    expect(onToggle).not.toHaveBeenCalled();
+
+    rerender(
+      <FilterTool active={new Set()} onToggle={onToggle} bookmarksShown onToggleBookmarks={onToggleBookmarks} />,
+    );
+    expect(screen.getByRole("button", { name: "Bookmarks" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("isn't offered without somewhere to send its taps", () => {
+    render(<FilterTool active={new Set()} onToggle={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Bookmarks" })).not.toBeInTheDocument();
+  });
+
+  it("gives Taxi stands a stop for cars, not a map pin", () => {
+    render(<FilterTool active={new Set()} onToggle={() => {}} />);
+    const chip = screen.getByRole("button", { name: "Taxi stands" });
+    expect(chip.querySelector(".icon-taximate-taxi-stand")).not.toBeNull();
   });
 });

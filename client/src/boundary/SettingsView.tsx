@@ -16,11 +16,11 @@ import "./SettingsView.css";
 /** The vehicle types: what choosing one does is in its hint (FR-2.1.1, D43). */
 const VEHICLES: readonly (VehicleType | undefined)[] = [undefined, "FUEL", "EV"];
 
-/** Each text size's name in the messages. */
-const SIZE_NAME: Record<TextSize, "normal" | "large" | "larger" | "largest"> = {
+/** Each font size's name in the messages (D52). */
+const SIZE_NAME: Record<TextSize, "normal" | "large" | "extraLarge" | "largest"> = {
   100: "normal",
   115: "large",
-  130: "larger",
+  130: "extraLarge",
   150: "largest",
 };
 
@@ -138,7 +138,7 @@ export function SettingsView({
       </fieldset>
 
       <fieldset className="settings__group">
-        <legend>{t("settings.textSize")}</legend>
+        <legend>{t("settings.fontSize")}</legend>
         <div className="settings__sizes">
           {TEXT_SIZES.map((size) => (
             <label key={size} className="settings__size">

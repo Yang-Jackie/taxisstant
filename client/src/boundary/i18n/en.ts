@@ -18,17 +18,19 @@ export const en = {
     expand: "Show the layers' names",
     collapse: "Show icons only",
     TAXI_STAND: "Taxi stands",
-    TAXIS: "Nearby taxis",
+    TAXIS: "Taxis",
     HOTSPOT: "Hotspots",
     CARPARK: "Carpark",
     FUEL: "Fuel",
     CHARGING: "Charge",
     HAWKER: "Hawker food",
+    /** D53: every bookmark on the map. */
+    bookmarks: "Bookmarks",
   },
   toast: {
     loadFailed: {
       TAXI_STAND: "Unable to load taxi stand markers. Please check your connection.",
-      TAXIS: "Unable to load nearby taxi markers. Please check your connection.",
+      TAXIS: "Unable to load taxi markers. Please check your connection.",
       HOTSPOT: "Unable to load hotspot markers. Please check your connection.",
       CARPARK: "Unable to load carpark markers. Please check your connection.",
       FUEL: "Unable to load fuel station markers. Please check your connection.",
@@ -51,9 +53,11 @@ export const en = {
     bookmarkAdded: "Location has been favourited",
     bookmarkRemoved: "Location has been unfavourited",
     bookmarkNotFound: "Unable to find bookmarked location. Please try again later",
+    /** D53: the Bookmarks filter turned on with nothing to show. */
+    noBookmarks: "No bookmarks yet. Tap the star on a place's details to save it.",
     /** D49: live data the driver has on went out of date. */
     outOfDate: {
-      TAXIS: "Nearby taxis are out of date, so they're hidden. Please check your connection.",
+      TAXIS: "Taxis are out of date, so they're hidden. Please check your connection.",
       HOTSPOT: "Hotspots are out of date, so they're hidden. Please check your connection.",
       CARPARK: "Carparks' free lots are out of date. Please check your connection.",
       CHARGING: "Free chargers are out of date. Please check your connection.",
@@ -80,6 +84,7 @@ export const en = {
       REST_STOP: "Suggested rest stop {{place}}: {{name}}",
     },
     highlighted: "{{name}}, from your bookmarks",
+    bookmarked: "{{name}}, bookmarked",
   },
   units: {
     metres: "{{n}} m",
@@ -173,8 +178,8 @@ export const en = {
       FUEL: { label: "Petrol or diesel", hint: "Hides charging points" },
       EV: { label: "Electric", hint: "Hides fuel stations" },
     },
-    textSize: "Text size",
-    size: { normal: "Normal", large: "Large", larger: "Larger", largest: "Largest" },
+    fontSize: "Font size",
+    size: { normal: "Normal", large: "Large", extraLarge: "Extra large", largest: "Largest" },
     darkMode: "Dark mode",
     darkModeHint: "Dark menus and a night map",
     askBeforeMaps: "Ask before opening Google Maps",
@@ -196,7 +201,7 @@ export const en = {
       },
       bookmarks: {
         title: "Bookmarks",
-        text: "Tap the star in a place's details to save it; your bookmarks are in the menu. Tap the star again to remove it.",
+        text: "Tap the star in a place's details to save it; your bookmarks are in the menu, and the star at the bottom shows them all on the map. Tap the star in its details again to remove it.",
       },
       location: {
         title: "Your location",
@@ -204,7 +209,7 @@ export const en = {
       },
       settings: {
         title: "Settings",
-        text: "Choose the language, what you drive, the text size and dark mode.",
+        text: "Choose the language, what you drive, the font size and dark mode.",
       },
       freshness: {
         title: "How up to date",

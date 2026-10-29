@@ -1,4 +1,5 @@
 import chevronRight from "@tabler/icons/outline/chevron-right.svg?raw";
+import star from "@tabler/icons/outline/star.svg?raw";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LAYER_TYPES, type LayerType } from "../entity/LayerType";
@@ -10,19 +11,24 @@ const NOTHING_LOADING: ReadonlySet<LayerType> = new Set();
 /** The mockup's order: the layers for finding passengers (amber), then those for a break (green). */
 const MOCKUP_ORDER: readonly LayerType[] = ["HOTSPOT", "TAXI_STAND", "TAXIS", "FUEL", "CHARGING", "CARPARK", "HAWKER"];
 
-interface ButtonsProps {
-  layers: readonly LayerType[];
-  active: ReadonlySet<LayerType>;
-  loading: ReadonlySet<LayerType>;
-  onToggle: (t: LayerType) => void;
+/** One button in the sheet: a layer, or the Bookmarks filter (D53). */
+interface Filter {
+  readonly key: string;
+  readonly icon: string;
+  readonly label: string;
+  /** Its colour: its layer's group, or for Bookmarks the star's amber. */
+  readonly group: "find" | "rest";
+  readonly on: boolean;
+  /** Its data is on its way. */
+  readonly busy: boolean;
+  readonly onToggle: () => void;
 }
 
 /**
  * The collapsed sheet: icon-only chips in a row that scrolls sideways, with a fade and chevron while more are off to
  * the right. Each chip keeps its layer's name for screen readers and as a tooltip.
  */
-function Chips({ layers, active, loading, onToggle }: ButtonsProps) {
-  const { t } = useTranslation();
+function Chips({ filters }: { filters: readonly Filter[] }) {
   const row = useRef<HTMLDivElement>(null);
   const [more, setMore] = useState(false);
   useEffect(() => {
@@ -36,21 +42,21 @@ function Chips({ layers, active, loading, onToggle }: ButtonsProps) {
       el.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [layers]);
+  }, [filters.length]);
   return (
     <div className="filter-tool__peek-area">
       <div ref={row} className="filter-tool__peek">
-        {layers.map((layer) => (
+        {filters.map((f) => (
           <button
-            key={layer}
+            key={f.key}
             type="button"
-            className={`filter-tool__chip filter-tool__chip--${GROUP[layer]}`}
-            aria-pressed={active.has(layer)}
-            aria-busy={loading.has(layer)}
-            aria-label={t(`layers.${layer}`)}
-            title={t(`layers.${layer}`)}
-            onClick={() => onToggle(layer)}
-            dangerouslySetInnerHTML={{ __html: LAYER_ICON[layer] }}
+            className={`filter-tool__chip filter-tool__chip--${f.group}`}
+            aria-pressed={f.on}
+            aria-busy={f.busy}
+            aria-label={f.label}
+            title={f.label}
+            onClick={f.onToggle}
+            dangerouslySetInnerHTML={{ __html: f.icon }}
           />
         ))}
       </div>
@@ -62,21 +68,20 @@ function Chips({ layers, active, loading, onToggle }: ButtonsProps) {
 }
 
 /** The expanded sheet (the dialog map's Filter menu): a tile per layer, with its icon and name. */
-function Tiles({ layers, active, loading, onToggle }: ButtonsProps) {
-  const { t } = useTranslation();
+function Tiles({ filters }: { filters: readonly Filter[] }) {
   return (
     <div className="filter-tool__tiles">
-      {layers.map((layer) => (
+      {filters.map((f) => (
         <button
-          key={layer}
+          key={f.key}
           type="button"
-          className={`filter-tool__tile filter-tool__tile--${GROUP[layer]}`}
-          aria-pressed={active.has(layer)}
-          aria-busy={loading.has(layer)}
-          onClick={() => onToggle(layer)}
+          className={`filter-tool__tile filter-tool__tile--${f.group}`}
+          aria-pressed={f.on}
+          aria-busy={f.busy}
+          onClick={f.onToggle}
         >
-          <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: LAYER_ICON[layer] }} />
-          {t(`layers.${layer}`)}
+          <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: f.icon }} />
+          {f.label}
         </button>
       ))}
     </div>
@@ -90,6 +95,9 @@ export interface FilterToolProps {
   layers?: readonly LayerType[];
   /** Layers whose data is on its way: a spinner shows, if it takes a moment (NF-3). */
   loading?: ReadonlySet<LayerType>;
+  /** The Bookmarks filter, after the layers (D53): offered only with somewhere to send its taps. */
+  bookmarksShown?: boolean;
+  onToggleBookmarks?: () => void;
 }
 
 /**
@@ -97,10 +105,36 @@ export interface FilterToolProps {
  * a layer at once, and a handle that expands the sheet to labelled tiles and back. A chip stays lit while its layer is
  * on, in its group's colour.
  */
-export function FilterTool({ active, onToggle, layers = LAYER_TYPES, loading = NOTHING_LOADING }: FilterToolProps) {
+export function FilterTool({
+  active,
+  onToggle,
+  layers = LAYER_TYPES,
+  loading = NOTHING_LOADING,
+  bookmarksShown = false,
+  onToggleBookmarks,
+}: FilterToolProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const shown = MOCKUP_ORDER.filter((l) => layers.includes(l));
+  const filters: Filter[] = MOCKUP_ORDER.filter((l) => layers.includes(l)).map((layer) => ({
+    key: layer,
+    icon: LAYER_ICON[layer],
+    label: t(`layers.${layer}`),
+    group: GROUP[layer],
+    on: active.has(layer),
+    busy: loading.has(layer),
+    onToggle: () => onToggle(layer),
+  }));
+  if (onToggleBookmarks) {
+    filters.push({
+      key: "bookmarks",
+      icon: star,
+      label: t("layers.bookmarks"),
+      group: "find", // amber, as the star in a place's details
+      on: bookmarksShown,
+      busy: false,
+      onToggle: onToggleBookmarks,
+    });
+  }
   return (
     <nav className="filter-tool" aria-label={t("layers.label")}>
       <button
@@ -112,11 +146,7 @@ export function FilterTool({ active, onToggle, layers = LAYER_TYPES, loading = N
       >
         <span className="filter-tool__bar" />
       </button>
-      {expanded ? (
-        <Tiles layers={shown} active={active} loading={loading} onToggle={onToggle} />
-      ) : (
-        <Chips layers={shown} active={active} loading={loading} onToggle={onToggle} />
-      )}
+      {expanded ? <Tiles filters={filters} /> : <Chips filters={filters} />}
     </nav>
   );
 }

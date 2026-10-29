@@ -38,7 +38,8 @@ export function initControllers(): Controllers {
   const recommendations = new RecommendationController(settings, dataSync, repo, mapDisplay, location);
   dataSync.attach(recommendations);
   location.attach(recommendations);
-  const bookmarks = new BookmarkController(new BookmarkList(), localStore, repo, dataSync, mapDisplay);
+  const bookmarks = new BookmarkController(new BookmarkList(), localStore, repo, dataSync, mapDisplay, settings);
+  dataSync.attach(bookmarks);
   const navigation = new NavigationController(settings, new NavigationGateway());
   return { settings, dataSync, mapDisplay, location, recommendations, bookmarks, navigation };
 }

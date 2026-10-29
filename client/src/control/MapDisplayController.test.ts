@@ -277,7 +277,7 @@ describe("MapDisplayController — live layers (package 2d)", () => {
     vi.restoreAllMocks();
   });
 
-  it("toggling Nearby taxis on downloads them and shows each taxi at street level", async () => {
+  it("toggling Taxis on downloads them and shows each taxi at street level", async () => {
     const { fetchFn, settings, mapDisplay } = setUp();
 
     await mapDisplay.toggleLayer("TAXIS");
@@ -319,7 +319,7 @@ describe("MapDisplayController — live layers (package 2d)", () => {
   });
 
   const toasts: [LiveLayer, string, RegExp][] = [
-    ["TAXIS", "/taxis", /^Unable to load nearby taxi markers\. Please check your connection\.$/],
+    ["TAXIS", "/taxis", /^Unable to load taxi markers\. Please check your connection\.$/],
     ["HOTSPOT", "/hotspots", /^Unable to load hotspot markers\. Please check your connection\.$/],
   ];
   for (const [layer, path, toast] of toasts) {
@@ -587,7 +587,7 @@ describe("MapDisplayController — out-of-date live data (D49)", () => {
     await vi.advanceTimersByTimeAsync(4.5 * 60 * 1000);
     expect(notice(mapDisplay)).toBeNull();
     await vi.advanceTimersByTimeAsync(60 * 1000); // over 5 minutes old (D22)
-    expect(notice(mapDisplay)).toBe("Nearby taxis are out of date, so they're hidden. Please check your connection.");
+    expect(notice(mapDisplay)).toBe("Taxis are out of date, so they're hidden. Please check your connection.");
 
     mapDisplay.dismissNotice();
     await vi.advanceTimersByTimeAsync(3 * LIVE_POLL_MS);
@@ -609,7 +609,7 @@ describe("MapDisplayController — out-of-date live data (D49)", () => {
     server.state.online = false;
     await vi.advanceTimersByTimeAsync(5.5 * 60 * 1000); // and gone again
 
-    expect(notice(mapDisplay)).toMatch(/^Nearby taxis are out of date/);
+    expect(notice(mapDisplay)).toMatch(/^Taxis are out of date/);
     mapDisplay.setForeground(false);
   });
 

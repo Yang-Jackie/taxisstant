@@ -15,5 +15,6 @@ export type NoticeKey =
   | "bookmarkAdded"
   | "bookmarkRemoved"
   | "bookmarkNotFound"
+  | "noBookmarks"
   | `outOfDate.${LiveData}`
   | "outOfDate.several";

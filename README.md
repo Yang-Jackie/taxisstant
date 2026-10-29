@@ -19,7 +19,7 @@ It suggests where to find a fare and where to take a break, hands directions to 
 | `server/` | The data service: Node.js with Express. On a schedule, it fetches open data from LTA DataMall, data.gov.sg and OpenStreetMap, checks and prepares it, and scores the suggested sites. It serves all of this at `/api`. There's no database: it keeps the latest good copy of each dataset in memory. |
 | `shared/` | The contract between the two: zod schemas for every API response, and `shared/openapi.json`, generated from them.                                                                                                                                                                                  |
 
-[PLAN.md](PLAN.md) has the build plan and the design decisions (D1–D51). It also maps the code to the team's design model.
+[PLAN.md](PLAN.md) has the build plan and the design decisions (D1–D53). It also maps the code to the team's design model.
 
 ## Set up
 

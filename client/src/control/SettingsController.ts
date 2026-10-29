@@ -24,6 +24,7 @@ const namesOf = <T>(isName: (v: unknown) => v is T) =>
 /** What is saved: plain arrays and objects, as IndexedDB keeps them. Anything missing or unexpected reads as unset. */
 const SavedPreferences = z.object({
   visibleLayers: namesOf(isLayerType),
+  showBookmarks: z.boolean().catch(false),
   activeSuggestions: namesOf(isRecommendationKind),
   suggestionLayers: z.record(z.string(), z.unknown()).catch({}),
   skipNavPrompt: z.boolean().catch(false),
@@ -83,6 +84,7 @@ export class SettingsController extends Store<UserPreferences> {
     super({
       language: phoneLanguage,
       visibleLayers: new Set(),
+      showBookmarks: false,
       activeSuggestions: new Set(),
       suggestionLayers: new Map(),
       skipNavPrompt: false,
@@ -115,6 +117,7 @@ export class SettingsController extends Store<UserPreferences> {
     if (!saved.success) return; // not an object at all: keep the defaults
     const {
       visibleLayers,
+      showBookmarks,
       activeSuggestions,
       suggestionLayers,
       skipNavPrompt,
@@ -137,6 +140,7 @@ export class SettingsController extends Store<UserPreferences> {
     this.setState({
       language: language ?? this.phoneLanguage,
       visibleLayers: visible,
+      showBookmarks,
       activeSuggestions: active,
       suggestionLayers: owned,
       skipNavPrompt,
@@ -186,6 +190,12 @@ export class SettingsController extends Store<UserPreferences> {
     }
     await this.save({ ...prefs, visibleLayers, activeSuggestions, suggestionLayers });
     return changed;
+  }
+
+  /** The Bookmarks filter (D53). */
+  async setBookmarksShown(on: boolean): Promise<void> {
+    if (this.getSnapshot().showBookmarks === on) return;
+    await this.save({ ...this.getSnapshot(), showBookmarks: on });
   }
 
   /** The navigation prompt's "Do not show this again" (the design model's setSkipNavPrompt). */
@@ -238,6 +248,7 @@ export class SettingsController extends Store<UserPreferences> {
     this.setState(next);
     await this.localStore.write(KEY, {
       visibleLayers: [...next.visibleLayers],
+      showBookmarks: next.showBookmarks,
       activeSuggestions: [...next.activeSuggestions],
       suggestionLayers: Object.fromEntries([...next.suggestionLayers].map(([k, layers]) => [k, [...layers]])),
       skipNavPrompt: next.skipNavPrompt,

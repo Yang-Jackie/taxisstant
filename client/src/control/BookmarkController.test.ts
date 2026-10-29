@@ -1,6 +1,7 @@
 // Package 8 acceptance tests — BookmarkController «control»: UC 0011 Bookmarks. The star bookmarks a landmark or
 // takes the bookmark away, with UC 0011's messages; choosing a bookmark shows its landmark highlighted (steps 2–4),
-// or exception 3a's toast when it can't be found. Saved through LocalStore (D42).
+// or exception 3a's toast when it can't be found. Saved through LocalStore (D42). Package 10a-3: the Bookmarks filter
+// shows them all on the map (D53).
 import { describe, expect, it } from "vitest";
 import type { Viewport } from "../entity/Bounds";
 import { BookmarkList } from "../entity/BookmarkList";
@@ -36,8 +37,9 @@ function setUp(answers: Record<string, Answer> = {}, store = memoryStore()) {
   const mapDisplay = new MapDisplayController(settings, dataSync, repo);
   dataSync.attach(mapDisplay);
   mapDisplay.refreshVisible(STREET_LEVEL);
-  const bookmarks = new BookmarkController(new BookmarkList(), store, repo, dataSync, mapDisplay);
-  return { store, repo, dataSync, mapDisplay, bookmarks };
+  const bookmarks = new BookmarkController(new BookmarkList(), store, repo, dataSync, mapDisplay, settings);
+  dataSync.attach(bookmarks);
+  return { store, repo, settings, dataSync, mapDisplay, bookmarks };
 }
 
 /** Suntec City, as the carpark layer has it once loaded. */
@@ -121,7 +123,7 @@ describe("BookmarkController — the star (UC 0011's alternative flows)", () => 
   it("load() starts with none when nothing, or something unexpected, was saved", async () => {
     const { bookmarks } = setUp({}, memoryStore({ bookmarks: "hello" }));
     await bookmarks.load();
-    expect(bookmarks.getSnapshot()).toEqual({ bookmarks: [], ids: new Set() });
+    expect(bookmarks.getSnapshot()).toEqual({ bookmarks: [], ids: new Set(), onMap: [] });
   });
 });
 
@@ -187,6 +189,118 @@ describe("BookmarkController.openBookmark (UC 0011 steps 2–4)", () => {
     expect(toastText(mapDisplay.getSnapshot().notice)).toBe(
       "Unable to find bookmarked location. Please try again later",
     );
+  });
+});
+
+describe("BookmarkController — the Bookmarks filter (D53)", () => {
+  /** A store as a session that bookmarked Suntec City leaves it, without the carpark layer saved. */
+  async function suntecSaved(): Promise<ReturnType<typeof memoryStore>> {
+    const store = memoryStore();
+    const first = setUp({}, store);
+    await first.bookmarks.toggleBookmark(await suntecIn(first.dataSync, first.repo));
+    store.data.delete("cache:/carparks");
+    return store;
+  }
+  const onMap = (bookmarks: BookmarkController) => bookmarks.getSnapshot().onMap.map((l) => l.name);
+
+  it("shows every bookmark's landmark, as today's data has it, and none once off again", async () => {
+    const { repo, dataSync, settings, bookmarks } = setUp();
+    const suntec = await suntecIn(dataSync, repo);
+    await bookmarks.toggleBookmark(suntec);
+    expect(onMap(bookmarks)).toEqual([]);
+
+    await bookmarks.toggleShown();
+    expect(bookmarks.getSnapshot().onMap).toEqual([suntec]);
+    expect(settings.getPreferences().showBookmarks).toBe(true);
+
+    await bookmarks.toggleShown();
+    expect(onMap(bookmarks)).toEqual([]);
+    expect(settings.getPreferences().showBookmarks).toBe(false);
+  });
+
+  it("follows the bookmarks while on: a new one shows, a removed one goes", async () => {
+    const { repo, dataSync, bookmarks } = setUp();
+    await dataSync.refreshLayer("CARPARK");
+    const [suntec, amk] = repo.getByLayerType("CARPARK");
+    await bookmarks.toggleBookmark(suntec!);
+    await bookmarks.toggleShown();
+
+    await bookmarks.toggleBookmark(amk!);
+    expect(onMap(bookmarks)).toContain(amk!.name);
+    await bookmarks.toggleBookmark(suntec!);
+    expect(onMap(bookmarks)).toEqual([amk!.name]);
+  });
+
+  it("loads the layers its bookmarks need when turned on", async () => {
+    const { mapDisplay, bookmarks } = setUp({}, await suntecSaved());
+    await bookmarks.load();
+
+    await bookmarks.toggleShown();
+
+    expect(onMap(bookmarks)).toEqual(["Suntec City"]);
+    expect(mapDisplay.getSnapshot().notice).toBeNull();
+  });
+
+  it("stays on from an earlier session, showing each bookmark once its layer arrives", async () => {
+    const store = await suntecSaved();
+    store.data.set("preferences", { showBookmarks: true });
+    const { settings, dataSync, bookmarks } = setUp({}, store);
+    await Promise.all([settings.load(), bookmarks.load()]);
+    expect(onMap(bookmarks)).toEqual([]); // the carpark layer isn't here yet
+
+    await dataSync.refreshLayer("CARPARK"); // the prefetch at startup
+
+    expect(onMap(bookmarks)).toEqual(["Suntec City"]);
+  });
+
+  it("says when there are no bookmarks yet, and stays on for the first one", async () => {
+    const { repo, dataSync, mapDisplay, bookmarks } = setUp();
+
+    await bookmarks.toggleShown();
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe(
+      "No bookmarks yet. Tap the star on a place's details to save it.",
+    );
+
+    await bookmarks.toggleBookmark(await suntecIn(dataSync, repo));
+    expect(onMap(bookmarks)).toEqual(["Suntec City"]);
+  });
+
+  it("3a: says it can't find a bookmark that is no longer in the data, and shows the others", async () => {
+    const store = memoryStore();
+    const first = setUp({}, store);
+    await first.dataSync.refreshLayer("CARPARK");
+    for (const c of first.repo.getByLayerType("CARPARK")) await first.bookmarks.toggleBookmark(c);
+    store.data.delete("cache:/carparks");
+    const { mapDisplay, bookmarks } = setUp(
+      {
+        "/carparks": ok(
+          CARPARKS.filter((c) => c.id !== "1"),
+          '"v2"',
+        ),
+      },
+      store,
+    );
+    await bookmarks.load();
+
+    await bookmarks.toggleShown();
+
+    expect(onMap(bookmarks)).not.toContain("Suntec City");
+    expect(onMap(bookmarks)).toHaveLength(CARPARKS.length - 1);
+    expect(toastText(mapDisplay.getSnapshot().notice)).toBe(
+      "Unable to find bookmarked location. Please try again later",
+    );
+  });
+
+  it("says nothing of a layer that didn't load if it was turned off again meanwhile", async () => {
+    const { mapDisplay, bookmarks } = setUp({ "*": offline }, await suntecSaved());
+    await bookmarks.load();
+
+    const turningOn = bookmarks.toggleShown();
+    await bookmarks.toggleShown();
+    await turningOn;
+
+    expect(mapDisplay.getSnapshot().notice).toBeNull();
+    expect(onMap(bookmarks)).toEqual([]);
   });
 });
 

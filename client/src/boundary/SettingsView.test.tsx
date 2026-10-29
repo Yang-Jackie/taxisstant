@@ -13,6 +13,7 @@ const defaults: UserPreferences = {
   activeSuggestions: new Set(),
   suggestionLayers: new Map(),
   skipNavPrompt: false,
+  showBookmarks: false,
   fontSize: 100,
   darkMode: false,
 };
@@ -59,6 +60,17 @@ describe("SettingsView", () => {
     expect(radio(/Large$/)).toBeChecked();
     await userEvent.click(radio(/Largest$/));
     expect(onSetDisplay).toHaveBeenCalledExactlyOnceWith(150, true);
+  });
+
+  it("names the sizes under Font size: Normal, Large, Extra large and Largest (D52)", () => {
+    renderSettings();
+    expect(screen.getByRole("group", { name: "Font size" })).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("radio")
+        .slice(-4)
+        .map((r) => r.closest("label")!.textContent),
+    ).toEqual(["NormalAa", "LargeAa", "Extra largeAa", "LargestAa"]);
   });
 
   it("shows each text size's sample at its own size, whatever the size now is", () => {
