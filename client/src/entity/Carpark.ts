@@ -1,6 +1,6 @@
 import { AVAILABILITY_MAX_AGE_MS, isRecent } from "./freshness";
 import { Landmark, type LandmarkProps } from "./Landmark";
-import type { LayerType } from "./LayerType";
+import type { StaticLayer } from "./LayerType";
 
 export interface CarparkProps extends LandmarkProps {
   agency: string;
@@ -37,7 +37,7 @@ export class Carpark extends Landmark {
       : undefined;
   }
 
-  getType(): LayerType {
+  getType(): StaticLayer {
     return "CARPARK";
   }
 }

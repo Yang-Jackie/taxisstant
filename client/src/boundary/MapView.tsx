@@ -12,8 +12,10 @@ import type { MapFocus, VisibleLayers } from "../control/MapDisplayController";
 import type { RecommendationResults } from "../control/RecommendationController";
 import { RECOMMENDATION_KINDS } from "../entity/RecommendationKind";
 import type { DriverPosition } from "../entity/DriverPosition";
-import { HotspotDetails, LandmarkDetails, SuggestionDetails } from "./LandmarkDetails";
-import { clusterIcon, driverIcon, markerIcon, SUGGESTION_GROUP, suggestionIcon } from "./markerIcons";
+import { bookmarkIdOf } from "../entity/Bookmark";
+import type { NavigationTarget } from "../control/NavigationController";
+import { HotspotDetails, LandmarkDetails, SuggestionDetails, type PlaceActions } from "./LandmarkDetails";
+import { clusterIcon, driverIcon, highlightIcon, markerIcon, SUGGESTION_GROUP, suggestionIcon } from "./markerIcons";
 import {
   MAX_ZOOM,
   MIN_ZOOM,
@@ -79,6 +81,12 @@ export interface MapViewProps {
   focus?: MapFocus | null;
   /** The suggested sites, best first per suggestion (UC 0008/0009). */
   suggestions?: RecommendationResults;
+  /** What the popups' buttons do: bookmark and navigate (D39). Without them, popups give facts only. */
+  actions?: PlaceActions;
+  /** A landmark to show highlighted with its details open: a chosen bookmark (UC 0011). */
+  highlighted?: Landmark | null;
+  /** The highlighted landmark's details were closed. */
+  onHighlightClosed?: (l: Landmark) => void;
 }
 
 /** Reports the view after every move or zoom, padded so markers just off screen are ready before they scroll in. */
@@ -179,8 +187,48 @@ function PointMarkers<T extends Locatable>({ layer, view, keyOf, titleOf, popupO
   );
 }
 
+/**
+ * A chosen bookmark's landmark, ringed and above everything else, with its details open, whether or not its layer is
+ * on or clustered (UC 0011 steps 3–4). Closing the details ends the highlight.
+ */
+function HighlightedLandmark({
+  landmark,
+  actions,
+  onClosed,
+}: {
+  landmark: Landmark;
+  actions?: PlaceActions;
+  onClosed?: (l: Landmark) => void;
+}) {
+  const ref = useRef<LeafletMarker>(null);
+  useEffect(() => {
+    ref.current?.openPopup();
+  }, []);
+  return (
+    <Marker
+      ref={ref}
+      position={positionOf(landmark.location)}
+      icon={highlightIcon(landmark.getType())}
+      title={`${landmark.name}, from your bookmarks`}
+      zIndexOffset={2000}
+      eventHandlers={{ popupclose: () => onClosed?.(landmark) }}
+    >
+      {/* No auto-pan: the map is already moving to centre the landmark, and Leaflet's auto-pan would stop that */}
+      <Popup autoPan={false}>
+        <LandmarkDetails item={landmark} actions={actions} />
+      </Popup>
+    </Marker>
+  );
+}
+
 /** The mockup's heat circles: amber, larger and stronger for very crowded stations (D23), with a flame to tap. */
-function HotspotCircles({ hotspots }: { hotspots: readonly Hotspot[] }) {
+function HotspotCircles({
+  hotspots,
+  onNavigate,
+}: {
+  hotspots: readonly Hotspot[];
+  onNavigate?: (t: NavigationTarget) => void;
+}) {
   const busy = (h: Hotspot) => (h.density === "HIGH" ? "very crowded" : "crowded");
   return (
     <>
@@ -200,7 +248,7 @@ function HotspotCircles({ hotspots }: { hotspots: readonly Hotspot[] }) {
           title={`${h.stationName}: ${busy(h)}`}
         >
           <Popup>
-            <HotspotDetails hotspot={h} />
+            <HotspotDetails hotspot={h} onNavigate={onNavigate} />
           </Popup>
         </TitledMarker>
       ))}
@@ -212,7 +260,13 @@ const SUGGESTION_COLOUR = { find: "#e8930c", rest: "#0e7a57" } as const;
 const SUGGESTION_NAME = { PICKUP: "Suggested pickup", REST_STOP: "Suggested rest stop" } as const;
 
 /** Each suggested site's area, outlined in its suggestion's colour, with a numbered pin to tap (D33). */
-function SuggestionAreas({ suggestions }: { suggestions: RecommendationResults }) {
+function SuggestionAreas({
+  suggestions,
+  onNavigate,
+}: {
+  suggestions: RecommendationResults;
+  onNavigate?: (t: NavigationTarget) => void;
+}) {
   return (
     <>
       {RECOMMENDATION_KINDS.flatMap((k) =>
@@ -241,7 +295,7 @@ function SuggestionAreas({ suggestions }: { suggestions: RecommendationResults }
             zIndexOffset={500}
           >
             <Popup>
-              <SuggestionDetails recommendation={r} />
+              <SuggestionDetails recommendation={r} onNavigate={onNavigate} />
             </Popup>
           </TitledMarker>
         )),
@@ -252,7 +306,16 @@ function SuggestionAreas({ suggestions }: { suggestions: RecommendationResults }
 
 const NO_SUGGESTIONS: RecommendationResults = { PICKUP: [], REST_STOP: [] };
 
-export function MapView({ visible, onPan, driver = null, focus = null, suggestions = NO_SUGGESTIONS }: MapViewProps) {
+export function MapView({
+  visible,
+  onPan,
+  driver = null,
+  focus = null,
+  suggestions = NO_SUGGESTIONS,
+  actions,
+  highlighted = null,
+  onHighlightClosed,
+}: MapViewProps) {
   const fuelShown = visible.FUEL.items.length > 0 || visible.FUEL.clusters.length > 0;
   return (
     <MapContainer
@@ -267,7 +330,7 @@ export function MapView({ visible, onPan, driver = null, focus = null, suggestio
       {onPan && <ViewportReporter onPan={onPan} />}
       <FocusFollower focus={focus} />
       {fuelShown && <OsmCredit />}
-      <HotspotCircles hotspots={visible.HOTSPOT.items} />
+      <HotspotCircles hotspots={visible.HOTSPOT.items} onNavigate={actions?.onNavigate} />
       {STATIC_LAYERS.map((t) => (
         <PointMarkers<Landmark>
           key={t}
@@ -275,11 +338,19 @@ export function MapView({ visible, onPan, driver = null, focus = null, suggestio
           view={visible[t]}
           keyOf={(item) => item.id}
           titleOf={(item) => item.name}
-          popupOf={(item) => <LandmarkDetails item={item} />}
+          popupOf={(item) => <LandmarkDetails item={item} actions={actions} />}
         />
       ))}
       <PointMarkers layer="TAXIS" view={visible.TAXIS} keyOf={(_, i) => String(i)} titleOf={() => "Available taxi"} />
-      <SuggestionAreas suggestions={suggestions} />
+      <SuggestionAreas suggestions={suggestions} onNavigate={actions?.onNavigate} />
+      {highlighted && (
+        <HighlightedLandmark
+          key={bookmarkIdOf(highlighted)}
+          landmark={highlighted}
+          actions={actions}
+          onClosed={onHighlightClosed}
+        />
+      )}
       {driver && <DriverDot driver={driver} />}
     </MapContainer>
   );

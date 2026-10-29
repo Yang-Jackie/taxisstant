@@ -1,5 +1,5 @@
 import { Landmark, type LandmarkProps } from "./Landmark";
-import type { LayerType } from "./LayerType";
+import type { StaticLayer } from "./LayerType";
 
 export interface TaxiStandProps extends LandmarkProps {
   standType: string;
@@ -16,7 +16,7 @@ export class TaxiStand extends Landmark {
     this.isBarrierFree = props.isBarrierFree;
   }
 
-  getType(): LayerType {
+  getType(): StaticLayer {
     return "TAXI_STAND";
   }
 }

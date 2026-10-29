@@ -1,13 +1,18 @@
 import car from "@tabler/icons/outline/car.svg?raw";
 import cup from "@tabler/icons/outline/cup.svg?raw";
 import flame from "@tabler/icons/outline/flame.svg?raw";
+import bookmarkIcon from "@tabler/icons/outline/bookmarks.svg?raw";
 import star from "@tabler/icons/outline/star.svg?raw";
 import x from "@tabler/icons/outline/x.svg?raw";
 import { useEffect } from "react";
+import type { NavigationTarget } from "../control/NavigationController";
 import type { RecommendationState } from "../control/RecommendationController";
+import type { Bookmark } from "../entity/Bookmark";
+import type { Location } from "../entity/Location";
 import { RECOMMENDATION_KINDS, type RecommendationKind } from "../entity/RecommendationKind";
 import type { SuggestedSite } from "../entity/SuggestedSite";
 import { SUGGESTION_GROUP } from "./markerIcons";
+import { BookmarkPanel } from "./BookmarkPanel";
 import { RecommendationCard } from "./RecommendationCard";
 import "./Sidemenu.css";
 
@@ -24,14 +29,30 @@ export interface SidemenuProps {
   /** The design model's Sidemenu.onToggleSuggestion. */
   onToggleSuggestion: (k: RecommendationKind) => void;
   onSelect: (site: SuggestedSite) => void;
+  onNavigate?: (target: NavigationTarget) => void;
+  /** The driver's bookmarks, newest first (D40). */
+  bookmarks?: readonly Bookmark[];
+  /** Where the driver is, to say how far each bookmark is. */
+  driverAt?: Location;
+  onSelectBookmark?: (b: Bookmark) => void;
   onClose: () => void;
 }
 
 /**
  * The mockup's drawer (the data dictionary's Sidemenu): Smart suggestions, each a toggle with its best sites below
- * it while on (D33). Language, Settings and Help & support join it in package 9.
+ * it while on (D33), then the driver's bookmarks (D40). Language, Settings and Help & support join it in package 9.
  */
-export function Sidemenu({ active, recommendations, onToggleSuggestion, onSelect, onClose }: SidemenuProps) {
+export function Sidemenu({
+  active,
+  recommendations,
+  onToggleSuggestion,
+  onSelect,
+  onNavigate,
+  bookmarks = [],
+  driverAt,
+  onSelectBookmark = () => {},
+  onClose,
+}: SidemenuProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -86,11 +107,19 @@ export function Sidemenu({ active, recommendations, onToggleSuggestion, onSelect
                   items={recommendations.results[k]}
                   reason={recommendations.noResults[k]}
                   onSelect={onSelect}
+                  onNavigate={onNavigate}
                 />
               )}
             </section>
           );
         })}
+        <h2 className="sidemenu__label">
+          <span dangerouslySetInnerHTML={{ __html: bookmarkIcon }} />
+          Bookmarks
+        </h2>
+        <div className="sidemenu__bookmarks">
+          <BookmarkPanel items={bookmarks} from={driverAt} onSelect={onSelectBookmark} />
+        </div>
       </aside>
     </div>
   );

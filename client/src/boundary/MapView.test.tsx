@@ -15,6 +15,7 @@ import { Taxi } from "../entity/Taxi";
 import { SuggestedPickup } from "../entity/SuggestedPickup";
 import { SuggestedRestStop } from "../entity/SuggestedRestStop";
 import { TaxiStand } from "../entity/TaxiStand";
+import type { PlaceActions } from "./LandmarkDetails";
 import { MapView } from "./MapView";
 
 function stand(id: string, name: string, latitude: number, longitude: number) {
@@ -361,5 +362,36 @@ describe("MapView — suggestions (package 7)", () => {
     const { container } = render(<MapView visible={visibleWith()} />);
     expect(container.querySelectorAll(".suggestion-pin")).toHaveLength(0);
     expect(container.querySelectorAll(".leaflet-overlay-pane path")).toHaveLength(0);
+  });
+});
+
+// Package 8 — popups with a star and Navigate (D39), and a chosen bookmark highlighted (UC 0011).
+describe("MapView — bookmarks and navigation (package 8)", () => {
+  const actions = (): PlaceActions => ({
+    bookmarked: new Set(["CARPARK:1"]),
+    onToggleBookmark: vi.fn(),
+    onNavigate: vi.fn(),
+  });
+
+  it("gives a landmark's popup its star and Navigate when it has actions", async () => {
+    render(<MapView visible={visibleWith({ CARPARK: { items: [suntec], clusters: [] } })} actions={actions()} />);
+    fireEvent.click(screen.getByTitle("Suntec City"));
+    expect(await screen.findByRole("button", { name: "Remove the bookmark for Suntec City" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Navigate" })).toBeInTheDocument();
+  });
+
+  it("shows a highlighted landmark ringed, with its details open, even with its layer off", async () => {
+    const { container } = render(<MapView visible={visibleWith()} highlighted={suntec} actions={actions()} />);
+    expect(screen.getByTitle("Suntec City, from your bookmarks")).toHaveClass("marker-chip--highlighted");
+    expect(await screen.findByRole("heading", { name: "Suntec City" })).toBeInTheDocument();
+    expect(container.querySelectorAll(".leaflet-popup")).toHaveLength(1);
+  });
+
+  it("says when the highlighted landmark's details are closed", async () => {
+    const onHighlightClosed = vi.fn();
+    render(<MapView visible={visibleWith()} highlighted={suntec} onHighlightClosed={onHighlightClosed} />);
+    await screen.findByRole("heading", { name: "Suntec City" });
+    fireEvent.click(document.querySelector(".leaflet-popup-close-button")!);
+    expect(onHighlightClosed).toHaveBeenCalledWith(suntec);
   });
 });

@@ -47,6 +47,7 @@ const prefs = (vehicleType?: VehicleType): UserPreferences => ({
   visibleLayers: new Set(),
   activeSuggestions: new Set(),
   suggestionLayers: new Map(),
+  skipNavPrompt: false,
   ...(vehicleType && { vehicleType }),
 });
 const ranked = (sites: Parameters<typeof rank>[0], p = prefs()) => rank(sites, FROM, p).map((r) => r.site.id);

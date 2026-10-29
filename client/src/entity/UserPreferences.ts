@@ -13,4 +13,6 @@ export interface UserPreferences {
   readonly suggestionLayers: ReadonlyMap<RecommendationKind, ReadonlySet<LayerType>>;
   /** Not chosen until the Settings page lets the driver choose (package 9). */
   readonly vehicleType?: VehicleType;
+  /** "Do not show this again" on the navigation prompt: Navigate opens Google Maps at once (UC 0012 step 2, D39). */
+  readonly skipNavPrompt: boolean;
 }

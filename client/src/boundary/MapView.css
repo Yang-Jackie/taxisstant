@@ -130,3 +130,78 @@
 .map-view .leaflet-top.leaflet-left {
   top: calc(64px + env(safe-area-inset-top));
 }
+
+/* Package 8: a popup's star and Navigate (D39), and a chosen bookmark's ringed marker (UC 0011) */
+.landmark-details__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.landmark-details__head h2 {
+  flex: 1;
+}
+/* Clear of Leaflet's close button, which sits in the popup's top-right corner */
+.landmark-details__star {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  margin: -10px 8px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #e8930c;
+  cursor: pointer;
+}
+.landmark-details__star span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.landmark-details__star svg {
+  width: 24px;
+  height: 24px;
+}
+.landmark-details__star[aria-pressed="true"] .landmark-details__star-off,
+.landmark-details__star[aria-pressed="false"] .landmark-details__star-on {
+  display: none;
+}
+.landmark-details__navigate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 8px;
+  border: none;
+  border-radius: 10px;
+  background: #1e6fe0;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+.landmark-details__navigate svg {
+  width: 18px;
+  height: 18px;
+}
+.marker-chip--highlighted {
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 7px currentColor,
+    0 4px 12px rgba(0, 0, 0, 0.35);
+  animation: marker-highlight 1.6s ease-in-out infinite;
+}
+/* The ring pulses; the marker itself can't move, since Leaflet places it with `transform` */
+@keyframes marker-highlight {
+  50% {
+    box-shadow:
+      0 0 0 3px #fff,
+      0 0 0 12px currentColor,
+      0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marker-chip--highlighted {
+    animation: none;
+  }
+}

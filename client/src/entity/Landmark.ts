@@ -1,5 +1,5 @@
 import type { Locatable } from "./Locatable";
-import type { LayerType } from "./LayerType";
+import type { StaticLayer } from "./LayerType";
 import type { Location } from "./Location";
 
 export interface LandmarkProps {
@@ -23,5 +23,5 @@ export abstract class Landmark implements Locatable {
     this.location = props.location;
   }
 
-  abstract getType(): LayerType;
+  abstract getType(): StaticLayer;
 }

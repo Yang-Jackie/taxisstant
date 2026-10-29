@@ -1,6 +1,7 @@
 import type { Bounds, Viewport } from "../entity/Bounds";
 import type { DriverPosition } from "../entity/DriverPosition";
 import type { Hotspot } from "../entity/Hotspot";
+import type { Landmark } from "../entity/Landmark";
 import { isStaticLayer, type LayerType, type StaticLayer } from "../entity/LayerType";
 import type { Locatable } from "../entity/Locatable";
 import type { Location } from "../entity/Location";
@@ -32,6 +33,8 @@ export interface MapDisplayState {
   readonly focus: MapFocus | null;
   /** The driver's dot is away from the middle of the screen: the re-centre button lights up (UC 0013 3a, D31). */
   readonly driverOffCentre: boolean;
+  /** A landmark shown highlighted, its details open: a chosen bookmark (UC 0011 step 3). */
+  readonly highlighted: Landmark | null;
 }
 
 /** Centring on the driver zooms in at least this far: street level, where taxi stands and carparks show one by one. */
@@ -102,7 +105,14 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
   private centredOnLiveFix = false;
 
   constructor(settings: SettingsController, dataSync: DataSyncController, repo: MapDataRepository) {
-    super({ visible: nothingVisible, notice: null, driver: null, focus: null, driverOffCentre: false });
+    super({
+      visible: nothingVisible,
+      notice: null,
+      driver: null,
+      focus: null,
+      driverOffCentre: false,
+      highlighted: null,
+    });
     this.settings = settings;
     this.dataSync = dataSync;
     this.repo = repo;
@@ -177,6 +187,17 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
       ...this.getSnapshot(),
       focus: { location: loc, zoom: Math.max(this.viewport.zoom, DRIVER_ZOOM), seq },
     });
+  }
+
+  /** Shows `l` highlighted with its details open, whatever layers are on, and moves the map to it (UC 0011 3–4). */
+  highlight(l: Landmark): void {
+    this.setState({ ...this.getSnapshot(), highlighted: l });
+    this.focusOn(l.location);
+  }
+
+  /** `l`'s highlighted details were closed. A later highlight (of another landmark) stays. */
+  clearHighlight(l: Landmark): void {
+    if (this.getSnapshot().highlighted === l) this.setState({ ...this.getSnapshot(), highlighted: null });
   }
 
   /** The re-centre button (UC 0013 3a). */

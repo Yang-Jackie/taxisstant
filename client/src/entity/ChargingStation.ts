@@ -1,6 +1,6 @@
 import { AVAILABILITY_MAX_AGE_MS, isRecent } from "./freshness";
 import { Landmark, type LandmarkProps } from "./Landmark";
-import type { LayerType } from "./LayerType";
+import type { StaticLayer } from "./LayerType";
 
 export interface ChargingStationProps extends LandmarkProps {
   operators: readonly string[];
@@ -48,7 +48,7 @@ export class ChargingStation extends Landmark {
       : undefined;
   }
 
-  getType(): LayerType {
+  getType(): StaticLayer {
     return "CHARGING";
   }
 }

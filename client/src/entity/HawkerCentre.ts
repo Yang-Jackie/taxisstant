@@ -1,5 +1,5 @@
 import { Landmark, type LandmarkProps } from "./Landmark";
-import type { LayerType } from "./LayerType";
+import type { StaticLayer } from "./LayerType";
 
 /** A day range when a centre is closed, in Singapore dates (yyyy-mm-dd, both days included). */
 export interface Closure {
@@ -43,7 +43,7 @@ export class HawkerCentre extends Landmark {
     this.closures = [...props.closures].sort((a, b) => a.from.localeCompare(b.from));
   }
 
-  getType(): LayerType {
+  getType(): StaticLayer {
     return "HAWKER";
   }
 

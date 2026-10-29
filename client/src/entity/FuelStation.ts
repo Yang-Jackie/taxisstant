@@ -1,5 +1,5 @@
 import { Landmark, type LandmarkProps } from "./Landmark";
-import type { LayerType } from "./LayerType";
+import type { StaticLayer } from "./LayerType";
 
 export interface FuelStationProps extends LandmarkProps {
   brand?: string;
@@ -18,7 +18,7 @@ export class FuelStation extends Landmark {
     this.openingHours = props.openingHours;
   }
 
-  getType(): LayerType {
+  getType(): StaticLayer {
     return "FUEL";
   }
 }

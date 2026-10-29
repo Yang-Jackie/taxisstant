@@ -353,16 +353,19 @@ I review and approve before the next package starts. Claude asks me whenever a d
    - [x] `RecommendationCard`: the best 3, with distance; tapping one shows it on the map; numbered pins and areas on the map
    - [x] turning a suggestion on also turns on its related layers; off turns off only those (D35)
    - [x] fixed on the way: a 304 no longer makes an old copy look new (D37); markers' titles follow changes (D38)
-8. **Navigation and bookmarks (UC 0011–0012)**
-   - [ ] `NavigationController` and `NavigationGateway.openDeepLink`
-   - [ ] Yes/No prompt with "Do not show again"
-   - [ ] `BookmarkController`, `BookmarkList` and `BookmarkPanel`
+8. **Navigation and bookmarks (UC 0011–0012)** ✅ (decided 29 Oct: D39–D42)
+   - [x] `NavigationController` (`navigateTo`, `confirm`) and `NavigationGateway.openDeepLink`: Google Maps directions to the destination only (D41); Navigate in landmark, hotspot and suggestion popups and on suggestion cards (D39)
+   - [x] Yes/No prompt with "Do not show this again", saved as `skipNavPrompt` (counts only with Yes)
+   - [x] `BookmarkController` (`toggleBookmark`, `openBookmark`, saved in IndexedDB), `BookmarkList` and `BookmarkPanel` in the side menu (D40); `Bookmark` with an id and a snapshot (D42); the popup's star; UC 0011's messages and exception 3a
+   - [x] a chosen bookmark shows its landmark highlighted (a ringed marker, details open) whatever layers are on; `Landmark.getType()` is a `StaticLayer`
+   - [x] found in Chrome: the popup closed when its star was tapped (React swapped the icon before Leaflet saw the tap, so it counted as a tap on the map; both icons now stay, and the star no longer overlaps the close button), and the highlight's popup cancelled the map's move to it (no auto-pan)
 9. **Settings (FR-2)**
    - [ ] EN/ZH language switch
    - [ ] vehicle type
    - [ ] font size
    - [ ] dark mode
    - [ ] every setting persisted
+   - [ ] a way to show the navigation prompt again (`skipNavPrompt`, D39): until then, "Do not show this again" can't be undone
    - [ ] Help & Support page (from the dialog map)
 10. **Hardening and deployment**
     - [ ] NFRs: toasts on every failure, timeouts, large icons with text labels
@@ -441,12 +444,15 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D36 — How old suggestions may be (Claude's decision at my request, 29 Oct).** A suggested site counts only while it is as fresh as the live data it was scored from (D22): pickups 5 minutes (taxis; also UC 0008/0009's "not older than 5 minutes"), rest stops 15 minutes (free lots). Older sites are not suggested: a toggle gives exception 2a, and a list that ages out says it is out of date. The use cases conflict here: their precondition says 5 minutes, and their special requirement wants the markers offline. Rest stops keep 15 minutes rather than lasting offline, because a saved copy's free lots would be stale.
 - **D37 — A 304 says how old the server's copy is (fix, 29 Oct).** Since 2d, a 304 made the client's copy count as confirmed "now". But a server whose source is down keeps its old copy, and with it the same ETag, so 20-minute-old taxis could show as current, against D22. The server now sends `Last-Modified` (the copy's `asOf`) on every answer, 304 included. The client keeps that time, never moving it backwards. Live data that is already too old when it arrives is stored but counts as nothing to show, so its toggle gives the "Unable to load" toast instead of an empty layer.
 - **D38 — Markers' titles follow changes (fix, 29 Oct).** react-leaflet sets a marker's `title` (its tooltip and screen-reader name) only when it creates the marker. So since 2b/2d/6, a cluster bubble kept its old count, a hotspot its old crowd level, and the driver's dot "You are here" after the GPS went quiet. `TitledMarker` keeps every marker's title current. Found in package 7, where re-ranked pins kept their old numbers.
+- **D39 — Navigation and the bookmark star start from a landmark's popup (my decision, 29 Oct).** The dialog map sends a tap on any map icon straight to the "open Google Maps?" prompt; UC 0011 has the same tap open the landmark with a star button. Tapping an icon opens its details popup (2b), which now has a star (bookmark, UC 0011) and Navigate (UC 0012); hotspot popups, suggestion pins and suggestion cards get Navigate too (the design's `RecommendationCard.onNavigate`). Navigate shows the Yes/No prompt unless "Do not show this again" was ticked with Yes (`skipNavPrompt`); ticked with No, nothing is remembered, since skipping the prompt means always opening Google Maps. The prompt is its own component rather than the design's `MapView.onConfirmNav`.
+- **D40 — Bookmarks live in the side menu (my decision, 29 Oct).** No document places UC 0011's "bookmark menu" (the data dictionary's side menu lists suggestions, language, settings and help). It is a section of the side menu under Smart suggestions (`BookmarkPanel`), newest first, with each one's distance. Choosing one closes the menu and shows the landmark highlighted on the map with its popup open (steps 3–4); a landmark that is no longer in the data gives exception 3a's toast.
+- **D41 — The Google Maps link has the destination only (my decision, 29 Oct).** UC 0012 step 4 sends both positions, its postcondition says the current one is optional, and its exception says "Try again later" without one. `NavigationGateway.openDeepLink(dest)` opens `google.com/maps/dir/?api=1&destination=…&travelmode=driving`: Google Maps starts from the phone's own location (it reads the GPS itself), so the driver's position never goes into a URL (D32) and navigation works before our GPS has a fix. It shows the route rather than starting turn-by-turn (step 5: "sees route"), so the driver can pick one. On a phone with the Google Maps app, the link opens the app.
+- **D42 — A bookmark records its landmark and a snapshot (my decision, 29 Oct).** The design's `Bookmark` (label, dateSaved) points at a whole `Landmark`, but `BookmarkList.remove(id)` needs an id (the AI report's fix). A bookmark is `id` (the landmark's layer and id, so one per landmark), `layer`, `landmarkId`, and the `label` (name) and `location` when saved, plus `dateSaved`. The list reads well offline; opening one looks the landmark up in today's data.
 
 ## Decisions I'll be asked about
 
 | When | Decision |
 |---|---|
-| Package 8 | `Bookmark` has no `id` and holds the whole `Landmark`, yet `BookmarkList.remove(id)` needs an id. Should bookmarks get an `id` and store a `landmarkId`? |
 | Package 10 | How to get access to the school lab server, and whether it can serve HTTPS. |
 | Package 10 | Should the app itself open with no connection (a service worker)? M7 caches the *data*; the page's own files still come from the server. |
 
@@ -478,4 +484,5 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **UC 0008/0009 contradict themselves** like UC 0001: the "not older than 5 minutes" precondition, against "markers available offline" (D36). UC 0009's 2a toast says "rest stop markers"; the app says "pickup markers".
 - **The dialog map shows suggestions as a list screen; UC 0008/0009 as map toggles** (D33). Its Settings UI has a "narrator on/off" option that no other document mentions (package 9).
 - **The app's name:** the mockup calls it "TaxiMate", the project's first page title "Taxi Assistant". It is TaxiMate (my decision, 29 Oct); the code's internal name `taxisstant` stays (the package scope, and the phone's IndexedDB database, whose renaming would lose every saved copy and setting).
+- **The dialog map has no bookmarks screen, and its icon tap goes straight to the navigation prompt,** while UC 0011 has the same tap open the landmark with a star (D39, D40). UC 0012 needs the current position in step 4, calls it optional in its postcondition, and fails without it in its exception (D41).
 - **The AI report and the Lab 3 report number the use cases differently.** This plan uses the Lab 3 report's numbering.

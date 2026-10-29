@@ -44,6 +44,7 @@ describe("SettingsController", () => {
       visibleLayers: ["TAXI_STAND"],
       activeSuggestions: [],
       suggestionLayers: {},
+      skipNavPrompt: false,
     });
   });
 
@@ -165,6 +166,7 @@ describe("SettingsController — suggestions (package 7, D35)", () => {
       visibleLayers: ["CARPARK", "HAWKER"],
       activeSuggestions: ["REST_STOP"],
       suggestionLayers: { REST_STOP: ["CARPARK", "HAWKER"] },
+      skipNavPrompt: false,
     });
     const afterReload = new SettingsController(store);
     await afterReload.load();
@@ -196,5 +198,26 @@ describe("SettingsController — suggestions (package 7, D35)", () => {
     await settings.load();
     expect(settings.isLayerVisible("FUEL")).toBe(true);
     expect(settings.getPreferences().activeSuggestions.size).toBe(0);
+  });
+});
+
+describe("SettingsController — the navigation prompt (package 8)", () => {
+  it("shows the prompt until told not to, saves that, and load() brings it back (UC 0012 step 2)", async () => {
+    const store = memoryStore();
+    const settings = new SettingsController(store);
+    expect(settings.getPreferences().skipNavPrompt).toBe(false);
+
+    await settings.setSkipNavPrompt(true);
+
+    expect(store.data.get("preferences")).toMatchObject({ skipNavPrompt: true });
+    const afterReload = new SettingsController(store);
+    await afterReload.load();
+    expect(afterReload.getPreferences().skipNavPrompt).toBe(true);
+  });
+
+  it("load() shows the prompt when the saved value isn't a yes or no", async () => {
+    const settings = new SettingsController(memoryStore({ preferences: { skipNavPrompt: "yes" } }));
+    await settings.load();
+    expect(settings.getPreferences().skipNavPrompt).toBe(false);
   });
 });

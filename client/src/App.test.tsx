@@ -3,7 +3,8 @@
 // M7: after one online session, the stands work with the server down (D1).
 // Package 2b: every static layer is downloaded at startup (D18) and clustered while zoomed out (D17).
 // Package 6: the driver's position (UC 0013). Package 7: smart suggestions from the side menu (UC 0008/0009).
-import { act, render, screen, waitFor } from "@testing-library/react";
+// Package 8: bookmarks (UC 0011) and navigation to Google Maps (UC 0012).
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -44,6 +45,7 @@ const taxiStandsButton = () => button("Taxi stands");
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("App (with controllers)", () => {
@@ -349,7 +351,7 @@ describe("App — smart suggestions (package 7)", () => {
     await userEvent.click(button("Open the menu"));
     await userEvent.click(pickupToggle());
 
-    expect(await screen.findByRole("button", { name: /Mt Elizabeth Rd/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^Mt Elizabeth Rd/ })).toBeInTheDocument();
     expect(pickupToggle()).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTitle("Suggested pickup 1: Mt Elizabeth Rd at Mt Elizabeth Hospital")).toBeInTheDocument();
     expect(taxiStandsButton()).toHaveAttribute("aria-pressed", "true");
@@ -362,7 +364,7 @@ describe("App — smart suggestions (package 7)", () => {
     await userEvent.click(button("Open the menu"));
     await userEvent.click(pickupToggle());
 
-    await userEvent.click(await screen.findByRole("button", { name: /Lucky Plaza/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Orchard Rd along driveway of Lucky Plaza/ }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -372,7 +374,7 @@ describe("App — smart suggestions (package 7)", () => {
     await openInOrchard();
     await userEvent.click(button("Open the menu"));
     await userEvent.click(pickupToggle());
-    await screen.findByRole("button", { name: /Lucky Plaza/ });
+    await screen.findByRole("button", { name: /^Orchard Rd along driveway of Lucky Plaza/ });
 
     await userEvent.click(pickupToggle());
 
@@ -400,7 +402,7 @@ describe("App — smart suggestions (package 7)", () => {
     await openInOrchard();
     await userEvent.click(button("Open the menu"));
     await userEvent.click(pickupToggle());
-    await screen.findByRole("button", { name: /Lucky Plaza/ });
+    await screen.findByRole("button", { name: /^Orchard Rd along driveway of Lucky Plaza/ });
     const firstSite = () => screen.getAllByRole("listitem")[0];
     expect(firstSite()).toHaveTextContent("Mt Elizabeth");
 
@@ -421,7 +423,7 @@ describe("App — smart suggestions (package 7)", () => {
     const first = await openInOrchard();
     await userEvent.click(button("Open the menu"));
     await userEvent.click(pickupToggle());
-    await screen.findByRole("button", { name: /Lucky Plaza/ });
+    await screen.findByRole("button", { name: /^Orchard Rd along driveway of Lucky Plaza/ });
     first.unmount();
 
     vi.setSystemTime(new Date("2026-10-29T13:10:00Z")); // the saved pickups are 10 minutes old
@@ -438,13 +440,105 @@ describe("App — smart suggestions (package 7)", () => {
     const first = await openInOrchard();
     await userEvent.click(button("Open the menu"));
     await userEvent.click(pickupToggle());
-    await screen.findByRole("button", { name: /Lucky Plaza/ });
+    await screen.findByRole("button", { name: /^Orchard Rd along driveway of Lucky Plaza/ });
     first.unmount();
 
     await openApp(); // no GPS answer this time: the saved position is enough (D32)
     await userEvent.click(button("Open the menu"));
 
     expect(pickupToggle()).toHaveAttribute("aria-pressed", "true");
-    expect(await screen.findByRole("button", { name: /Lucky Plaza/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /^Orchard Rd along driveway of Lucky Plaza/ }),
+    ).toBeInTheDocument();
+  });
+});
+
+// Package 8 — bookmarks and navigation in the whole app (UC 0011, UC 0012).
+describe("App — bookmarks and navigation (package 8)", () => {
+  const menu = () => screen.getByRole("dialog", { name: "Menu" });
+  /** Opens the app with the Carpark layer on, and Suntec City's details open. */
+  async function openSuntec() {
+    const app = await openApp();
+    await userEvent.click(button("Carpark"));
+    fireEvent.click(await screen.findByTitle("Suntec City"));
+    await screen.findByRole("heading", { name: "Suntec City" });
+    return app;
+  }
+
+  it("bookmarks a carpark with its star, lists it in the side menu, and shows it highlighted when chosen", async () => {
+    serve();
+    await openSuntec();
+
+    await userEvent.click(button("Bookmark Suntec City"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Location has been favourited");
+    expect(button("Remove the bookmark for Suntec City")).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(within(menu()).getByRole("button", { name: /^Suntec City/ }));
+
+    expect(screen.queryByRole("dialog", { name: "Menu" })).not.toBeInTheDocument();
+    expect(await screen.findByTitle("Suntec City, from your bookmarks")).toHaveClass("marker-chip--highlighted");
+  });
+
+  it("keeps bookmarks after a reload", async () => {
+    serve();
+    const first = await openSuntec();
+    await userEvent.click(button("Bookmark Suntec City"));
+    first.unmount();
+
+    await openApp();
+    await userEvent.click(button("Open the menu"));
+
+    expect(within(menu()).getByRole("button", { name: /^Suntec City/ })).toBeInTheDocument();
+  });
+
+  it("asks before opening Google Maps, and opens directions there on Yes (UC 0012)", async () => {
+    serve();
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await openSuntec();
+
+    await userEvent.click(button("Navigate"));
+    expect(screen.getByRole("alertdialog", { name: "Open Google Maps?" })).toBeInTheDocument();
+    expect(open).not.toHaveBeenCalled();
+    await userEvent.click(button("Yes"));
+
+    expect(open).toHaveBeenCalledExactlyOnceWith(
+      "https://www.google.com/maps/dir/?api=1&destination=1.29375%2C103.85718&travelmode=driving",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("opens nothing on No (4a)", async () => {
+    serve();
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await openSuntec();
+
+    await userEvent.click(button("Navigate"));
+    await userEvent.click(button("No"));
+
+    expect(open).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("stops asking after 'Do not show this again', in this session and the next", async () => {
+    serve();
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const first = await openSuntec();
+    await userEvent.click(button("Navigate"));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Do not show this again" }));
+    await userEvent.click(button("Yes"));
+
+    await userEvent.click(button("Navigate"));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(open).toHaveBeenCalledTimes(2);
+    first.unmount();
+
+    await openApp(); // Carpark is still on
+    fireEvent.click(await screen.findByTitle("Suntec City"));
+    await userEvent.click(await screen.findByRole("button", { name: "Navigate" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(open).toHaveBeenCalledTimes(3);
   });
 });

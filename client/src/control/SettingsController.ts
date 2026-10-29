@@ -19,6 +19,7 @@ const SavedPreferences = z.object({
   visibleLayers: namesOf(isLayerType),
   activeSuggestions: namesOf(isRecommendationKind),
   suggestionLayers: z.record(z.string(), z.unknown()).catch({}),
+  skipNavPrompt: z.boolean().catch(false),
 });
 
 /** The only owner of the driver's preferences (D3). Saves every change through LocalStore. */
@@ -26,7 +27,12 @@ export class SettingsController extends Store<UserPreferences> {
   private readonly localStore: Pick<LocalStore, "read" | "write">;
 
   constructor(localStore: Pick<LocalStore, "read" | "write">) {
-    super({ visibleLayers: new Set(), activeSuggestions: new Set(), suggestionLayers: new Map() });
+    super({
+      visibleLayers: new Set(),
+      activeSuggestions: new Set(),
+      suggestionLayers: new Map(),
+      skipNavPrompt: false,
+    });
     this.localStore = localStore;
   }
 
@@ -46,7 +52,7 @@ export class SettingsController extends Store<UserPreferences> {
   async load(): Promise<void> {
     const saved = SavedPreferences.safeParse(await this.localStore.read(KEY));
     if (!saved.success) return; // not an object at all: keep the defaults
-    const { visibleLayers, activeSuggestions, suggestionLayers } = saved.data;
+    const { visibleLayers, activeSuggestions, suggestionLayers, skipNavPrompt } = saved.data;
     const visible = new Set(visibleLayers);
     const active = new Set(activeSuggestions);
     // A suggestion owns only layers that are still on, and only while it is on itself
@@ -60,6 +66,7 @@ export class SettingsController extends Store<UserPreferences> {
       visibleLayers: visible,
       activeSuggestions: active,
       suggestionLayers: owned,
+      skipNavPrompt,
     });
   }
 
@@ -108,12 +115,19 @@ export class SettingsController extends Store<UserPreferences> {
     return changed;
   }
 
+  /** The navigation prompt's "Do not show this again" (the design model's setSkipNavPrompt). */
+  async setSkipNavPrompt(on: boolean): Promise<void> {
+    if (this.getSnapshot().skipNavPrompt === on) return;
+    await this.save({ ...this.getSnapshot(), skipNavPrompt: on });
+  }
+
   private async save(next: UserPreferences): Promise<void> {
     this.setState(next);
     await this.localStore.write(KEY, {
       visibleLayers: [...next.visibleLayers],
       activeSuggestions: [...next.activeSuggestions],
       suggestionLayers: Object.fromEntries([...next.suggestionLayers].map(([k, layers]) => [k, [...layers]])),
+      skipNavPrompt: next.skipNavPrompt,
     });
   }
 }

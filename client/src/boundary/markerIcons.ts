@@ -12,7 +12,8 @@ import { DivIcon } from "leaflet";
 import type { LayerType } from "../entity/LayerType";
 import type { RecommendationKind } from "../entity/RecommendationKind";
 
-const SVG: Record<LayerType, string> = {
+/** Each layer's icon, as an SVG string. */
+export const LAYER_ICON: Record<LayerType, string> = {
   TAXI_STAND: mapPin,
   TAXIS: car,
   HOTSPOT: flame,
@@ -42,12 +43,30 @@ export function markerIcon(t: LayerType): DivIcon {
   if (!icon) {
     icon = new DivIcon({
       className: `marker-chip marker-chip--${GROUP[t]}`,
-      html: SVG[t],
+      html: LAYER_ICON[t],
       iconSize: [MARKER_PX, MARKER_PX],
       iconAnchor: [MARKER_PX / 2, MARKER_PX / 2],
       popupAnchor: [0, -MARKER_PX / 2],
     });
     icons.set(t, icon);
+  }
+  return icon;
+}
+
+const highlightIcons = new Map<LayerType, DivIcon>();
+
+/** A chosen bookmark's landmark: its layer's marker in a ring, so it stands out (UC 0011 step 3). */
+export function highlightIcon(t: LayerType): DivIcon {
+  let icon = highlightIcons.get(t);
+  if (!icon) {
+    icon = new DivIcon({
+      className: `marker-chip marker-chip--${GROUP[t]} marker-chip--highlighted`,
+      html: LAYER_ICON[t],
+      iconSize: [MARKER_PX, MARKER_PX],
+      iconAnchor: [MARKER_PX / 2, MARKER_PX / 2],
+      popupAnchor: [0, -MARKER_PX / 2],
+    });
+    highlightIcons.set(t, icon);
   }
   return icon;
 }
@@ -73,7 +92,7 @@ export function clusterIcon(t: LayerType, count: number): DivIcon {
   const px = count < 10 ? 42 : count < 100 ? 48 : 56;
   return new DivIcon({
     className: `marker-cluster marker-cluster--${GROUP[t]}`,
-    html: `${SVG[t]}<span>${count}</span>`,
+    html: `${LAYER_ICON[t]}<span>${count}</span>`,
     iconSize: [px, px],
     iconAnchor: [px / 2, px / 2],
   });

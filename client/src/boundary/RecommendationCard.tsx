@@ -1,3 +1,5 @@
+import navigation from "@tabler/icons/outline/navigation.svg?raw";
+import type { NavigationTarget } from "../control/NavigationController";
 import { SEARCH_RADIUS_M, type NoResultsReason, type Recommendation } from "../control/RecommendationController";
 import type { RecommendationKind } from "../entity/RecommendationKind";
 import type { SuggestedSite } from "../entity/SuggestedSite";
@@ -25,10 +27,12 @@ export interface RecommendationCardProps {
   reason?: NoResultsReason;
   /** A site was chosen: the dialog map's "show on the map". */
   onSelect: (site: SuggestedSite) => void;
+  /** The design model's RecommendationCard.onNavigate: route there (UC 0012, D39). */
+  onNavigate?: (target: NavigationTarget) => void;
 }
 
 /** The design model's RecommendationCard: one suggestion's best sites, nearest best first (D33, D34). */
-export function RecommendationCard({ kind, items, reason, onSelect }: RecommendationCardProps) {
+export function RecommendationCard({ kind, items, reason, onSelect, onNavigate }: RecommendationCardProps) {
   if (items.length === 0) {
     return <p className="recommendation-card__empty">{reason ? emptyText(kind, reason) : null}</p>;
   }
@@ -47,6 +51,15 @@ export function RecommendationCard({ kind, items, reason, onSelect }: Recommenda
               </span>
               <span className="recommendation-card__distance">{distance(distanceM)}</span>
             </button>
+            {onNavigate && (
+              <button
+                type="button"
+                className="recommendation-card__navigate"
+                aria-label={`Navigate to ${site.name}`}
+                onClick={() => onNavigate({ location: site.centre, name: site.name })}
+                dangerouslySetInnerHTML={{ __html: navigation }}
+              />
+            )}
           </li>
         ))}
       </ol>

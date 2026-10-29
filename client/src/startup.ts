@@ -1,13 +1,17 @@
 import { createContext } from "react";
+import { BookmarkController } from "./control/BookmarkController";
 import { DataSyncController } from "./control/DataSyncController";
 import { LocationController } from "./control/LocationController";
 import { MapDisplayController } from "./control/MapDisplayController";
+import { NavigationController } from "./control/NavigationController";
 import { RecommendationController } from "./control/RecommendationController";
 import { SettingsController } from "./control/SettingsController";
+import { BookmarkList } from "./entity/BookmarkList";
 import { MapDataRepository } from "./entity/MapDataRepository";
 import { DataApiClient } from "./services/DataApiClient";
 import { GPSInterface } from "./services/GPSInterface";
 import { LocalStore } from "./services/LocalStore";
+import { NavigationGateway } from "./services/NavigationGateway";
 import { CacheManager } from "./services/CacheManager";
 
 export interface Controllers {
@@ -16,6 +20,8 @@ export interface Controllers {
   readonly mapDisplay: MapDisplayController;
   readonly location: LocationController;
   readonly recommendations: RecommendationController;
+  readonly bookmarks: BookmarkController;
+  readonly navigation: NavigationController;
 }
 
 export function initControllers(): Controllers {
@@ -32,7 +38,9 @@ export function initControllers(): Controllers {
   const recommendations = new RecommendationController(settings, dataSync, repo, mapDisplay, location);
   dataSync.attach(recommendations);
   location.attach(recommendations);
-  return { settings, dataSync, mapDisplay, location, recommendations };
+  const bookmarks = new BookmarkController(new BookmarkList(), localStore, repo, dataSync, mapDisplay);
+  const navigation = new NavigationController(settings, new NavigationGateway());
+  return { settings, dataSync, mapDisplay, location, recommendations, bookmarks, navigation };
 }
 
 export async function startControllers({
@@ -41,8 +49,9 @@ export async function startControllers({
   mapDisplay,
   location,
   recommendations,
+  bookmarks,
 }: Controllers): Promise<void> {
-  await settings.load();
+  await Promise.all([settings.load(), bookmarks.load()]);
   void location.startTracking(); // asks for permission now; the map opens where the driver was (D32)
   await dataSync.loadCached();
   const prefetch = dataSync.refreshStatic(); // every static layer, in the background (D18)

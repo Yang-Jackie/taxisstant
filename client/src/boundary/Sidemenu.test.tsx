@@ -10,19 +10,29 @@ import { SuggestedPickup } from "../entity/SuggestedPickup";
 import { Sidemenu, type SidemenuProps } from "./Sidemenu";
 
 const asOf = new Date("2026-10-29T13:05:00Z"); // 21:05 in Singapore
-const pickup = (id: string, name: string, summary: string) =>
+const pickup = (id: string, name: string, summary: string, centre: Location) =>
   new SuggestedPickup({
     id,
     name,
-    centre: new Location(1.3, 103.8),
+    centre,
     radius: 300,
     score: 0.5,
     summary,
     asOf,
     taxiCount: 0,
   });
-const mtElizabeth = pickup("A05", "Mt Elizabeth Hospital", "Orchard crowded · 1 empty taxi nearby");
-const luckyPlaza = pickup("A01", "Lucky Plaza", "Orchard crowded · 3 empty taxis nearby");
+const mtElizabeth = pickup(
+  "A05",
+  "Mt Elizabeth Hospital",
+  "Orchard crowded · 1 empty taxi nearby",
+  new Location(1.304571786, 103.835547),
+);
+const luckyPlaza = pickup(
+  "A01",
+  "Lucky Plaza",
+  "Orchard crowded · 3 empty taxis nearby",
+  new Location(1.304294727, 103.8338467),
+);
 
 const none: RecommendationState = { results: { PICKUP: [], REST_STOP: [] }, noResults: {}, pending: new Set() };
 const pickupsOn: RecommendationState = {
@@ -114,5 +124,28 @@ describe("Sidemenu", () => {
   it("puts the focus on its close button when it opens, for keyboards and screen readers", () => {
     renderMenu();
     expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Close the menu" })).toHaveFocus();
+  });
+
+  it("lists the bookmarks under them (D40), and shows the map one that is chosen", async () => {
+    const onSelectBookmark = vi.fn();
+    const suntec = {
+      id: "CARPARK:1",
+      layer: "CARPARK" as const,
+      landmarkId: "1",
+      label: "Suntec City",
+      location: new Location(1.29375, 103.85718),
+      dateSaved: asOf,
+    };
+    renderMenu({ bookmarks: [suntec], onSelectBookmark });
+    expect(screen.getByRole("heading", { name: "Bookmarks" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Suntec City/ }));
+    expect(onSelectBookmark).toHaveBeenCalledExactlyOnceWith(suntec);
+  });
+
+  it("offers Navigate beside each suggested site (RecommendationCard.onNavigate, D39)", async () => {
+    const onNavigate = vi.fn();
+    renderMenu({ active: new Set<RecommendationKind>(["PICKUP"]), recommendations: pickupsOn, onNavigate });
+    await userEvent.click(screen.getByRole("button", { name: "Navigate to Lucky Plaza" }));
+    expect(onNavigate).toHaveBeenCalledExactlyOnceWith({ location: luckyPlaza.centre, name: "Lucky Plaza" });
   });
 });
