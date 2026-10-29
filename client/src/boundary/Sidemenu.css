@@ -1,0 +1,230 @@
+/* The mockup's drawer: slides in from the left over a dimmed map */
+.sidemenu__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1040; /* above the map, its buttons and the layer tools; below the toast */
+  background: rgba(0, 0, 0, 0.42);
+  animation: sidemenu-fade 0.25s ease-out;
+}
+.sidemenu__drawer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1050;
+  width: min(300px, 86%);
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #fff;
+  border-radius: 0 22px 22px 0;
+  box-shadow: 6px 0 26px rgba(0, 0, 0, 0.22);
+  animation: sidemenu-slide 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes sidemenu-slide {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes sidemenu-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidemenu__overlay,
+  .sidemenu__drawer {
+    animation: none;
+  }
+}
+
+.sidemenu__brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: calc(20px + env(safe-area-inset-top)) 16px 18px 22px;
+  border-bottom: 1px solid #e4e6ea;
+}
+.sidemenu__logo {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: #e8930c;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidemenu__logo svg {
+  width: 26px;
+  height: 26px;
+}
+.sidemenu__brand-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.sidemenu__name {
+  font-size: 18px;
+  font-weight: 800;
+}
+.sidemenu__tagline {
+  font-size: 12.5px;
+  color: #6a6d73;
+  margin-top: 2px;
+}
+.sidemenu__close {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: #6a6d73;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sidemenu__label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 16px 22px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6a6d73;
+}
+.sidemenu__label svg {
+  width: 16px;
+  height: 16px;
+  color: #e8930c;
+}
+
+.sidemenu__suggestion {
+  margin: 0 14px 10px;
+}
+/* Off: white with a coloured edge. On: filled, green for rest stops and amber for pickups (the data dictionary) */
+.sidemenu__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 14px;
+  border: 1.5px solid;
+  border-radius: 15px;
+  background: #fff;
+  color: #17181a;
+  text-align: left;
+  cursor: pointer;
+}
+.sidemenu__suggestion--find .sidemenu__toggle {
+  border-color: #f3d48a;
+}
+.sidemenu__suggestion--find .sidemenu__toggle[aria-pressed="true"] {
+  background: #fdf1d6;
+  border-color: #e8930c;
+}
+.sidemenu__suggestion--find .sidemenu__icon {
+  color: #6b4600;
+}
+.sidemenu__suggestion--rest .sidemenu__toggle {
+  border-color: #b2e0d0;
+}
+.sidemenu__suggestion--rest .sidemenu__toggle[aria-pressed="true"] {
+  background: #ddf3eb;
+  border-color: #0e7a57;
+}
+.sidemenu__suggestion--rest .sidemenu__icon {
+  color: #0a4e38;
+}
+.sidemenu__toggle[aria-busy="true"] {
+  cursor: progress;
+}
+.sidemenu__icon svg {
+  width: 27px;
+  height: 27px;
+  display: block;
+}
+.sidemenu__toggle-text {
+  display: flex;
+  flex-direction: column;
+}
+.sidemenu__title {
+  font-size: 15.5px;
+  font-weight: 800;
+}
+.sidemenu__subtitle {
+  font-size: 12.5px;
+  color: #6a6d73;
+  margin-top: 2px;
+}
+
+/* The suggestion's best sites, under its toggle */
+.recommendation-card ol {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.recommendation-card li + li {
+  border-top: 1px solid #e4e6ea;
+}
+.recommendation-card button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  border: none;
+  background: none;
+  color: #17181a;
+  text-align: left;
+  cursor: pointer;
+}
+.recommendation-card__place {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidemenu__suggestion--find .recommendation-card__place {
+  background: #e8930c;
+}
+.sidemenu__suggestion--rest .recommendation-card__place {
+  background: #0e7a57;
+}
+.recommendation-card__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.recommendation-card__name {
+  font-weight: 700;
+  font-size: 14px;
+}
+.recommendation-card__summary {
+  font-size: 12.5px;
+  color: #6a6d73;
+}
+.recommendation-card__distance {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-size: 13px;
+}
+.recommendation-card__as-of,
+.recommendation-card__empty {
+  margin: 6px 4px 0;
+  font-size: 12.5px;
+  color: #6a6d73;
+}

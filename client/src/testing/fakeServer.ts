@@ -7,6 +7,8 @@ import type {
   FuelStationDto,
   HawkerCentreDto,
   HotspotDto,
+  SuggestedPickupDto,
+  SuggestedRestStopDto,
   TaxiDto,
   TaxiStandDto,
 } from "@taxisstant/shared";
@@ -131,12 +133,90 @@ export function hotspotsAt(now: Date): HotspotDto[] {
   ];
 }
 
+/**
+ * Pickups scored by the server, best first (D28): Lucky Plaza and Mt Elizabeth in Orchard, 170 m apart, and one at
+ * Jurong East, 10 km west. Distances are from ORCHARD, where tests put the driver.
+ */
+export const PICKUPS: SuggestedPickupDto[] = [
+  {
+    id: "JE1",
+    name: "Jurong East MRT",
+    latitude: 1.3333,
+    longitude: 103.7424,
+    radius: 300,
+    score: 0.9,
+    summary: "Jurong East very crowded · no empty taxis nearby",
+    taxiCount: 0,
+    crowdDensity: "HIGH",
+    stationName: "Jurong East",
+  },
+  {
+    id: "A05",
+    name: "Mt Elizabeth Rd at Mt Elizabeth Hospital",
+    latitude: 1.304571786,
+    longitude: 103.835547,
+    radius: 300,
+    score: 0.5,
+    summary: "Orchard crowded · 1 empty taxi nearby",
+    taxiCount: 1,
+    crowdDensity: "MEDIUM",
+    stationName: "Orchard",
+  },
+  {
+    id: "A01",
+    name: "Orchard Rd along driveway of Lucky Plaza",
+    latitude: 1.304294727,
+    longitude: 103.8338467,
+    radius: 300,
+    score: 0.3,
+    summary: "Orchard crowded · 3 empty taxis nearby",
+    taxiCount: 3,
+    crowdDensity: "MEDIUM",
+    stationName: "Orchard",
+  },
+];
+/** Rest stops scored by the server, best first (D29): one 3.1 km from ORCHARD with fuel, one 2.9 km with chargers. */
+export const REST_STOPS: SuggestedRestStopDto[] = [
+  {
+    id: "adam-road-food-centre",
+    name: "Adam Road Food Centre",
+    latitude: 1.324131966,
+    longitude: 103.8141632,
+    radius: 500,
+    score: 0.8,
+    summary: "Food (32 stalls) · parking (40 free) · fuel",
+    foodStalls: 32,
+    hasParking: true,
+    freeLots: 40,
+    hasFuel: true,
+    hasCharging: false,
+  },
+  {
+    id: "maxwell-food-centre",
+    name: "Maxwell Food Centre",
+    latitude: 1.28048,
+    longitude: 103.84458,
+    radius: 500,
+    score: 0.7,
+    summary: "Food (100 stalls) · parking · EV charging (2 free)",
+    foodStalls: 100,
+    hasParking: true,
+    hasFuel: false,
+    hasCharging: true,
+    freeChargePoints: 2,
+  },
+];
+/** Where tests put the driver: Orchard Road, by Lucky Plaza. */
+export const ORCHARD = { latitude: 1.3043, longitude: 103.8338 };
+
 /** Each endpoint's data, by path under /api. Live data is made at the moment it is asked for, so it is current. */
 export const DATA: Record<string, unknown[] | (() => unknown[])> = {
   "/taxis": TAXIS,
   "/carparks/availability": CARPARK_LOTS,
   "/charging-stations/availability": CHARGER_POINTS,
   "/hotspots": () => hotspotsAt(new Date()),
+  "/pickup-sites": PICKUPS,
+  "/rest-stop-sites": REST_STOPS,
   "/taxi-stands": STANDS,
   "/carparks": CARPARKS,
   "/fuel-stations": FUEL,

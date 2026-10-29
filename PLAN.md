@@ -346,12 +346,13 @@ I review and approve before the next package starts. Claude asks me whenever a d
    - [x] the mockup's blue dot with its accuracy circle, grey when not live; the map centres once (D31)
    - [x] the crosshair button, lit when the driver is away from the middle of the screen (UC 0013 3a)
    - [x] the denied banner with steps for this phone's browser, and Try again (D30)
-7. **Recommendations (UC 0008–0009)**
-   - [ ] client data for suggestions: `MapDataRepository.getSuggestions` / `replaceSuggestions`, `DataSyncObserver.onRecommendationUpdated` (D9)
-   - [ ] `RecommendationController`: `toggle`, plus `rank()` by distance and preferences on the client
-   - [ ] `Sidemenu.onToggleSuggestion`
-   - [ ] `RecommendationCard`
-   - [ ] turning a suggestion on also turns on its related layers
+7. **Recommendations (UC 0008–0009)** ✅
+   - [x] client data for suggestions: `SuggestedSite` → `SuggestedPickup` / `SuggestedRestStop`, `MapDataRepository.getSuggestions` / `replaceSuggestions`, `DataSyncObserver.onRecommendationUpdated` (D9); suggestions are live data, polled with the layers (`refreshLive(layers, kinds)`, D25) and fresh for 5 or 15 minutes (D36)
+   - [x] `RecommendationController`: `toggle`, plus `rank()` by distance and preferences on the client (D34); re-ranked as the driver moves and new scores arrive; UC 0008/0009 toasts (2a, 4a)
+   - [x] `Sidemenu.onToggleSuggestion`: the mockup's drawer, opened by its menu button (D33)
+   - [x] `RecommendationCard`: the best 3, with distance; tapping one shows it on the map; numbered pins and areas on the map
+   - [x] turning a suggestion on also turns on its related layers; off turns off only those (D35)
+   - [x] fixed on the way: a 304 no longer makes an old copy look new (D37); markers' titles follow changes (D38)
 8. **Navigation and bookmarks (UC 0011–0012)**
    - [ ] `NavigationController` and `NavigationGateway.openDeepLink`
    - [ ] Yes/No prompt with "Do not show again"
@@ -407,7 +408,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D8 — Visibility.**
   - Fields the diagram marks `#` (protected) or `-` (private) become `readonly` public fields when other layers need to read them, e.g. the map showing a landmark's `name`.
   - The diagram only defines `getLocation()` and `getType()`, with no getters for `id` or `name`.
-- **D9 — Suggestion updates (my decision, 23 Oct).** `DataSyncObserver` gets a second method, `onRecommendationUpdated(k: RecommendationKind)`. `onDataUpdated(t: LayerType)` stays for map layers. Added in Phase 2, package 7.
+- **D9 — Suggestion updates (my decision, 23 Oct).** `DataSyncObserver` gets a second method, `onRecommendationUpdated(k: RecommendationKind)`. `onDataUpdated(t: LayerType)` stays for map layers. Built in package 7 with both methods optional, so each observer implements what it listens to: `MapDisplayController` layers, `RecommendationController` suggestions. The design model's `RecommendationController.onDataUpdated(t)` isn't needed, because the server scores the sites from the layers. Added in Phase 2, package 7.
 - **D10 — One `CacheManager`, passed in (my decision, 27 Oct).** The diagram marks `CacheManager` «Singleton». Instead, `initControllers()` creates exactly one and passes it to `DataSyncController`, like `LocalStore`. There is still only one instance, but the startup code guarantees it rather than a static `getInstance()`, so tests can use a fresh one and dependencies show in constructors.
 - **D11 — The contract is zod, in `shared/` (my decision, 28 Oct).** The diagram generates TypeScript types *from* an OpenAPI spec. We go the other way: each response shape is written once as a zod schema in `shared/`, both sides infer their types from it, and the OpenAPI document is generated from the same schemas. One source of truth and no code-generation step for the code; the client also uses the schemas to check what it downloads and what it saved.
 - **D12 — Fuel stations from OpenStreetMap (my decision, 28 Oct).** No official dataset lists retail stations (Singapore Customs' "licensed petroleum premises" is 21 depots, last updated 2012). OSM, through the Overpass API, has about 200 (Singapore has about 184), refreshed daily. This adds a fourth provider, `OSM_OVERPASS`, which the design doesn't have. OSM's licence (ODbL) requires "© OpenStreetMap contributors" on the map while the Fuel layer is on. Public Overpass servers are sometimes at capacity, so the sync relies on D7's retries and last good copy.
@@ -431,8 +432,15 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **D30 — When location is denied (my decision, 28 Oct).** UC 0013 wants an "actionable banner" that takes the driver "directly to OS app settings", but a web app can't open the phone's or the browser's settings, and once denied it can't even ask again. The banner keeps the use case's text; its button shows the steps for this phone's browser (iPhone Safari, Android Chrome, others), next to "Try again". The driver's dot turns grey, as specified.
 - **D31 — The map centres on the driver once (my decision, 28 Oct).** On the session's first fix the map centres on the driver; after that it never moves by itself. UC 0013 step 3 says the map keeps the driver in view; instead, the crosshair button lights up whenever the driver's dot is away from the middle of the screen, whether the driver panned away (3a) or the taxi drove off, and tapping it re-centres.
 - **D32 — Only the last position is kept (my decision, 28 Oct).** UC 0013's postcondition stores the location locally: only the latest fix (no history) goes into IndexedDB on the phone, so the map opens where the driver was and package 7 can rank suggestions before the GPS answers. It never leaves the phone, as the deployment diagram says. The design model's `TaxiDriver` (`driverId`, `currentLocation`) becomes `LocationController`'s state: with no user accounts, there is no driver id.
+- **D33 — A suggestion is a toggle and a list (my decision, 29 Oct).** UC 0008/0009 make suggestions map toggles; the dialog map makes them a list sorted by proximity, where choosing one shows it on the map. Both: in the side menu (the mockup's drawer, "Smart suggestions"), each suggestion is a persisted toggle (UC, design note) that draws the best nearby sites as circles (amber for pickup, green for rest stops, as the data dictionary colours them) and lists them as `RecommendationCard`s; tapping a card shows the site on the map (dialog map, `MapDisplayController.focusOn`).
+- **D34 — How suggestions are ranked (my decision, 29 Oct).** `RecommendationController.rank(sites, from, prefs)` keeps sites within 3 km (pickup) or 5 km (rest stop) of the driver, ranks them by score × 1/(1 + km/1.5), with a rest stop that has the driver's energy stop (vehicle type, package 9) counting ×1.25, and shows the top 3 (NF-1: few enough to read at a glance). With none nearby, or no position to rank from, the toggle gives UC 0008/0009's exception 4a toast and switches back.
+- **D35 — Turning a suggestion off undoes only what it turned on (my decision, 29 Oct).** Turning a suggestion on turns its related layers on (UC 0008/0009 step 5: Charge, Fuel, Carpark, Hawker food; or Taxi stands, Nearby taxis, Hotspots). Turning it off turns off only the layers it switched on, not ones the driver already had on (UC 0008's alternative flow turns them all off).
 
 ---
+
+- **D36 — How old suggestions may be (Claude's decision at my request, 29 Oct).** A suggested site counts only while it is as fresh as the live data it was scored from (D22): pickups 5 minutes (taxis; also UC 0008/0009's "not older than 5 minutes"), rest stops 15 minutes (free lots). Older sites are not suggested: a toggle gives exception 2a, and a list that ages out says it is out of date. The use cases conflict here: their precondition says 5 minutes, and their special requirement wants the markers offline. Rest stops keep 15 minutes rather than lasting offline, because a saved copy's free lots would be stale.
+- **D37 — A 304 says how old the server's copy is (fix, 29 Oct).** Since 2d, a 304 made the client's copy count as confirmed "now". But a server whose source is down keeps its old copy, and with it the same ETag, so 20-minute-old taxis could show as current, against D22. The server now sends `Last-Modified` (the copy's `asOf`) on every answer, 304 included. The client keeps that time, never moving it backwards. Live data that is already too old when it arrives is stored but counts as nothing to show, so its toggle gives the "Unable to load" toast instead of an empty layer.
+- **D38 — Markers' titles follow changes (fix, 29 Oct).** react-leaflet sets a marker's `title` (its tooltip and screen-reader name) only when it creates the marker. So since 2b/2d/6, a cluster bubble kept its old count, a hotspot its old crowd level, and the driver's dot "You are here" after the GPS went quiet. `TitledMarker` keeps every marker's title current. Found in package 7, where re-ranked pins kept their old numbers.
 
 ## Decisions I'll be asked about
 
@@ -467,4 +475,7 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **The deployment diagram's data.gov.sg "HDB carpark availability"** isn't used: LTA covers every agency (D19).
 - **UC 0013's exception sends the driver to OS app settings,** which a web app can't open (D30). Its step 3 keeps the map on the driver; the app centres once (D31).
 - **`TaxiDriver.driverId`** has no meaning without user accounts, which the design rules out (D32).
+- **UC 0008/0009 contradict themselves** like UC 0001: the "not older than 5 minutes" precondition, against "markers available offline" (D36). UC 0009's 2a toast says "rest stop markers"; the app says "pickup markers".
+- **The dialog map shows suggestions as a list screen; UC 0008/0009 as map toggles** (D33). Its Settings UI has a "narrator on/off" option that no other document mentions (package 9).
+- **The mockup calls the app "TaxiMate"**; the app keeps the name "Taxi Assistant", as in its page title (decided 29 Oct).
 - **The AI report and the Lab 3 report number the use cases differently.** This plan uses the Lab 3 report's numbering.

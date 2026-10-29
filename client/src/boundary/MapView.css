@@ -82,3 +82,51 @@
   color: #b42318;
   font-weight: 700;
 }
+
+/* Package 7: a suggested site's numbered pin, as the mockup's hotspot pin */
+.suggestion-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.suggestion-pin__bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+  border: 2px solid #fff;
+  border-radius: 14px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+}
+.suggestion-pin__bubble svg {
+  width: 15px;
+  height: 15px;
+}
+.suggestion-pin::after {
+  content: "";
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 7px solid;
+}
+.suggestion-pin--find .suggestion-pin__bubble {
+  background: #e8930c;
+}
+.suggestion-pin--find::after {
+  border-top-color: #e8930c;
+}
+.suggestion-pin--rest .suggestion-pin__bubble {
+  background: #0e7a57;
+}
+.suggestion-pin--rest::after {
+  border-top-color: #0e7a57;
+}
+
+/* Leaflet's zoom buttons sit below the menu button (top left, as in the mockup) */
+.map-view .leaflet-top.leaflet-left {
+  top: calc(64px + env(safe-area-inset-top));
+}

@@ -2,6 +2,7 @@
 // A fake server stands in for fetch; IndexedDB is the in-memory one from test-setup.ts (empty per test).
 // M7: after one online session, the stands work with the server down (D1).
 // Package 2b: every static layer is downloaded at startup (D18) and clustered while zoomed out (D17).
+// Package 6: the driver's position (UC 0013). Package 7: smart suggestions from the side menu (UC 0008/0009).
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +10,7 @@ import { App } from "./App";
 import { ControllersContext, initControllers, startControllers } from "./startup";
 import { LocalStore } from "./services/LocalStore";
 import { fakeGeolocation } from "./testing/fakeGps";
-import { callsTo, fakeServer, offline, status, type Answer } from "./testing/fakeServer";
+import { callsTo, fakeServer, offline, ok, ORCHARD, PICKUPS, status, type Answer } from "./testing/fakeServer";
 
 const STATIC_PATHS = ["/taxi-stands", "/carparks", "/fuel-stations", "/charging-stations", "/hawker-centres"];
 
@@ -42,6 +43,7 @@ const taxiStandsButton = () => button("Taxi stands");
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("App (with controllers)", () => {
@@ -323,5 +325,126 @@ describe("App — location (package 6)", () => {
     await openApp();
 
     expect(await screen.findByTitle("Your last known position")).toBeInTheDocument();
+  });
+});
+
+// Package 7 — smart suggestions in the whole app (UC 0008/0009).
+describe("App — smart suggestions (package 7)", () => {
+  const pickupToggle = () => screen.getByRole("button", { name: /^Suggested pickup/ });
+
+  /** Opens the app with the driver in Orchard. */
+  async function openInOrchard() {
+    const gps = fakeGeolocation();
+    vi.stubGlobal("navigator", { ...navigator, geolocation: gps.geolocation });
+    const app = await openApp();
+    await waitFor(() => expect(gps.watching()).toBe(true));
+    act(() => gps.move(ORCHARD.latitude, ORCHARD.longitude));
+    return app;
+  }
+
+  it("turns Suggested pickup on from the side menu: its best sites, its pins and its layers (D33, D35)", async () => {
+    serve();
+    await openInOrchard();
+
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(pickupToggle());
+
+    expect(await screen.findByRole("button", { name: /Mt Elizabeth Rd/ })).toBeInTheDocument();
+    expect(pickupToggle()).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTitle("Suggested pickup 1: Mt Elizabeth Rd at Mt Elizabeth Hospital")).toBeInTheDocument();
+    expect(taxiStandsButton()).toHaveAttribute("aria-pressed", "true");
+    expect(button("Hotspots")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("closes the menu to show a chosen site on the map", async () => {
+    serve();
+    await openInOrchard();
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(pickupToggle());
+
+    await userEvent.click(await screen.findByRole("button", { name: /Lucky Plaza/ }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("turns it off again with the layers it turned on", async () => {
+    serve();
+    await openInOrchard();
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(pickupToggle());
+    await screen.findByRole("button", { name: /Lucky Plaza/ });
+
+    await userEvent.click(pickupToggle());
+
+    expect(pickupToggle()).toHaveAttribute("aria-pressed", "false");
+    expect(taxiStandsButton()).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByTitle(/^Suggested pickup/)).not.toBeInTheDocument();
+  });
+
+  it("gives the toast over the menu and stays off when no sites can be loaded (exception 2a)", async () => {
+    serve({ "/pickup-sites": status(503) });
+    await openInOrchard();
+    await userEvent.click(button("Open the menu"));
+
+    await userEvent.click(pickupToggle());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Unable to load pickup markers. Please check your connection.",
+    );
+    expect(pickupToggle()).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("suggests again when new scores arrive, e.g. on coming back to the app (D25)", async () => {
+    let scores = PICKUPS;
+    serve({ "/pickup-sites": (init) => ok(scores, `"${scores[2]!.score}"`)(init) });
+    await openInOrchard();
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(pickupToggle());
+    await screen.findByRole("button", { name: /Lucky Plaza/ });
+    const firstSite = () => screen.getAllByRole("listitem")[0];
+    expect(firstSite()).toHaveTextContent("Mt Elizabeth");
+
+    scores = PICKUPS.map((p) => (p.id === "A01" ? { ...p, score: 0.95 } : p)); // Lucky Plaza gets busy
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    visibility.mockReturnValue("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    await waitFor(() => expect(firstSite()).toHaveTextContent("Lucky Plaza"));
+    visibility.mockRestore();
+  });
+
+  it("switches a suggestion left on off at startup, with its toast, when it has nothing recent to load (2a)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T13:00:00Z"));
+    serve();
+    const first = await openInOrchard();
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(pickupToggle());
+    await screen.findByRole("button", { name: /Lucky Plaza/ });
+    first.unmount();
+
+    vi.setSystemTime(new Date("2026-10-29T13:10:00Z")); // the saved pickups are 10 minutes old
+    serve({ "*": offline });
+    await openApp();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load pickup markers.");
+    await userEvent.click(button("Open the menu"));
+    expect(pickupToggle()).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("keeps a suggestion on after a reload, and suggests again from where the driver was", async () => {
+    serve();
+    const first = await openInOrchard();
+    await userEvent.click(button("Open the menu"));
+    await userEvent.click(pickupToggle());
+    await screen.findByRole("button", { name: /Lucky Plaza/ });
+    first.unmount();
+
+    await openApp(); // no GPS answer this time: the saved position is enough (D32)
+    await userEvent.click(button("Open the menu"));
+
+    expect(pickupToggle()).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("button", { name: /Lucky Plaza/ })).toBeInTheDocument();
   });
 });

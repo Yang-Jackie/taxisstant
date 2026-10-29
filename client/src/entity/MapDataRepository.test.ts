@@ -1,5 +1,5 @@
 // M1 acceptance tests — MapDataRepository «container» (design model, 23 Oct): getByLayerType, replaceLayer.
-// updateAvailability and the suggestion methods come in Phase 2, with Carpark, ChargingStation and SuggestedSite.
+// updateAvailability came with Carpark and ChargingStation (2d); getSuggestions and replaceSuggestions in package 7.
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { Location } from "./Location";
 import { MapDataRepository } from "./MapDataRepository";
@@ -7,6 +7,8 @@ import type { ChargingStation } from "./ChargingStation";
 import type { FuelStation } from "./FuelStation";
 import type { HawkerCentre } from "./HawkerCentre";
 import { Carpark } from "./Carpark";
+import { SuggestedPickup } from "./SuggestedPickup";
+import type { SuggestedRestStop } from "./SuggestedRestStop";
 import { Taxi } from "./Taxi";
 import { TaxiStand } from "./TaxiStand";
 
@@ -128,5 +130,48 @@ describe("MapDataRepository", () => {
       expect(before[0]!.availableLots).toBeUndefined();
       expect(repo.getByLayerType("CARPARK")[0]!.availableLots).toBe(12);
     });
+  });
+});
+
+describe("MapDataRepository suggestions (package 7)", () => {
+  const site = (id: string) =>
+    new SuggestedPickup({
+      id,
+      name: id,
+      centre: new Location(1.3, 103.8),
+      radius: 300,
+      score: 0.5,
+      summary: "",
+      asOf: new Date("2026-10-29T13:00:00Z"),
+      taxiCount: 0,
+    });
+
+  it("returns no suggestions before any were loaded", () => {
+    expect(new MapDataRepository().getSuggestions("PICKUP")).toEqual([]);
+  });
+
+  it("keeps each suggestion's sites apart from the other's, and from the layers", () => {
+    const repo = new MapDataRepository();
+    const [x, y] = [site("X"), site("Y")];
+    repo.replaceSuggestions("PICKUP", [x, y]);
+    expect(repo.getSuggestions("PICKUP")).toEqual([x, y]);
+    expect(repo.getSuggestions("REST_STOP")).toEqual([]);
+    expect(repo.getByLayerType("TAXI_STAND")).toEqual([]);
+  });
+
+  it("replaces the whole list, and can't be changed through the arrays it receives or returns", () => {
+    const repo = new MapDataRepository();
+    const given = [site("X")];
+    repo.replaceSuggestions("PICKUP", given);
+    given.push(site("Z"));
+    repo.getSuggestions("PICKUP").push(site("Z"));
+    repo.replaceSuggestions("PICKUP", [site("Y")]);
+    expect(repo.getSuggestions("PICKUP").map((s) => s.id)).toEqual(["Y"]);
+  });
+
+  it("types each suggestion's sites by kind", () => {
+    const repo = new MapDataRepository();
+    expectTypeOf(repo.getSuggestions("PICKUP")).toEqualTypeOf<SuggestedPickup[]>();
+    expectTypeOf(repo.getSuggestions("REST_STOP")).toEqualTypeOf<SuggestedRestStop[]>();
   });
 });

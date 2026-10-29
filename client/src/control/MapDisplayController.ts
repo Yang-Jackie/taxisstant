@@ -51,7 +51,7 @@ const LOAD_FAILED: Record<StaticLayer | LiveLayer, string> = {
 /** Hotspots turned on when no station is busy: not a failure, but the empty map needs a word (D23). */
 const NO_HOTSPOTS = "No stations are crowded right now.";
 
-/** Live layers are polled together this often while any is on and the app is in front (D25). */
+/** Live layers and suggestions are polled together this often while any is on and the app is in front (D25). */
 export const LIVE_POLL_MS = 30_000;
 
 /** The layers whose live data the timer asks for: the live layers, and the ones with live availability (D25). */
@@ -124,9 +124,12 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
   async toggleLayer(t: LayerType): Promise<void> {
     const on = !this.settings.isLayerVisible(t);
     await this.settings.setLayerVisible(t, on);
-    if (on && POLLED.includes(t) && !isLive(t)) void this.dataSync.refreshLive(new Set([t])); // availability now, not in 30 s
-    if (on && isStaticLayer(t)) await this.load(t);
-    if (on && isLive(t)) await this.loadLive(t);
+    if (on) await this.show(t);
+  }
+
+  /** Loads layers that something else just turned on in the settings: a suggestion's related layers (D35). */
+  async showLayers(layers: readonly LayerType[]): Promise<void> {
+    await Promise.all(layers.map((t) => this.show(t)));
   }
 
   /**
@@ -182,8 +185,20 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
     if (driver) this.focusOn(driver.location);
   }
 
+  /** The app's one toast (D3): a newer message replaces the one showing. */
+  showNotice(message: string): void {
+    this.setState({ ...this.getSnapshot(), notice: message });
+  }
+
   dismissNotice(): void {
     this.setState({ ...this.getSnapshot(), notice: null });
+  }
+
+  /** A layer that was just turned on: its data, and availability now rather than at the next poll. */
+  private async show(t: LayerType): Promise<void> {
+    if (POLLED.includes(t) && !isLive(t)) void this.dataSync.refreshLive(new Set([t]));
+    if (isStaticLayer(t)) await this.load(t);
+    if (isLive(t)) await this.loadLive(t);
   }
 
   private async load(t: StaticLayer): Promise<void> {
@@ -191,7 +206,7 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
       await this.dataSync.refreshLayer(t);
     } catch {
       await this.settings.setLayerVisible(t, false);
-      this.setState({ ...this.getSnapshot(), notice: LOAD_FAILED[t] });
+      this.showNotice(LOAD_FAILED[t]);
     }
   }
 
@@ -200,11 +215,11 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
       await this.dataSync.refreshLiveLayer(t);
     } catch {
       await this.settings.setLayerVisible(t, false);
-      this.setState({ ...this.getSnapshot(), notice: LOAD_FAILED[t] });
+      this.showNotice(LOAD_FAILED[t]);
       return;
     }
     if (t === "HOTSPOT" && !this.repo.getByLayerType("HOTSPOT").some((h) => h.isCurrent(new Date()))) {
-      this.setState({ ...this.getSnapshot(), notice: NO_HOTSPOTS });
+      this.showNotice(NO_HOTSPOTS);
     }
   }
 
@@ -214,7 +229,8 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
 
   /** The timer runs only while the app is in front and something it polls is on: no wasted data or battery. */
   private updatePolling(): void {
-    const needed = this.foreground && this.polledLayers().size > 0;
+    const { activeSuggestions } = this.settings.getPreferences();
+    const needed = this.foreground && (this.polledLayers().size > 0 || activeSuggestions.size > 0);
     if (needed && !this.timer) this.timer = setInterval(() => void this.poll(), LIVE_POLL_MS);
     if (!needed && this.timer) {
       clearInterval(this.timer);
@@ -222,10 +238,14 @@ export class MapDisplayController extends Store<MapDisplayState> implements Data
     }
   }
 
-  /** One tick: ask for the live data that's on, then recompute, since data ages even when nothing new arrives (D22). */
+  /**
+   * One tick: ask for the live data and suggestions that are on, then recompute, since data ages even when nothing new
+   * arrives (D22).
+   */
   private async poll(): Promise<void> {
     const layers = this.polledLayers();
-    if (layers.size > 0) await this.dataSync.refreshLive(layers);
+    const { activeSuggestions } = this.settings.getPreferences();
+    if (layers.size > 0 || activeSuggestions.size > 0) await this.dataSync.refreshLive(layers, activeSuggestions);
     this.recompute();
   }
 

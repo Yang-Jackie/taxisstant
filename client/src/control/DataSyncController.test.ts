@@ -2,6 +2,7 @@
 // its observers (DataSyncObserver) which layer changed. A fake fetch stands in for the server.
 // M7 adds the cache: loadCached() at startup, a daily ETag re-check, and the saved copy when offline (D1).
 // Package 2b: every static layer (D18). refreshLayer(t) is one layer, as a toggle needs it; refreshStatic() is all of them.
+// Package 7: suggested sites are live data too, polled with the layers (refreshLive(layers, kinds), D9, D36).
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Carpark } from "../entity/Carpark";
 import { ChargingStation } from "../entity/ChargingStation";
@@ -9,6 +10,8 @@ import { FuelStation } from "../entity/FuelStation";
 import { HawkerCentre } from "../entity/HawkerCentre";
 import { STATIC_LAYERS } from "../entity/LayerType";
 import { MapDataRepository } from "../entity/MapDataRepository";
+import { SuggestedPickup } from "../entity/SuggestedPickup";
+import { SuggestedRestStop } from "../entity/SuggestedRestStop";
 import { Taxi } from "../entity/Taxi";
 import { TaxiStand } from "../entity/TaxiStand";
 import { CacheManager } from "../services/CacheManager";
@@ -444,5 +447,90 @@ describe("DataSyncController — live layers (package 2d)", () => {
     const next = p.open({ "*": offline });
     await next.dataSync.loadCached();
     expect(next.repo.getByLayerType("TAXIS")).toHaveLength(4);
+  });
+});
+
+describe("DataSyncController — suggested sites (package 7)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("refreshSuggestions loads the pickups as real SuggestedPickups, scored at the server's asOf", async () => {
+    const { fetchFn, repo, dataSync } = setUp();
+
+    await dataSync.refreshSuggestions("PICKUP");
+
+    expect(callsTo(fetchFn, "/pickup-sites")).toBe(1);
+    const sites = repo.getSuggestions("PICKUP");
+    expect(sites.map((s) => s.id)).toEqual(["JE1", "A05", "A01"]);
+    expect(sites[0]).toBeInstanceOf(SuggestedPickup);
+    expect(Date.now() - sites[0]!.asOf.getTime()).toBeLessThan(1000);
+  });
+
+  it("refreshSuggestions loads the rest stops as real SuggestedRestStops", async () => {
+    const { fetchFn, repo, dataSync } = setUp();
+    await dataSync.refreshSuggestions("REST_STOP");
+    expect(callsTo(fetchFn, "/rest-stop-sites")).toBe(1);
+    expect(repo.getSuggestions("REST_STOP")[1]).toBeInstanceOf(SuggestedRestStop);
+  });
+
+  it("tells observers which suggestion changed with onRecommendationUpdated, not onDataUpdated (D9)", async () => {
+    const { dataSync, observer } = setUp();
+    const listener = { onRecommendationUpdated: vi.fn() };
+    dataSync.attach(listener);
+
+    await dataSync.refreshSuggestions("REST_STOP");
+
+    expect(listener.onRecommendationUpdated).toHaveBeenCalledExactlyOnceWith("REST_STOP");
+    expect(observer.onDataUpdated).not.toHaveBeenCalled(); // and an observer of layers only is left alone
+  });
+
+  it("refreshLive asks for the suggestions in `kinds` together with the layers, and only those", async () => {
+    const { fetchFn, dataSync } = setUp();
+
+    await dataSync.refreshLive(new Set(["TAXIS"]), new Set(["PICKUP"]));
+
+    expect([
+      callsTo(fetchFn, "/taxis"),
+      callsTo(fetchFn, "/pickup-sites"),
+      callsTo(fetchFn, "/rest-stop-sites"),
+    ]).toEqual([1, 1, 0]);
+  });
+
+  it("refreshLive without kinds asks for no suggestions, as before", async () => {
+    const { fetchFn, dataSync } = setUp();
+    await dataSync.refreshLive(new Set(["TAXIS"]));
+    expect(callsTo(fetchFn, "/pickup-sites")).toBe(0);
+  });
+
+  it("refreshSuggestions rejects when nothing was saved and the download fails (exception 2a)", async () => {
+    const { dataSync } = setUp({ "*": offline });
+    await expect(dataSync.refreshSuggestions("PICKUP")).rejects.toThrow();
+  });
+
+  it("accepts saved pickups offline for 5 minutes, and saved rest stops for 15 (D36)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T13:00:00Z"));
+    const p = phone();
+    await p.open().dataSync.refreshLive(new Set(), new Set(["PICKUP", "REST_STOP"]));
+
+    vi.setSystemTime(new Date("2026-10-29T13:04:00Z"));
+    await expect(p.open({ "*": offline }).dataSync.refreshSuggestions("PICKUP")).resolves.toBeUndefined();
+    vi.setSystemTime(new Date("2026-10-29T13:06:00Z"));
+    await expect(p.open({ "*": offline }).dataSync.refreshSuggestions("PICKUP")).rejects.toThrow();
+    await expect(p.open({ "*": offline }).dataSync.refreshSuggestions("REST_STOP")).resolves.toBeUndefined();
+    vi.setSystemTime(new Date("2026-10-29T13:16:00Z"));
+    await expect(p.open({ "*": offline }).dataSync.refreshSuggestions("REST_STOP")).rejects.toThrow();
+  });
+
+  it("loadCached brings back saved suggestions, and says so", async () => {
+    const p = phone();
+    await p.open().dataSync.refreshSuggestions("PICKUP");
+    const next = p.open({ "*": offline });
+    const listener = { onRecommendationUpdated: vi.fn() };
+    next.dataSync.attach(listener);
+
+    await next.dataSync.loadCached();
+
+    expect(next.repo.getSuggestions("PICKUP")).toHaveLength(3);
+    expect(listener.onRecommendationUpdated).toHaveBeenCalledWith("PICKUP");
   });
 });

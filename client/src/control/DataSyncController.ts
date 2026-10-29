@@ -1,6 +1,13 @@
 import { ENDPOINTS, type ApiResponse, type Endpoint, type HotspotDto } from "@taxisstant/shared";
-import { AVAILABILITY_MAX_AGE_MS, HOTSPOT_MAX_LAG_MS, isRecent, TAXI_MAX_AGE_MS } from "../entity/freshness";
+import {
+  AVAILABILITY_MAX_AGE_MS,
+  HOTSPOT_MAX_LAG_MS,
+  isRecent,
+  SUGGESTION_MAX_AGE_MS,
+  TAXI_MAX_AGE_MS,
+} from "../entity/freshness";
 import { STATIC_LAYERS, type LayerType, type StaticLayer } from "../entity/LayerType";
+import type { RecommendationKind } from "../entity/RecommendationKind";
 import type { LayerItems, MapDataRepository } from "../entity/MapDataRepository";
 import type { CacheManager } from "../services/CacheManager";
 import type { ApiResult, DataApiClient } from "../services/DataApiClient";
@@ -9,6 +16,8 @@ import { toChargingStation } from "../services/toChargingStation";
 import { toFuelStation } from "../services/toFuelStation";
 import { toHawkerCentre } from "../services/toHawkerCentre";
 import { toHotspot } from "../services/toHotspot";
+import { toSuggestedPickup } from "../services/toSuggestedPickup";
+import { toSuggestedRestStop } from "../services/toSuggestedRestStop";
 import { toTaxi } from "../services/toTaxi";
 import { toTaxiStand } from "../services/toTaxiStand";
 import type { DataSyncObserver } from "./DataSyncObserver";
@@ -16,7 +25,7 @@ import type { DataSyncObserver } from "./DataSyncObserver";
 /** Static layers are re-checked with the server once a day (D1). */
 const STATIC_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** How one static layer gets from the cache or the server into the repository. */
+/** How one layer's (or suggestion's) data gets from the cache or the server into the repository. */
 interface LayerSync {
   loadCached(): Promise<void>;
   refresh(): Promise<void>;
@@ -27,6 +36,8 @@ export type LiveLayer = "TAXIS" | "HOTSPOT";
 export const LIVE_LAYERS: readonly LiveLayer[] = ["TAXIS", "HOTSPOT"];
 type AvailabilityLayer = "CARPARK" | "CHARGING";
 const AVAILABILITY_LAYERS: readonly AvailabilityLayer[] = ["CARPARK", "CHARGING"];
+/** Everything asked for again on every poll: live layers, availability, and suggestions, which change with them. */
+type LiveData = LiveLayer | AvailabilityLayer | RecommendationKind;
 
 const isLive = (t: LayerType): t is LiveLayer => (LIVE_LAYERS as readonly LayerType[]).includes(t);
 const hasAvailability = (t: LayerType): t is AvailabilityLayer =>
@@ -42,8 +53,8 @@ export class DataSyncController {
   private readonly observers: DataSyncObserver[] = [];
   private readonly layers: Readonly<Record<StaticLayer, LayerSync>>;
   private readonly refreshes = new Map<StaticLayer, Promise<void>>();
-  private readonly live: Readonly<Record<LiveLayer | AvailabilityLayer, LayerSync>>;
-  private readonly liveRequests = new Map<LiveLayer | AvailabilityLayer, Promise<void>>();
+  private readonly live: Readonly<Record<LiveData, LayerSync>>;
+  private readonly liveRequests = new Map<LiveData, Promise<void>>();
   /** The latest availability per layer, put back whenever its static layer is replaced. */
   private readonly availability = new Map<AvailabilityLayer, { values: ReadonlyMap<string, number>; asOf: Date }>();
 
@@ -100,31 +111,66 @@ export class DataSyncController {
           this.setAvailability("CHARGING", new Map(r.data.map((a) => [a.id, a.availablePoints])), new Date(r.asOf));
         },
       ),
-    } satisfies Record<LiveLayer | AvailabilityLayer, LayerSync>;
+      PICKUP: this.liveLayer(
+        ENDPOINTS.pickupSites,
+        SUGGESTION_MAX_AGE_MS.PICKUP,
+        (r) => new Date(r.asOf),
+        (r) => {
+          const asOf = new Date(r.asOf);
+          this.repo.replaceSuggestions(
+            "PICKUP",
+            r.data.map((dto) => toSuggestedPickup(dto, asOf)),
+          );
+          this.notifySuggestions("PICKUP");
+        },
+      ),
+      REST_STOP: this.liveLayer(
+        ENDPOINTS.restStopSites,
+        SUGGESTION_MAX_AGE_MS.REST_STOP,
+        (r) => new Date(r.asOf),
+        (r) => {
+          const asOf = new Date(r.asOf);
+          this.repo.replaceSuggestions(
+            "REST_STOP",
+            r.data.map((dto) => toSuggestedRestStop(dto, asOf)),
+          );
+          this.notifySuggestions("REST_STOP");
+        },
+      ),
+    } satisfies Record<LiveData, LayerSync>;
   }
 
   attach(o: DataSyncObserver): void {
     this.observers.push(o);
   }
 
-  /** At startup: fill the repository with what earlier sessions saved, static and live. Never touches the network. */
+  /**
+   * At startup: fill the repository with what earlier sessions saved, static, live and suggestions. Never touches the
+   * network.
+   */
   async loadCached(): Promise<void> {
     await Promise.all(STATIC_LAYERS.map((t) => this.layers[t].loadCached()));
     await Promise.all(Object.values(this.live).map((l) => l.loadCached())); // availability goes onto loaded layers
   }
 
   /**
-   * The design model's refreshLive: brings the live data of `layers` up to date together (D25), including carpark and
-   * charger availability for those layers. Never rejects; a toggle uses refreshLiveLayer to hear about failures.
+   * The design model's refreshLive: brings the live data of `layers` and the suggestions of `kinds` up to date together
+   * (D25), including carpark and charger availability for those layers. Never rejects; a toggle uses refreshLiveLayer
+   * or refreshSuggestions to hear about failures.
    */
-  async refreshLive(layers: ReadonlySet<LayerType>): Promise<void> {
-    const wanted = [...layers].filter((t) => isLive(t) || hasAvailability(t));
+  async refreshLive(layers: ReadonlySet<LayerType>, kinds: ReadonlySet<RecommendationKind> = new Set()): Promise<void> {
+    const wanted: LiveData[] = [...[...layers].filter((t) => isLive(t) || hasAvailability(t)), ...kinds];
     await Promise.allSettled(wanted.map((t) => this.requestLive(t)));
   }
 
   /** Brings one live layer up to date. Rejects only when there is nothing recent enough to show (D22, exception 4a). */
   refreshLiveLayer(t: LiveLayer): Promise<void> {
     return this.requestLive(t);
+  }
+
+  /** Brings one suggestion's sites up to date. Rejects only when there is nothing recent enough to rank (D36, 2a). */
+  refreshSuggestions(k: RecommendationKind): Promise<void> {
+    return this.requestLive(k);
   }
 
   /**
@@ -152,7 +198,7 @@ export class DataSyncController {
   }
 
   /** One request at a time per live endpoint: a poll and a toggle arriving together share it. */
-  private requestLive(t: LiveLayer | AvailabilityLayer): Promise<void> {
+  private requestLive(t: LiveData): Promise<void> {
     let request = this.liveRequests.get(t);
     if (!request) {
       request = this.live[t].refresh().finally(() => this.liveRequests.delete(t));
@@ -162,7 +208,11 @@ export class DataSyncController {
   }
 
   private notify(t: LayerType): void {
-    for (const o of this.observers) o.onDataUpdated(t);
+    for (const o of this.observers) o.onDataUpdated?.(t);
+  }
+
+  private notifySuggestions(k: RecommendationKind): void {
+    for (const o of this.observers) o.onRecommendationUpdated?.(k);
   }
 
   private setAvailability(t: AvailabilityLayer, values: ReadonlyMap<string, number>, asOf: Date): void {

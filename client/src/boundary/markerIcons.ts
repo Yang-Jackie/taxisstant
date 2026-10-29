@@ -7,8 +7,10 @@ import flame from "@tabler/icons/outline/flame.svg?raw";
 import gasStation from "@tabler/icons/outline/gas-station.svg?raw";
 import mapPin from "@tabler/icons/outline/map-pin.svg?raw";
 import parking from "@tabler/icons/outline/parking.svg?raw";
+import star from "@tabler/icons/outline/star.svg?raw";
 import { DivIcon } from "leaflet";
 import type { LayerType } from "../entity/LayerType";
+import type { RecommendationKind } from "../entity/RecommendationKind";
 
 const SVG: Record<LayerType, string> = {
   TAXI_STAND: mapPin,
@@ -75,4 +77,32 @@ export function clusterIcon(t: LayerType, count: number): DivIcon {
     iconSize: [px, px],
     iconAnchor: [px / 2, px / 2],
   });
+}
+
+/** Suggestions take the colour of their group: pickups amber, rest stops green (the data dictionary's toggles). */
+export const SUGGESTION_GROUP: Record<RecommendationKind, "find" | "rest"> = { PICKUP: "find", REST_STOP: "rest" };
+
+const PIN_WIDTH = 46;
+const PIN_HEIGHT = 28;
+const PIN_TAIL = 7;
+const suggestionIcons = new Map<string, DivIcon>();
+
+/**
+ * The mockup's pin: a bubble with a star and the site's place in the ranking (D34). Its tail stops at the top of the
+ * landmark's own marker, so both stay readable.
+ */
+export function suggestionIcon(k: RecommendationKind, place: number): DivIcon {
+  const key = `${k}-${place}`;
+  let icon = suggestionIcons.get(key);
+  if (!icon) {
+    icon = new DivIcon({
+      className: `suggestion-pin suggestion-pin--${SUGGESTION_GROUP[k]}`,
+      html: `<span class="suggestion-pin__bubble">${star}${place}</span>`,
+      iconSize: [PIN_WIDTH, PIN_HEIGHT],
+      iconAnchor: [PIN_WIDTH / 2, PIN_HEIGHT + PIN_TAIL + MARKER_PX / 2],
+      popupAnchor: [0, -(PIN_HEIGHT + PIN_TAIL + MARKER_PX / 2)],
+    });
+    suggestionIcons.set(key, icon);
+  }
+  return icon;
 }

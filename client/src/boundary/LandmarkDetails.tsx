@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Recommendation } from "../control/RecommendationController";
 import { Carpark } from "../entity/Carpark";
 import { ChargingStation } from "../entity/ChargingStation";
 import { FuelStation } from "../entity/FuelStation";
@@ -6,15 +7,10 @@ import { HawkerCentre, type Closure } from "../entity/HawkerCentre";
 import type { Hotspot } from "../entity/Hotspot";
 import type { Landmark } from "../entity/Landmark";
 import { TaxiStand } from "../entity/TaxiStand";
+import { clock, distance } from "./format";
 
 const shortDate = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", timeZone: "Asia/Singapore" });
 const day = (isoDate: string) => shortDate.format(new Date(`${isoDate}T00:00:00+08:00`));
-const clock = new Intl.DateTimeFormat("en-SG", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Singapore",
-});
 /** "as of 20:50", in Singapore time: how old a live figure is (D22). */
 const asOf = (at: Date | undefined) => (at ? ` · as of ${clock.format(at)}` : "");
 const range = (c: Closure) => (c.from === c.to ? day(c.from) : `${day(c.from)} – ${day(c.to)}`);
@@ -109,6 +105,20 @@ export function HotspotDetails({ hotspot }: { hotspot: Hotspot }) {
         {hotspot.density === "HIGH" ? "Very crowded" : "Crowded"} platforms{asOf(hotspot.validTo)}
       </p>
       <p className="landmark-details__muted">{hotspot.codes.join(" · ")}</p>
+    </div>
+  );
+}
+
+/** What a suggested site's popup says: why it was suggested, how far it is, and when it was scored (D34). */
+export function SuggestionDetails({ recommendation }: { recommendation: Recommendation }) {
+  const { site, distanceM } = recommendation;
+  return (
+    <div className="landmark-details">
+      <h2>{site.name}</h2>
+      <p>{site.summary}</p>
+      <p className="landmark-details__muted">
+        {distance(distanceM)} away{asOf(site.asOf)}
+      </p>
     </div>
   );
 }

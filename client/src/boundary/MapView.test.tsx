@@ -12,6 +12,8 @@ import { FuelStation } from "../entity/FuelStation";
 import { Hotspot } from "../entity/Hotspot";
 import { Location } from "../entity/Location";
 import { Taxi } from "../entity/Taxi";
+import { SuggestedPickup } from "../entity/SuggestedPickup";
+import { SuggestedRestStop } from "../entity/SuggestedRestStop";
 import { TaxiStand } from "../entity/TaxiStand";
 import { MapView } from "./MapView";
 
@@ -210,7 +212,7 @@ describe("MapView — live layers (package 2d)", () => {
     expect(markers[0]).toHaveClass("marker-chip--find");
   });
 
-  it("keeps a bubble's title in step with its count as taxis come and go (react-leaflet sets it only once)", () => {
+  it("keeps a bubble's title in step with its count as taxis come and go", () => {
     const view = (count: number) => visibleWith({ TAXIS: { items: [], clusters: [{ ...carparkCluster, count }] } });
     const { rerender } = render(<MapView visible={view(12)} />);
     rerender(<MapView visible={view(13)} />);
@@ -283,5 +285,81 @@ describe("MapView — the driver (package 6)", () => {
 
     rerender(<MapView visible={visibleWith()} onPan={onPan} focus={{ location: here, zoom: 16, seq: 3 }} />);
     expect(centreLatitude()).toBeCloseTo(1.29, 3);
+  });
+});
+
+// Package 7 — suggested sites: each one's area, and a numbered pin to tap (D33).
+describe("MapView — suggestions (package 7)", () => {
+  const asOf = new Date("2026-10-29T13:05:00Z");
+  const luckyPlaza = new SuggestedPickup({
+    id: "A01",
+    name: "Lucky Plaza",
+    centre: new Location(1.3043, 103.8338),
+    radius: 300,
+    score: 0.6,
+    summary: "Orchard crowded · no empty taxis nearby",
+    asOf,
+    taxiCount: 0,
+  });
+  const mtElizabeth = new SuggestedPickup({
+    ...luckyPlaza,
+    id: "A05",
+    name: "Mt Elizabeth",
+    centre: new Location(1.3046, 103.8355),
+  });
+  const maxwell = new SuggestedRestStop({
+    id: "maxwell",
+    name: "Maxwell Food Centre",
+    centre: new Location(1.28048, 103.84458),
+    radius: 500,
+    score: 0.7,
+    summary: "Food (100 stalls) · parking",
+    asOf,
+    foodStalls: 100,
+    hasParking: true,
+    hasFuel: false,
+    hasCharging: false,
+  });
+  const suggestions = {
+    PICKUP: [
+      { site: luckyPlaza, distanceM: 5 },
+      { site: mtElizabeth, distanceM: 196 },
+    ],
+    REST_STOP: [{ site: maxwell, distanceM: 2907 }],
+  };
+
+  it("pins each site with its place in the ranking, amber for pickups and green for rest stops", () => {
+    render(<MapView visible={visibleWith()} suggestions={suggestions} />);
+    expect(screen.getByTitle("Suggested pickup 1: Lucky Plaza")).toHaveTextContent("1");
+    expect(screen.getByTitle("Suggested pickup 2: Mt Elizabeth")).toHaveClass("suggestion-pin--find");
+    expect(screen.getByTitle("Suggested rest stop 1: Maxwell Food Centre")).toHaveClass("suggestion-pin--rest");
+  });
+
+  it("outlines each site's area in its suggestion's colour", () => {
+    const { container } = render(<MapView visible={visibleWith()} suggestions={suggestions} />);
+    expect(container.querySelectorAll('path[stroke="#e8930c"]')).toHaveLength(2);
+    expect(container.querySelectorAll('path[stroke="#0e7a57"]')).toHaveLength(1);
+  });
+
+  it("says why a site was suggested, how far it is and when it was scored, when its pin is tapped", async () => {
+    render(<MapView visible={visibleWith()} suggestions={suggestions} />);
+    fireEvent.click(screen.getByTitle("Suggested rest stop 1: Maxwell Food Centre"));
+    expect(await screen.findByText("Food (100 stalls) · parking")).toBeInTheDocument();
+    expect(screen.getByText("2.9 km away · as of 21:05")).toBeInTheDocument();
+  });
+
+  it("keeps each pin's title in step with its place when the ranking changes (react-leaflet sets it only once)", () => {
+    const { rerender } = render(<MapView visible={visibleWith()} suggestions={suggestions} />);
+    rerender(
+      <MapView visible={visibleWith()} suggestions={{ ...suggestions, PICKUP: [...suggestions.PICKUP].reverse() }} />,
+    );
+    expect(screen.getByTitle("Suggested pickup 1: Mt Elizabeth")).toHaveTextContent("1");
+    expect(screen.getByTitle("Suggested pickup 2: Lucky Plaza")).toHaveTextContent("2");
+  });
+
+  it("draws nothing for suggestions that are off", () => {
+    const { container } = render(<MapView visible={visibleWith()} />);
+    expect(container.querySelectorAll(".suggestion-pin")).toHaveLength(0);
+    expect(container.querySelectorAll(".leaflet-overlay-pane path")).toHaveLength(0);
   });
 });

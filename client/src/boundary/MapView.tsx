@@ -9,9 +9,11 @@ import type { Locatable } from "../entity/Locatable";
 import type { Location } from "../entity/Location";
 import type { LayerView } from "../control/LayerClusters";
 import type { MapFocus, VisibleLayers } from "../control/MapDisplayController";
+import type { RecommendationResults } from "../control/RecommendationController";
+import { RECOMMENDATION_KINDS } from "../entity/RecommendationKind";
 import type { DriverPosition } from "../entity/DriverPosition";
-import { HotspotDetails, LandmarkDetails } from "./LandmarkDetails";
-import { clusterIcon, driverIcon, markerIcon } from "./markerIcons";
+import { HotspotDetails, LandmarkDetails, SuggestionDetails } from "./LandmarkDetails";
+import { clusterIcon, driverIcon, markerIcon, SUGGESTION_GROUP, suggestionIcon } from "./markerIcons";
 import {
   MAX_ZOOM,
   MIN_ZOOM,
@@ -53,8 +55,8 @@ function positionOf(location: Location): LatLngTuple {
 
 /**
  * A Marker whose title (its tooltip, and its name for screen readers) follows the prop. react-leaflet sets a marker's
- * title only when it makes the marker, so a cluster's count, a hotspot's level or the driver's "last known position"
- * would otherwise go stale.
+ * title only when it makes the marker, so a cluster's count, a hotspot's level, a suggestion's place or the driver's
+ * "last known position" would otherwise go stale.
  */
 function TitledMarker({ title, ...props }: MarkerProps & { title: string }) {
   const ref = useRef<LeafletMarker>(null);
@@ -75,6 +77,8 @@ export interface MapViewProps {
   driver?: DriverPosition | null;
   /** Where the controller wants the map to go; it goes each time `seq` changes. */
   focus?: MapFocus | null;
+  /** The suggested sites, best first per suggestion (UC 0008/0009). */
+  suggestions?: RecommendationResults;
 }
 
 /** Reports the view after every move or zoom, padded so markers just off screen are ready before they scroll in. */
@@ -96,7 +100,7 @@ function ViewportReporter({ onPan }: { onPan: (viewport: Viewport) => void }) {
   return null;
 }
 
-/** Moves the map when the controller asks: centring on the driver (D31) or, later, on a chosen place. */
+/** Moves the map when the controller asks: centring on the driver (D31) or on a chosen suggestion (D33). */
 function FocusFollower({ focus }: { focus: MapFocus | null }) {
   const map = useMap();
   useEffect(() => {
@@ -204,7 +208,51 @@ function HotspotCircles({ hotspots }: { hotspots: readonly Hotspot[] }) {
   );
 }
 
-export function MapView({ visible, onPan, driver = null, focus = null }: MapViewProps) {
+const SUGGESTION_COLOUR = { find: "#e8930c", rest: "#0e7a57" } as const;
+const SUGGESTION_NAME = { PICKUP: "Suggested pickup", REST_STOP: "Suggested rest stop" } as const;
+
+/** Each suggested site's area, outlined in its suggestion's colour, with a numbered pin to tap (D33). */
+function SuggestionAreas({ suggestions }: { suggestions: RecommendationResults }) {
+  return (
+    <>
+      {RECOMMENDATION_KINDS.flatMap((k) =>
+        suggestions[k].map(({ site }) => (
+          <Circle
+            key={`area-${k}-${site.id}`}
+            center={positionOf(site.centre)}
+            radius={site.radius}
+            pathOptions={{
+              weight: 2,
+              color: SUGGESTION_COLOUR[SUGGESTION_GROUP[k]],
+              dashArray: "6 6",
+              fillOpacity: 0.08,
+            }}
+            interactive={false}
+          />
+        )),
+      )}
+      {RECOMMENDATION_KINDS.flatMap((k) =>
+        suggestions[k].map((r, i) => (
+          <TitledMarker
+            key={`pin-${k}-${r.site.id}`}
+            position={positionOf(r.site.centre)}
+            icon={suggestionIcon(k, i + 1)}
+            title={`${SUGGESTION_NAME[k]} ${i + 1}: ${r.site.name}`}
+            zIndexOffset={500}
+          >
+            <Popup>
+              <SuggestionDetails recommendation={r} />
+            </Popup>
+          </TitledMarker>
+        )),
+      )}
+    </>
+  );
+}
+
+const NO_SUGGESTIONS: RecommendationResults = { PICKUP: [], REST_STOP: [] };
+
+export function MapView({ visible, onPan, driver = null, focus = null, suggestions = NO_SUGGESTIONS }: MapViewProps) {
   const fuelShown = visible.FUEL.items.length > 0 || visible.FUEL.clusters.length > 0;
   return (
     <MapContainer
@@ -231,6 +279,7 @@ export function MapView({ visible, onPan, driver = null, focus = null }: MapView
         />
       ))}
       <PointMarkers layer="TAXIS" view={visible.TAXIS} keyOf={(_, i) => String(i)} titleOf={() => "Available taxi"} />
+      <SuggestionAreas suggestions={suggestions} />
       {driver && <DriverDot driver={driver} />}
     </MapContainer>
   );

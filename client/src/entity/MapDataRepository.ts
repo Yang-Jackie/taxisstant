@@ -5,6 +5,10 @@ import type { HawkerCentre } from "./HawkerCentre";
 import type { Hotspot } from "./Hotspot";
 import type { LayerType } from "./LayerType";
 import type { Locatable } from "./Locatable";
+import type { RecommendationKind } from "./RecommendationKind";
+import type { SuggestedPickup } from "./SuggestedPickup";
+import type { SuggestedRestStop } from "./SuggestedRestStop";
+import type { SuggestedSite } from "./SuggestedSite";
 import type { Taxi } from "./Taxi";
 import type { TaxiStand } from "./TaxiStand";
 
@@ -18,8 +22,14 @@ export interface LayerItems {
   HAWKER: HawkerCentre;
 }
 
+export interface SuggestionItems {
+  PICKUP: SuggestedPickup;
+  REST_STOP: SuggestedRestStop;
+}
+
 export class MapDataRepository {
   private readonly layers = new Map<LayerType, Locatable[]>();
+  private readonly suggestions = new Map<RecommendationKind, SuggestedSite[]>();
 
   getByLayerType<K extends LayerType>(t: K): LayerItems[K][] {
     return [...(this.layers.get(t) ?? [])] as LayerItems[K][];
@@ -27,6 +37,15 @@ export class MapDataRepository {
 
   replaceLayer<K extends LayerType>(t: K, items: LayerItems[K][]): void {
     this.layers.set(t, [...items]);
+  }
+
+  /** The server's scored sites for one suggestion, best score first; the client ranks them by distance (D34). */
+  getSuggestions<K extends RecommendationKind>(k: K): SuggestionItems[K][] {
+    return [...(this.suggestions.get(k) ?? [])] as SuggestionItems[K][];
+  }
+
+  replaceSuggestions<K extends RecommendationKind>(k: K, s: SuggestionItems[K][]): void {
+    this.suggestions.set(k, [...s]);
   }
 
   /**
