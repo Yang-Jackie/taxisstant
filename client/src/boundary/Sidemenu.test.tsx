@@ -44,9 +44,10 @@ function renderMenu(props: Partial<SidemenuProps> = {}) {
 const toggle = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
 
 describe("Sidemenu", () => {
-  it("is a dialog with the mockup's two smart suggestions, both off at first", () => {
+  it("is a dialog with the mockup's brand and two smart suggestions, both off at first", () => {
     renderMenu();
     expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument();
+    expect(screen.getByText("TaxiMate")).toBeInTheDocument();
     expect(screen.getByText("Smart suggestions")).toBeInTheDocument();
     expect(toggle("Suggested pickup")).toHaveAttribute("aria-pressed", "false");
     expect(toggle("Suggested pickup")).toHaveTextContent("Best place to find a fare now");

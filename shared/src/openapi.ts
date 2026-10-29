@@ -56,10 +56,10 @@ export function buildOpenApi() {
   return {
     openapi: "3.1.0",
     info: {
-      title: "Taxi Assistant data API",
+      title: "TaxiMate data API",
       version: "1.0.0",
       description:
-        "Read-only data for the Taxi Assistant client. The server fetches and prepares government data on a " +
+        "Read-only data for the TaxiMate client. The server fetches and prepares government data on a " +
         "schedule; clients only ever talk to this API. Unknown paths answer 404 with an ApiError body.",
     },
     servers: [{ url: "/api" }],

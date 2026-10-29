@@ -47,7 +47,7 @@ export function Sidemenu({ active, recommendations, onToggleSuggestion, onSelect
         <header className="sidemenu__brand">
           <span className="sidemenu__logo" dangerouslySetInnerHTML={{ __html: car }} />
           <span className="sidemenu__brand-text">
-            <span className="sidemenu__name">Taxi Assistant</span>
+            <span className="sidemenu__name">TaxiMate</span>
             <span className="sidemenu__tagline">Singapore driver assistant</span>
           </span>
           <button

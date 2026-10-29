@@ -1,4 +1,4 @@
-# Taxi Assistant — Build Plan
+# TaxiMate — Build Plan
 
 A mobile-layout web app for Singapore taxi drivers, built from the SC2006 team's Lab 1–3 design
 ([softwarelab3/2006-SCSC-F2](https://github.com/softwarelab3/2006-SCSC-F2)).
@@ -477,5 +477,5 @@ I review and approve before the next package starts. Claude asks me whenever a d
 - **`TaxiDriver.driverId`** has no meaning without user accounts, which the design rules out (D32).
 - **UC 0008/0009 contradict themselves** like UC 0001: the "not older than 5 minutes" precondition, against "markers available offline" (D36). UC 0009's 2a toast says "rest stop markers"; the app says "pickup markers".
 - **The dialog map shows suggestions as a list screen; UC 0008/0009 as map toggles** (D33). Its Settings UI has a "narrator on/off" option that no other document mentions (package 9).
-- **The mockup calls the app "TaxiMate"**; the app keeps the name "Taxi Assistant", as in its page title (decided 29 Oct).
+- **The app's name:** the mockup calls it "TaxiMate", the project's first page title "Taxi Assistant". It is TaxiMate (my decision, 29 Oct); the code's internal name `taxisstant` stays (the package scope, and the phone's IndexedDB database, whose renaming would lose every saved copy and setting).
 - **The AI report and the Lab 3 report number the use cases differently.** This plan uses the Lab 3 report's numbering.
