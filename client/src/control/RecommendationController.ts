@@ -1,7 +1,7 @@
 import type { LayerType } from "../entity/LayerType";
 import type { Location } from "../entity/Location";
 import type { MapDataRepository, SuggestionItems } from "../entity/MapDataRepository";
-import type { RecommendationKind } from "../entity/RecommendationKind";
+import { RECOMMENDATION_KINDS, type RecommendationKind } from "../entity/RecommendationKind";
 import { SuggestedRestStop } from "../entity/SuggestedRestStop";
 import type { SuggestedSite } from "../entity/SuggestedSite";
 import type { UserPreferences } from "../entity/UserPreferences";
@@ -123,9 +123,16 @@ export class RecommendationController extends Store<RecommendationState> impleme
     this.repo = repo;
     this.mapDisplay = mapDisplay;
     this.location = location;
+    // The results follow the settings at once, whatever changed them, rather than once the change is saved
+    settings.subscribe(() => {
+      for (const k of RECOMMENDATION_KINDS) this.update(k);
+    });
   }
 
-  /** At startup: rank the suggestions an earlier session left on. One whose sites can't be loaded is switched off. */
+  /**
+   * At startup: bring the suggestions an earlier session left on up to date (they rank as their sites arrive). One
+   * whose sites can't be loaded is switched off.
+   */
   async start(): Promise<void> {
     const on = [...this.settings.getPreferences().activeSuggestions];
     await Promise.all(
@@ -136,7 +143,6 @@ export class RecommendationController extends Store<RecommendationState> impleme
           await this.settings.setSuggestionActive(k, false);
           this.mapDisplay.showNotice(LOAD_FAILED[k]);
         }
-        this.update(k);
       }),
     );
   }
@@ -149,7 +155,6 @@ export class RecommendationController extends Store<RecommendationState> impleme
     if (this.settings.isSuggestionActive(k) === on) return; // a second tap while loading shares the same request
     if (!on) {
       await this.settings.setSuggestionActive(k, false);
-      this.update(k);
       return;
     }
 
@@ -171,7 +176,6 @@ export class RecommendationController extends Store<RecommendationState> impleme
       return;
     }
     const turnedOn = await this.settings.setSuggestionActive(k, true, RELATED_LAYERS[k]);
-    this.update(k);
     await this.mapDisplay.showLayers(turnedOn);
   }
 

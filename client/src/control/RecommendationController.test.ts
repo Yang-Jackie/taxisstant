@@ -263,6 +263,17 @@ describe("RecommendationController.toggle — off (D35)", () => {
     expect(visibleLayers(settings)).toEqual([]);
   });
 
+  it("clears its sites at once, without waiting for the settings to be saved", async () => {
+    const store = memoryStore();
+    const { recommendations } = setUp({}, store);
+    await recommendations.toggle("PICKUP", true);
+    store.write = () => new Promise<undefined>(() => {}); // a save that never finishes
+
+    void recommendations.toggle("PICKUP", false);
+
+    expect(recommendations.getSnapshot().results.PICKUP).toEqual([]);
+  });
+
   it("leaves on the layers the driver already had on", async () => {
     const { settings, mapDisplay, recommendations } = setUp();
     await mapDisplay.toggleLayer("TAXI_STAND");
