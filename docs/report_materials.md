@@ -165,6 +165,8 @@ The diagrams' "HTTPS · REST / JSON · gzip + ETag · 11 GET endpoints", "no dat
 4. **Phone storage** also keeps the last known position (`lastLocation`), so the map opens where the driver was.
 5. **HTTPS:** as the diagrams say, for the deployed app. During development it's `http://localhost` (section 4).
 
+For every other document (the class diagram, the use cases, the requirements, the data dictionary, the dialog map and the mockup), see [differences_from_docs.md](differences_from_docs.md).
+
 ## Example items, one per endpoint
 
 Each endpoint's `data` is a list of items like these, real ones from 29 Oct (the hawker centre's closures are shortened to one). The full rules for every field are in [`shared/openapi.json`](../shared/openapi.json).
