@@ -8,6 +8,10 @@ Most of it matches the 23 Oct diagrams. The last section lists where it doesn't.
 
 The data service (Node.js and Express) serves 11 endpoints under `/api`, all `GET`, all JSON. They give public data only, so there is no login. The full specification is [`shared/openapi.json`](../shared/openapi.json) (OpenAPI 3.1). Paste it into [editor.swagger.io](https://editor.swagger.io) to browse every endpoint and its schema, or to take screenshots of them.
 
+**Pictures of the JSON format, ready for the report, are in [`json-format/`](json-format/):**
+- `00-response-envelope.png` is the shape every response shares, plus the error body and the headers.
+- `01-taxi-stands.png` to `11-rest-stop-sites.png` have one picture per endpoint: a real response (one item shown) beside a table of its fields, with each field's type and meaning, taken from the OpenAPI file.
+
 ### Every response has the same shape
 
 ```json
