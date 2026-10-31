@@ -1,8 +1,8 @@
-# TaxiMate: APIs, compression and data storage
+# TaxiMate: APIs, compression, data storage and development tools
 
 Notes for the report: our backend API, the outside APIs we use, whether we use gzip, and how and where data is stored. They describe the app as built on 30 Oct 2026, checked against the code and the running service. Sizes and counts are from the night of 29 Oct.
 
-Most of it matches the 23 Oct diagrams. The last section lists where it doesn't.
+Most of it matches the 23 Oct diagrams. Section 5 lists where it doesn't. Section 6 lists our development tools and versions, checked on 31 Oct 2026.
 
 ## 1. Our backend API
 
@@ -177,6 +177,33 @@ The diagrams' "HTTPS · REST / JSON · gzip + ETag · 11 GET endpoints", "no dat
 5. **HTTPS:** as the diagrams say, for the deployed app. During development it's `http://localhost` (section 4).
 
 For every other document (the class diagram, the use cases, the requirements, the data dictionary, the dialog map and the mockup), see [differences_from_docs.md](differences_from_docs.md).
+
+## 6. Development tools and versions
+
+Package versions below are the exact versions in [`package-lock.json`](../package-lock.json). Node.js 24 is the setup target in the README; the shell checked on 31 Oct had Node.js 22.15.0, npm 10.9.2 and Git 2.49.0.windows.1. These local tools are not pinned by the project.
+
+| Tool | Version | What we use it for |
+| --- | --- | --- |
+| Node.js | 24 (setup target); 22.15.0 (local shell) | Runs the server and development tools |
+| npm | 10.9.2 (local shell) | Installs packages and runs scripts across the three workspaces |
+| Git | 2.49.0.windows.1 (local shell) | Version control |
+| TypeScript | 7.0.2 | Language and type checking for client, server and shared code |
+| Vite | 8.3.5 | Frontend development server and production build |
+| `@vitejs/plugin-react` | 6.1.2 | React support in Vite |
+| `tsx` | 4.23.15 | Runs TypeScript server code and scripts, with automatic restart during development |
+| Concurrently | 10.0.6 | Starts client and server together with `npm run dev` |
+| Vitest and `@vitest/coverage-v8` | 5.0.5 each | Tests and code coverage |
+| Testing Library (`@testing-library/react`) | 16.3.3 | Tests React components through their rendered UI |
+| `@testing-library/jest-dom` | 7.0.1 | Assertions about elements shown on screen |
+| `@testing-library/user-event` | 14.6.8 | Simulates clicks, typing and other user actions |
+| jsdom | 30.1.3 | Provides a browser-like environment for frontend tests |
+| `fake-indexeddb` | 6.2.6 | Tests browser storage without a real browser |
+| Supertest | 7.3.1 | Tests the server's HTTP endpoints |
+| `@seriousme/openapi-schema-validator` | 2.11.0 | Checks the generated OpenAPI specification |
+| Oxlint | 1.89.0 | Checks code for common mistakes |
+| Prettier | 3.9.10 | Keeps code formatting consistent |
+
+The main app libraries are **React and React DOM 19.3.1**, **Express 5.3.0**, **Leaflet 1.9.4** with **React Leaflet 5.0.0**, and **zod 4.6.7** for data validation and the shared API contract.
 
 ## Example items, one per endpoint
 
