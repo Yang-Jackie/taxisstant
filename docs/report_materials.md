@@ -85,6 +85,17 @@ The phone never calls these: the server fetches them on a schedule and keeps the
 | **data.gov.sg** (`api-open.data.gov.sg`) | Dataset `d_bda4baa634dd1cc7a6c7cad5f19e2d68`, "Dates of Hawker Centres Closure" (NEA) | Hawker centres and their closures | daily | No key. It answers with a link to a file |
 | **OpenStreetMap, Overpass API** (`overpass-api.de`) | A query for everything tagged `amenity=fuel` in Singapore | Petrol stations | daily | No key. The app names itself in a `User-Agent`, as OpenStreetMap asks |
 
+For petrol stations, the server sends `POST https://overpass-api.de/api/interpreter`, with this Overpass QL query in a form field named `data`:
+
+```text
+[out:json][timeout:90];
+area["ISO3166-1"="SG"][admin_level=2]->.sg;
+nwr["amenity"="fuel"](area.sg);
+out center tags;
+```
+
+This selects Singapore, finds fuel stations mapped as nodes, ways or relations (`nwr`), and returns their tags and coordinates as JSON, using centre coordinates for ways and relations.
+
 Each request times out after 60 seconds. A server error (5xx) or a dropped connection is retried after 1 s, then after 3 s. If a fetch still fails, the server keeps the last good copy and tries again a minute later.
 
 ### Used by the phone directly
